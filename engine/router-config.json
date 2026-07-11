@@ -1,0 +1,90 @@
+{
+  // At peak times OTP auto-shrinks its departure search window; the
+  // drive-to-Pioneer-Village option vanished at exactly 8:00am because
+  // its bus fell outside the shrunken window. Guarantee at least 1h.
+  "transit": {
+    "dynamicSearchWindow": {
+      "minWindow": "1h"
+    }
+  },
+
+  // Runtime settings for route requests.
+  "routingDefaults": {
+    // How far the router will let you bike or drive to reach transit.
+    // Defaults are timid; these values reflect real GTA behaviour
+    // (people drive 10-15 min to a GO station).
+    // NOTE: this is the OTP 2.5.0 spelling. The earlier
+    // "maxAccessEgressDuration" block was silently ignored (2.9-era name).
+    "accessEgress": {
+      "maxDuration": "45m",
+      "maxStopCount": 4000,
+      "maxDurationForMode": {
+        // 30m hid the right lot for downtown->suburb trips: downtown to the
+        // Hwy 407 / Pioneer Village subway lots is ~30-32 min, so the router
+        // fell back to a closer-but-wrong GO lot + slow local buses.
+        "CAR_TO_PARK": "45m"
+      }
+    },
+
+    // OTP silently drops park-and-ride+transit itineraries whenever a
+    // drive+walk-only itinerary has lower internal cost - even if the
+    // transit one is 30 min faster on the clock (car minutes cost 3x,
+    // walk 2x internally). Our app hides non-transit results in the
+    // drive/bike-to-station cards, so that filter only starves them.
+    // (OTP 2.5 wants a "limit function" here, not true/false: keep transit
+    // itineraries unless they cost more than 9h + 9x the street-only cost,
+    // i.e. effectively never drop them.)
+    "itineraryFilters": {
+      "removeTransitWithHigherCostThanBestOnStreetOnly": "9h + 9.0 t",
+      // Default 0.85 merged "ride 118 + walk 720m" (faster) with
+      // "ride 118 + transfer to another 118" (less walking) and kept the
+      // SLOWER one - internal cost prices walking 2x. Group only near-
+      // identical trips; the app picks the fastest visible one itself.
+      "groupSimilarityKeepOne": 0.95
+    },
+
+    // Mildly discourage transfers: a nominally-faster 3-transfer TTC trip
+    // is fragile in practice. This is a first crude step toward the
+    // custom ranking layer; tune freely.
+    "transferPenalty": 300,
+
+    "walk": {
+      // Commuter pace, 5 km/h. The 1.33 default (~4.8 km/h) made the walk
+      // to/into stations feel padded - an 800 m station approach dropped
+      // from ~11 min to ~9 min at this speed.
+      "speed": 1.4,
+
+      // OTP charges 3x walking time on stairs by default. Toronto stations
+      // are mapped stair-by-stair in OSM, so that default adds phantom
+      // minutes to every subway entrance/exit/transfer and makes the
+      // router avoid the subway. Most stations have escalators; 1.6 keeps
+      // stairs slower than flat ground without poisoning subway trips.
+      "stairsTimeFactor": 1.6
+    },
+
+    "bicycle": {
+      // Prefer safer streets over absolute shortest path
+      "optimization": { "type": "safest-streets" },
+      "speed": 4.5
+    },
+
+    "car": {
+      "reluctance": 3.0
+    }
+  },
+
+  // Live data feeds pulled while the server runs. Bike Share Toronto's
+  // station list + bike availability (GBFS). Stations are linked into the
+  // street network at startup - a server RESTART picks this up, no graph
+  // rebuild needed. After restarting, the log should say how many
+  // stations were fetched; also grep for "Unexpected config parameter".
+  "updaters": [
+    {
+      "type": "vehicle-rental",
+      "sourceType": "gbfs",
+      "network": "bikeshare-toronto",
+      "url": "https://tor.publicbikesystem.net/customer/gbfs/v2/gbfs.json",
+      "frequency": "1m"
+    }
+  ]
+}
