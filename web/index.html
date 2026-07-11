@@ -4,8 +4,9 @@
 <meta charset="utf-8">
 <title>GTA Router</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
-<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<!-- served locally (web/vendor/) so an internet blip can't blank the app -->
+<link href="vendor/maplibre-gl.css" rel="stylesheet">
+<script src="vendor/maplibre-gl.js"></script>
 <style>
   :root {
     --panel: rgba(248,248,250,.85); --card: rgba(255,255,255,.92);
@@ -33,7 +34,8 @@
   #map { position: absolute; inset: 0; }
 
   /* floating panel */
-  #panel { position: absolute; top: 14px; left: 14px; width: 384px;
+  #panel { position: absolute; top: 14px; left: 14px;
+    width: min(384px, calc(100vw - 28px));
     max-height: calc(100% - 28px); display: flex; flex-direction: column;
     background: var(--panel); backdrop-filter: blur(24px) saturate(180%);
     -webkit-backdrop-filter: blur(24px) saturate(180%);
@@ -168,6 +170,11 @@
     border: 1px dashed var(--line); border-radius: 12px; text-align: center; }
   .err { color: var(--bad); font-size: 12.5px; padding: 6px 2px;
     white-space: pre-wrap; }
+  .sugmsg { padding: 10px 14px; color: var(--muted); font-size: 12px; }
+  .warnbar { background: color-mix(in srgb, var(--bad) 12%, transparent);
+    color: var(--bad); font-size: 11.5px; font-weight: 600;
+    border-radius: 10px; padding: 7px 10px; margin: -4px 2px 10px; }
+  .card:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   .loading { display: flex; align-items: center; justify-content: center;
     gap: 10px; color: var(--muted); padding: 28px 0; font-size: 12.5px; }
   .spinner { width: 16px; height: 16px; border-radius: 50%;
@@ -306,8 +313,10 @@
   <div class="ctrls">
     <select id="daySel" title="Day"></select>
     <select id="timeSel" title="Departure time"></select>
-    <button class="ibtn" id="swap" title="Swap start and end"></button>
-    <button class="ibtn" id="clear" title="Clear"></button>
+    <button class="ibtn" id="swap" title="Swap start and end"
+      aria-label="Swap start and end"></button>
+    <button class="ibtn" id="clear" title="Clear"
+      aria-label="Clear start, end and results"></button>
   </div>
   <div class="ctrls">
     <span class="havelbl">Using:</span>
@@ -322,8 +331,8 @@
   </div>
   <div class="ctrls">
     <div class="seg" id="riderSeg" title="Fare type">
-      <button data-rider="adult" class="on">Adult</button>
-      <button data-rider="youth">Youth 13&ndash;19</button>
+      <button data-rider="adult" class="on" aria-pressed="true">Adult</button>
+      <button data-rider="youth" aria-pressed="false">Youth 13&ndash;19</button>
     </div>
     <select id="driveSel" title="Hide options with a longer drive (to the station, or at the end)">
       <option value="8000">Drive &le; 8 km</option>
@@ -342,7 +351,20 @@
 
 <script>
 "use strict";
+/* if the vendored map library is missing, say so instead of a blank page */
+if (typeof maplibregl === "undefined"){
+  document.body.innerHTML = '<div style="display:flex;height:100%;align-items:center;justify-content:center;font:15px/1.5 -apple-system,sans-serif;color:#6e6e73;text-align:center;padding:30px">The map library didn&#39;t load &mdash; the web/vendor/ files are missing or unreadable.<br>Restore them, then reload this page.</div>';
+  throw new Error("maplibre-gl missing");
+}
 const OTP = "http://localhost:8080/otp/gtfs/v1";
+
+/* localStorage can hold junk (old versions, other tabs, a bad write) -
+   never let one broken value kill the whole script */
+function loadStored(key, fallback){
+  try { const v = JSON.parse(localStorage.getItem(key) || "null");
+        return (v && typeof v === "object") ? v : fallback; }
+  catch (e){ return fallback; }
+}
 
 /* ---- inline icons (Lucide, ISC license — lucide.dev) ---- */
 const ICONS = {
@@ -364,9 +386,11 @@ const modeIcon = m => ({ WALK:"walk", BICYCLE:"bike", CAR:"car", BUS:"bus",
   RAIL:"rail", SUBWAY:"rail", TRAM:"bus" }[m] || "bus");
 
 /* ---- fare model: keep in sync with costs.py ---- */
-// [name-match, adult fare, youth fare (null = youth rate not modelled)]
-const LOCAL_FARES = [["TTC",3.30,2.35],["TORONTO",3.30,2.35],["YORK",4.25,null],
-                     ["MIWAY",3.50,null],["DURHAM",3.25,null],["BRAMPTON",4.75,null]];
+// [name-match, adult fare, youth fare (null = not modelled), verified?]
+// verified = Sam or a source confirmed it; unverified fares say so in the UI
+const LOCAL_FARES = [["TTC",3.30,2.35,true],["TORONTO",3.30,2.35,true],
+                     ["YORK",4.25,null,false],["MIWAY",3.50,null,true],
+                     ["DURHAM",3.25,null,false],["BRAMPTON",4.75,null,false]];
 const GO_BASE = 3.70, GO_PER_KM = 0.11, UP_FARE = 12.35, ONE_FARE = true;
 const GO_YOUTH_FACTOR = 0.60;  // 40% off, gotransit.com youth discount
 const GAS_PER_KM = 0.14, WEAR_PER_KM = 0.10, DOWNTOWN_PARKING = 25.0, GO_PARKING = 0.0;
@@ -468,18 +492,20 @@ function itineraryCostDetail(it){
     items.push({ label, amount: f });
   }
   if (tlegs.some(l => agencyOf(l).includes("UP")))
-    items.push({ label: "UP Express", amount: UP_FARE });
+    items.push({ label: "UP Express — fare unverified", amount: UP_FARE });
   const ridden = [];
   for (const l of tlegs){
     const a = agencyOf(l);
     const hit = LOCAL_FARES.find(([k]) => a.includes(k));
     if (hit && !ridden.some(r => r.a === a))
-      ridden.push({ a, fare: (rider === "youth" && hit[2] != null) ? hit[2] : hit[1] });
+      ridden.push({ a, fare: (rider === "youth" && hit[2] != null) ? hit[2] : hit[1],
+                    ver: hit[3] });
   }
   ridden.forEach((r, i) => {
     const free = ONE_FARE && (usedGo || i > 0);
     items.push({ label: prettyAgency(r.a)
-      + (free ? " — free (One Fare transfer)" : ""), amount: free ? 0 : r.fare });
+      + (free ? " — free (One Fare transfer)"
+              : (r.ver ? "" : " — fare unverified")), amount: free ? 0 : r.fare });
   });
   legs.forEach((l,i) => {
     if (l.mode === "BICYCLE" && l.rentedBike){
@@ -495,7 +521,10 @@ function itineraryCostDetail(it){
                    amount: km * (GAS_PER_KM + WEAR_PER_KM) });
       if (later){ if (GO_PARKING > 0) items.push({ label: "Station parking", amount: GO_PARKING }); }
       // car AFTER transit = a pickup or your car already waiting - no
-      // parking fee; only a start-of-trip drive to the destination pays it
+      // parking fee; only a start-of-trip drive to the destination pays it.
+      // (Unreachable in the app today - trips without transit are filtered
+      // out before pricing. Kept so the model matches costs.py, which DOES
+      // price pure-car trips for carprobe comparisons.)
       else if (!earlier) items.push({ label: "Downtown parking", amount: DOWNTOWN_PARKING });
     }
   });
@@ -518,11 +547,12 @@ darkMql.addEventListener("change", () => map.setStyle(styleURL()));
 /* route layers survive style swaps: whenever the style (re)loads and our
    source is gone, put it back. styledata fires many times; the re-add is
    idempotent and wrapped so a mid-load call just retries shortly after. */
-let lastRouteFC = null;
+let lastRouteFC = null, routeRetry = 0;
 function ensureRoute(){
   if (!lastRouteFC || map.getSource("route")) return;
-  try { addRouteLayers(lastRouteFC); }
-  catch (e){ setTimeout(ensureRoute, 250); }
+  try { addRouteLayers(lastRouteFC); routeRetry = 0; }
+  // give up after ~10s - a style that never loads must not retry forever
+  catch (e){ if (routeRetry++ < 40) setTimeout(ensureRoute, 250); }
 }
 map.on("styledata", ensureRoute);
 map.on("style.load", ensureRoute);
@@ -554,19 +584,31 @@ function drawRoute(fc){
 /* ---- Bike Share docks on the map (small green dots, zoom in to see).
    Loaded once from the router; if the server hasn't been restarted since
    the GBFS updater was added, the list is empty and no dots appear. ---- */
-let dockFC = null;
+let dockFC = null, dockRetry = 0;
 async function loadDocks(){
   try {
-    const r = await fetch(OTP, { method: "POST",
+    // ask for live bike/dock counts too; fall back to names-only if the
+    // schema doesn't have them
+    let r = await fetch(OTP, { method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: "{vehicleRentalStations{name lat lon}}" }) });
-    const js = await r.json();
+      body: JSON.stringify({ query:
+        "{vehicleRentalStations{name lat lon availableVehicles{total} availableSpaces{total}}}" }) });
+    let js = await r.json();
+    if (js.errors){
+      r = await fetch(OTP, { method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: "{vehicleRentalStations{name lat lon}}" }) });
+      js = await r.json();
+    }
     const st = ((js.data || {}).vehicleRentalStations) || [];
     if (!st.length) return;
     dockFC = { type: "FeatureCollection", features: st.map(s => ({
-      type: "Feature", properties: { name: s.name },
+      type: "Feature", properties: { name: s.name,
+        bikes: s.availableVehicles ? s.availableVehicles.total : null,
+        spaces: s.availableSpaces ? s.availableSpaces.total : null },
       geometry: { type: "Point", coordinates: [s.lon, s.lat] } })) };
-    ensureDocks();
+    if (map.getSource("docks")) map.getSource("docks").setData(dockFC);
+    else ensureDocks();
   } catch (e){ /* engine down - the plan() error path already tells the user */ }
 }
 function ensureDocks(){
@@ -580,19 +622,27 @@ function ensureDocks(){
                "circle-stroke-color": darkMql.matches ? "#1c1c1e" : "#ffffff",
                "circle-stroke-width": 1.25 } },
       map.getLayer("route-casing") ? "route-casing" : undefined);
-  } catch (e){ setTimeout(ensureDocks, 250); }
+    dockRetry = 0;
+  } catch (e){ if (dockRetry++ < 40) setTimeout(ensureDocks, 250); }
 }
 map.on("style.load", ensureDocks);
 map.on("styledata", ensureDocks);
 map.on("click", "docks", e => {
+  const p = e.features[0].properties;
+  // counts refresh every 2 min below; null/"null" = engine had no counts
+  const counts = (p.bikes != null && p.bikes !== "null")
+    ? `<br>${p.bikes} bike${p.bikes == 1 ? "" : "s"} &middot; ${p.spaces} free dock${p.spaces == 1 ? "" : "s"}`
+    : "";
   new maplibregl.Popup({ closeButton: false, offset: 8 })
     .setLngLat(e.features[0].geometry.coordinates)
-    .setHTML(`<b>${esc(e.features[0].properties.name)}</b><br>Bike Share dock`)
+    .setHTML(`<b>${esc(p.name)}</b><br>Bike Share dock${counts}`)
     .addTo(map);
 });
 map.on("mouseenter", "docks", () => map.getCanvas().style.cursor = "pointer");
 map.on("mouseleave", "docks", () => map.getCanvas().style.cursor = "");
 loadDocks();
+// the GBFS feed updates server-side every minute - keep the dots honest
+setInterval(() => { if (!document.hidden) loadDocks(); }, 120000);
 
 /* sweep the route on from start to end when an option is selected */
 let sweepToken = 0;
@@ -667,11 +717,22 @@ function setPoint(which, lngLat, label){
     const p = m.getLngLat();
     if (which === "from") fromPt = p; else toPt = p;
     document.getElementById(which + "Box").value = fmt(p);
+    savePts();
     plan();
   });
   if (which === "from"){ fromMarker = m; fromPt = lngLat; }
   else { toMarker = m; toPt = lngLat; }
   document.getElementById(which + "Box").value = label || fmt(lngLat);
+  savePts();
+}
+/* remember the trip ends, so tomorrow's commute is one click, not a re-type */
+function savePts(){
+  const j = {};
+  if (fromPt) j.from = { lng: fromPt.lng, lat: fromPt.lat,
+    label: document.getElementById("fromBox").value };
+  if (toPt) j.to = { lng: toPt.lng, lat: toPt.lat,
+    label: document.getElementById("toBox").value };
+  localStorage.setItem("pts", JSON.stringify(j));
 }
 const fmt = p => p.lat.toFixed(4) + ", " + p.lng.toFixed(4);
 map.on("click", e => {
@@ -718,15 +779,16 @@ function attachSuggest(which){
   const box = document.createElement("div");
   box.className = "sug";
   row.appendChild(box);
-  let items = [], hi = -1, timer = null, ctrl = null;
+  let items = [], hi = -1, timer = null, ctrl = null, note = null;
 
-  const hide = () => { box.classList.remove("open"); hi = -1; };
+  const hide = () => { box.classList.remove("open"); hi = -1; note = null; };
   const render = () => {
-    if (!items.length){ hide(); return; }
+    if (!items.length && !note){ hide(); return; }
     box.innerHTML = items.map((it, i) =>
       `<div class="item ${i === hi ? "hi" : ""}" data-i="${i}">
         <div class="p1">${esc(it.p1)}</div>
-        ${it.p2 ? `<div class="p2">${esc(it.p2)}</div>` : ""}</div>`).join("");
+        ${it.p2 ? `<div class="p2">${esc(it.p2)}</div>` : ""}</div>`).join("")
+      + (note ? `<div class="sugmsg">${esc(note)}</div>` : "");
     box.classList.add("open");
   };
   const pick = i => {
@@ -753,9 +815,16 @@ function attachSuggest(which){
           { signal: ctrl.signal });
         const js = await r.json();
         items = normalizeSuggestions(js.features || []);
+        // silence was the old behavior - say WHY nothing showed up
+        note = items.length ? null : "No matches near Toronto — try a street address.";
         hi = items.length ? 0 : -1;
         render();
-      } catch (e){ /* aborted or offline - just keep quiet */ }
+      } catch (e){
+        if (e.name === "AbortError") return;  // superseded by a newer keystroke
+        items = []; hi = -1;
+        note = "Search is offline — check your internet, then try again.";
+        render();
+      }
     }, 350);
   });
   input.addEventListener("keydown", e => {
@@ -820,8 +889,9 @@ const COMBOS = [
     need: ["bike", "carEnd"], drive: true, needsLeg: "BICYCLE", carAfter: true },
 ];
 
-/* which mode mixes the user has switched on (persisted) */
-const storedHave = JSON.parse(localStorage.getItem("have") || "{}");
+/* which mode mixes the user has switched on (persisted; loadStored so a
+   corrupt value can't brick the whole script) */
+const storedHave = loadStored("have", {});
 // migrate the old single "car" toggle -> separate start/end toggles
 if (storedHave.car !== undefined){
   if (storedHave.carStart === undefined) storedHave.carStart = storedHave.car;
@@ -868,8 +938,8 @@ function normalizeItin(n){
       intermediatePlaces: (l.stopCalls || []).slice(1, -1) })) };
 }
 
-async function fetchCombo(combo, date, time, carReluctance){
-  const r = await fetch(OTP, { method: "POST",
+async function fetchCombo(combo, date, time, carReluctance, signal){
+  const r = await fetch(OTP, { method: "POST", signal,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ query: PC_QUERY, variables: {
       origin: { location: { coordinate:
@@ -898,15 +968,15 @@ async function fetchCombo(combo, date, time, carReluctance){
     its = its.filter(it => endLegOnly(it, l => l.mode === "CAR"));
   if (combo.rentEnd)
     its = its.filter(it => endLegOnly(it, l => l.mode === "BICYCLE" && l.rentedBike));
-  const seen = new Set();
-  its = its.filter(it => {
-    const sig = itinSig(it);
-    if (seen.has(sig)) return false;
-    seen.add(sig); return true;
-  });
-  return its.slice(0, 4);
+  return dedupeAlts(its).slice(0, 4);
 }
 
+/* GTFS colors come straight from the feeds - only trust clean 6-digit hex,
+   never inject arbitrary feed text into a style attribute */
+function routeColor(r){
+  const c = ((r || {}).color || "").replace(/^#/, "");
+  return /^[0-9a-f]{6}$/i.test(c) ? "#" + c : null;
+}
 function agencyColor(a){
   if (a.includes("GO")) return "#256434";
   if (a.includes("UP")) return "#6d4c2f";
@@ -925,26 +995,48 @@ function legChip(l){
   if (l.mode === "CAR")
     return `<span class="gchip">${icn("car")}${(l.distance/1000).toFixed(1)} km</span>`;
   const r = l.route || {}, name = r.shortName || r.longName || l.mode;
-  const bg = r.color ? "#" + r.color : agencyColor(agencyOf(l));
+  const bg = routeColor(r) || agencyColor(agencyOf(l));
   return `<span class="rt" style="background:${bg}">${esc(name)}</span>`;
 }
-const esc = s => String(s).replace(/[&<>"]/g, c =>
-  ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+const esc = s => String(s).replace(/[&<>"']/g, c =>
+  ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
 const hhmm = t => new Date(t).toLocaleTimeString([], { hour:"numeric", minute:"2-digit" });
 
-let itinsById = {}, selId = null, lastParts = null;
+let itinsById = {}, selId = null, lastParts = null, fcCache = {};
 
+/* one plain-words line for whatever went wrong, instead of raw fetch noise */
+function friendlyErr(e){
+  if (e && (e.name === "AbortError" || e.name === "TimeoutError"))
+    return "The trip engine took too long to answer — try again in a moment.";
+  if (e instanceof TypeError)
+    return "Can't reach the trip engine. Is the app running? (bash run.sh)";
+  return e.message || String(e);
+}
+
+let planCtrl = null, planSeq = 0;
 async function plan(){
   if (!fromPt || !toPt) return;
   closeDetail();
+  // a newer plan always wins: abort the old one and ignore its results.
+  // without this, the SLOWER of two overlapping plans painted the screen -
+  // results for a question the user was no longer asking.
+  if (planCtrl) planCtrl.abort();
+  const ctrl = planCtrl = new AbortController();
+  const seq = ++planSeq;
+  const timer = setTimeout(() => ctrl.abort(), 25000);  // never spin forever
   const date = document.getElementById("daySel").value;
   const time = document.getElementById("timeSel").value;
   const box = document.getElementById("results");
-  box.innerHTML = '<div class="loading"><div class="spinner"></div>Comparing your options&hellip;</div>';
   const active = COMBOS.filter(c => c.need.every(k => have[k]));
+  box.innerHTML = '<div class="loading"><div class="spinner"></div><span id="loadTxt">Comparing your options&hellip;</span></div>';
+  let done = 0;
+  const tick = () => { done++;
+    const t = document.getElementById("loadTxt");
+    if (t && seq === planSeq)
+      t.innerHTML = `Comparing your options&hellip; ${done}/${active.length}`; };
   const parts = await Promise.all(active.map(async c => {
     try {
-      if (!c.drive) return { c, its: await fetchCombo(c, date, time) };
+      if (!c.drive) return { c, its: await fetchCombo(c, date, time, null, ctrl.signal) };
       // Drive-to-station twice: biased to short drives (nearby station,
       // survives a tight "Drive <= N km" filter) and to long ones (drive
       // to the best station outright). Merged, the drive filter always
@@ -952,19 +1044,17 @@ async function plan(){
       // (30 = "hate driving": mild values still let fast 40 km drives
       // crowd short ones out of the result set entirely)
       const [near, far] = await Promise.all([
-        fetchCombo(c, date, time, 30.0),
-        fetchCombo(c, date, time, 2.0)]);
-      const seen = new Set(), merged = [];
-      for (const it of near.concat(far)){
-        const sig = Math.round(it.duration/60) + "|" + it.legs.map(l =>
-          l.mode + ((l.route||{}).shortName || "")).join(",");
-        if (!seen.has(sig)){ seen.add(sig); merged.push(it); }
-      }
+        fetchCombo(c, date, time, 30.0, ctrl.signal),
+        fetchCombo(c, date, time, 2.0, ctrl.signal)]);
+      const merged = dedupeAlts(near.concat(far));
       merged.sort((a, b) => a.duration - b.duration);
       return { c, its: merged.slice(0, 6) };
     }
-    catch (e){ return { c, err: e.message }; }
+    catch (e){ return { c, err: friendlyErr(e) }; }
+    finally { tick(); }
   }));
+  clearTimeout(timer);
+  if (seq !== planSeq) return;   // superseded while we were waiting
   lastParts = parts;
   renderResults(parts);
 }
@@ -990,9 +1080,12 @@ function cardHTML(it, cid, fastestIt, cheapestIt){
   const badges =
     (it === fastestIt ? '<span class="badge fast">Fastest</span>' : "") +
     (it === cheapestIt ? '<span class="badge cheap">Cheapest</span>' : "");
-  return `<div class="card" id="${cid}" onclick="openIt('${cid}')">
+  const alts = (it.altTimes || []).slice().sort((a,b) => a-b).slice(0, 2);
+  return `<div class="card" id="${cid}" onclick="openIt('${cid}')"
+      tabindex="0" role="button">
     <div class="head"><span class="mins">${Math.round(it.duration/60)} min</span>
-      <span class="times">${hhmm(it.startTime)} &ndash; ${hhmm(it.endTime)}</span>
+      <span class="times">${hhmm(it.startTime)} &ndash; ${hhmm(it.endTime)}${
+        alts.length ? " &middot; also " + alts.map(hhmm).join(", ") : ""}</span>
       <span class="cost">$${cost.toFixed(2)}</span></div>
     ${badges ? `<div class="badges">${badges}</div>` : ""}
     ${viaLine(it)}
@@ -1020,30 +1113,47 @@ function visibleIts(p){
 const itinSig = it => Math.round(it.duration/60) + "|" + it.legs.map(l =>
   l.mode + ((l.route||{}).shortName || "")).join(",");
 
-function renderResults(parts){
-  itinsById = {}; selId = null;
-
-  // one pool, drive cap applied, deduped (the same trip often comes
-  // back from several of the mode-mix queries)
-  const seen = new Set(), pool = [];
-  for (const p of parts) for (const it of visibleIts(p)){
+/* the same trip pattern often comes back several times (other query, later
+   departure). Keep ONE card, but remember the other departure times so
+   "when's the next one?" isn't silently erased. */
+function dedupeAlts(list){
+  const kept = new Map();
+  for (const it of list){
     const sig = itinSig(it);
-    if (seen.has(sig)) continue;
-    seen.add(sig);
-    pool.push({ it, cost: itineraryCost(it) });
+    const k = kept.get(sig);
+    if (!k){ it.altTimes = it.altTimes || []; kept.set(sig, it); continue; }
+    for (const t of [it.startTime, ...(it.altTimes || [])])
+      if (t !== k.startTime && !k.altTimes.includes(t)) k.altTimes.push(t);
   }
+  return [...kept.values()];
+}
+
+function renderResults(parts, opts){
+  opts = opts || {};
+  itinsById = {}; selId = null; fcCache = {};
+
+  // one pool, drive cap applied, deduped (departure alts collected)
+  const all = [];
+  for (const p of parts) all.push(...visibleIts(p));
+  const pool = dedupeAlts(all).map(it => ({ it, cost: itineraryCost(it) }));
   pool.sort((a,b) => a.it.duration - b.it.duration);
 
   // keep only options nothing else beats on time AND price at once
   const lead = pool.filter(x => !pool.some(y => y !== x
     && y.it.duration <= x.it.duration && y.cost <= x.cost
     && (y.it.duration < x.it.duration || y.cost < x.cost)));
-  const main = lead.slice(0, 5);
-  const rest = pool.filter(x => !main.includes(x));
-
-  const fastestIt = pool.length ? pool[0].it : null;
+  let main = lead.slice(0, 5);
   let cheapest = null;
   for (const x of pool) if (!cheapest || x.cost < cheapest.cost) cheapest = x;
+  // the cheapest option must never hide inside collapsed "more options"
+  if (cheapest && !main.includes(cheapest) && lead.includes(cheapest))
+    main = lead.slice(0, 4).concat([cheapest]);
+  const rest = pool.filter(x => !main.includes(x));
+
+  // on duration ties, the badge goes to a card that actually headlines
+  const fastestIt = pool.length
+    ? (lead.find(x => x.it.duration === pool[0].it.duration) || pool[0]).it
+    : null;
   const cheapestIt = cheapest ? cheapest.it : null;
 
   const errs = [...new Set(parts.filter(p => p.err).map(p => p.err))];
@@ -1054,22 +1164,44 @@ function renderResults(parts){
   };
 
   if (!pool.length){
-    html += `<div class="none">No sensible route found &mdash; try switching
+    // a dead engine is not the user's fault - don't blame their toggles
+    html += errs.length
+      ? `<div class="none">Couldn't check your routes &mdash; see the
+          message above.</div>`
+      : `<div class="none">No sensible route found &mdash; try switching
       on more of the "Using" toggles or raising the drive limit.</div>`;
   } else {
     html += main.map(x => card(x.it)).join("");
     if (rest.length)
       html += `<div class="extra" id="exAll">${rest.map(x => card(x.it)).join("")}</div>
-        <button class="morebtn" onclick="toggleMore('exAll', this,
+        <button class="morebtn" aria-expanded="false" onclick="toggleMore('exAll', this,
           ${rest.length})">${rest.length} more option${rest.length > 1 ? "s" : ""} ${icn("chev")}</button>`;
   }
   document.getElementById("results").innerHTML = html;
-  const first = Object.keys(itinsById)[0];
-  if (first) window.select(first);
+  if (opts.animateFrom){   // prices roll over from the previous fare type
+    for (const [cid, it] of Object.entries(itinsById)){
+      const el = document.getElementById(cid);
+      const costEl = el && el.querySelector(".cost");
+      const old = opts.animateFrom[itinSig(it)];
+      if (costEl && old != null){
+        const target = parseFloat(costEl.textContent.slice(1));
+        costEl.textContent = "$" + old.toFixed(2);
+        countTo(costEl, target);
+      }
+    }
+  }
+  let pick = Object.keys(itinsById)[0];
+  if (opts.selectSig){     // keep the user's selected trip selected
+    const hit = Object.entries(itinsById).find(([, it]) =>
+      itinSig(it) === opts.selectSig);
+    if (hit) pick = hit[0];
+  }
+  if (pick) window.select(pick, { fit: !opts.noFit, sweep: !opts.noSweep });
 }
 window.toggleMore = function(exId, btn, n){
   const el = document.getElementById(exId);
   const open = el.classList.toggle("open");
+  btn.setAttribute("aria-expanded", open ? "true" : "false");
   btn.innerHTML = (open ? "Show fewer" : `${n} more option${n > 1 ? "s" : ""}`)
     + " " + icn("chev");
 };
@@ -1093,8 +1225,7 @@ function modeColor(l){
   if (l.mode === "WALK") return darkMql.matches ? "#98989d" : "#8e8e93";
   if (l.mode === "BICYCLE") return "#34c759";
   if (l.mode === "CAR") return darkMql.matches ? "#aeaeb2" : "#48484a";
-  const r = l.route || {};
-  return r.color ? "#" + r.color : agencyColor(agencyOf(l));
+  return routeColor(l.route) || agencyColor(agencyOf(l));
 }
 function buildFC(it, preview){
   return { type: "FeatureCollection", features: it.legs.map(l => ({
@@ -1104,19 +1235,35 @@ function buildFC(it, preview){
     geometry: { type: "LineString",
                 coordinates: decodePolyline(l.legGeometry.points) } })) };
 }
-window.select = function(cid){
+/* decoded routes are cached per card - hovering shouldn't re-decode
+   every polyline every time the mouse moves */
+function cachedFC(cid, preview){
+  const key = cid + (preview ? "|p" : "");
+  if (!fcCache[key]) fcCache[key] = buildFC(itinsById[cid], preview);
+  return fcCache[key];
+}
+window.select = function(cid, opts){
+  opts = opts || {};
   document.querySelectorAll(".card.sel").forEach(el => el.classList.remove("sel"));
   const el = document.getElementById(cid);
   if (el) el.classList.add("sel");
   selId = cid;
-  const fc = buildFC(itinsById[cid]);
-  animateRoute(fc);
+  const fc = cachedFC(cid);
+  if (opts.sweep === false) drawRoute(fc); else animateRoute(fc);
+  if (opts.fit === false) return;
   const all = fc.features.flatMap(f => f.geometry.coordinates);
   if (all.length){
     const b = all.reduce((bb,c) => bb.extend(c),
       new maplibregl.LngLatBounds(all[0], all[0]));
-    map.fitBounds(b, { padding: { top: 60, bottom: 60, right: 60, left: 430 },
-                       maxZoom: 14 });
+    // the fixed 430px left padding used to THROW on narrow windows, which
+    // killed the click handler and made cards unopenable on phones
+    const wide = map.getContainer().clientWidth > 760;
+    try {
+      map.fitBounds(b, { padding: wide
+          ? { top: 60, bottom: 60, right: 60, left: 430 }
+          : { top: 70, bottom: 40, right: 40, left: 40 },
+        maxZoom: 14 });
+    } catch (e){ /* a wrong zoom beats a dead card */ }
   }
 };
 
@@ -1126,7 +1273,14 @@ resultsEl.addEventListener("mouseover", e => {
   const c = e.target.closest(".card");
   if (!c || c.id === selId || !itinsById[c.id]) return;
   sweepToken++;  // cancel any in-flight sweep so it can't fight the preview
-  if (map.getSource("route")) map.getSource("route").setData(buildFC(itinsById[c.id], true));
+  if (map.getSource("route")) map.getSource("route").setData(cachedFC(c.id, true));
+});
+/* keyboard: cards are real buttons - Enter or Space opens them */
+resultsEl.addEventListener("keydown", e => {
+  if ((e.key === "Enter" || e.key === " ") && e.target.classList.contains("card")){
+    e.preventDefault();
+    window.openIt(e.target.id);
+  }
 });
 resultsEl.addEventListener("mouseout", e => {
   const c = e.target.closest(".card");
@@ -1163,14 +1317,17 @@ function renderDetail(cid){
       sub = `${mins} min &middot; park your bike at ${esc(l.to.name)}`;
     } else if (l.mode === "CAR"){
       what = `${icn("car")} Drive ${(l.distance/1000).toFixed(1)} km`;
-      sub = sawTransit
+      // the router has no traffic model - say so instead of implying
+      // rush hour will really flow at free-way speed
+      sub = (sawTransit
         ? `${mins} min &middot; to ${esc(l.to.name === "Destination" ? "your destination" : l.to.name)}`
-        : `${mins} min &middot; park at ${esc(l.to.name)}`;
+        : `${mins} min &middot; park at ${esc(l.to.name)}`)
+        + " &middot; light traffic assumed";
     } else {
       sawTransit = true;
       const r = l.route || {};
       const stops = (l.intermediatePlaces || []).length + 1;
-      const bg = r.color ? "#" + r.color : agencyColor(agencyOf(l));
+      const bg = routeColor(r) || agencyColor(agencyOf(l));
       what = `<span class="rt" style="background:${bg}">${esc(r.shortName || r.longName || "")}</span>
         ${esc(prettyAgency(agencyOf(l)))}`
         + (l.headsign ? ` <span style="font-weight:500;color:var(--muted)">&middot; ${esc(l.headsign)}</span>` : "");
@@ -1203,7 +1360,8 @@ function renderDetail(cid){
       <div class="fitem total"><span>Total</span><span>$${total.toFixed(2)}</span></div>
       <div class="fnote">Fares are estimates. One Fare makes local transit free when a
         GO trip is part of the journey. Youth rates applied for TTC and GO; other
-        systems' youth fares aren't modelled yet.</div>
+        systems' youth fares aren't modelled yet. Driving times assume light
+        traffic &mdash; rush hour will be slower.</div>
     </div>`;
 }
 window.closeDetail = function(){
@@ -1226,45 +1384,20 @@ function countTo(el, to){
   // animation frames don't run in hidden/background tabs - never let the
   // displayed price depend on them
   if (document.hidden){ el.textContent = final; return; }
+  const tok = (+el.dataset.ct || 0) + 1;  // a newer roll cancels this one
+  el.dataset.ct = tok;
   const from = parseFloat((el.textContent || "").replace(/[^0-9.]/g, "")) || 0;
   const t0 = performance.now(), dur = 450;
   let done = false;
   (function step(now){
+    if (+el.dataset.ct !== tok) return;
     const p = Math.min((now - t0) / dur, 1);
     const eased = 1 - Math.pow(1 - p, 3);
     el.textContent = "$" + (from + (to - from) * eased).toFixed(2);
     if (p < 1) requestAnimationFrame(step); else done = true;
   })(t0);
-  setTimeout(() => { if (!done) el.textContent = final; }, dur + 150);
-}
-
-/* re-price every visible card in place (no re-render, no map jump) */
-function refreshPrices(){
-  const entries = Object.entries(itinsById);
-  if (!entries.length) return;
-  const costs = {};
-  entries.forEach(([cid, it]) => costs[cid] = itineraryCost(it));
-  const cheapCid = entries.reduce((a, [cid]) =>
-    costs[cid] < costs[a] ? cid : a, entries[0][0]);
-  const fastCid = entries.reduce((a, [cid, it]) =>
-    it.duration < itinsById[a].duration ? cid : a, entries[0][0]);
-  for (const [cid, it] of entries){
-    const card = document.getElementById(cid);
-    if (!card) continue;
-    countTo(card.querySelector(".cost"), costs[cid]);
-    const badges =
-      (cid === fastCid ? '<span class="badge fast">Fastest</span>' : "") +
-      (cid === cheapCid ? '<span class="badge cheap">Cheapest</span>' : "");
-    let bd = card.querySelector(".badges");
-    if (badges){
-      if (!bd){
-        bd = document.createElement("div");
-        bd.className = "badges";
-        card.querySelector(".head").after(bd);
-      }
-      bd.innerHTML = badges;
-    } else if (bd) bd.remove();
-  }
+  setTimeout(() => {
+    if (!done && +el.dataset.ct === tok) el.textContent = final; }, dur + 150);
 }
 
 /* the "Using:" toggles - flip one and the trip is re-planned with the
@@ -1276,20 +1409,33 @@ for (const id of ["haveBike", "haveCarStart", "haveCarEnd", "haveShare"]){
   const k = b.dataset.have;
   b.innerHTML = icn(HAVE_ICON[k], 13) + HAVE_LABEL[k];
   b.classList.toggle("on", !!have[k]);
+  b.setAttribute("aria-pressed", have[k] ? "true" : "false");
   b.onclick = () => {
     have[k] = !have[k];
     localStorage.setItem("have", JSON.stringify(have));
     b.classList.toggle("on", have[k]);
+    b.setAttribute("aria-pressed", have[k] ? "true" : "false");
     plan();
   };
 }
 
 document.querySelectorAll("#riderSeg button").forEach(b => {
   b.onclick = () => {
+    if (rider === b.dataset.rider) return;
+    // remember old prices (to roll from) and the selected trip (to keep)
+    const oldCosts = {};
+    for (const it of Object.values(itinsById))
+      oldCosts[itinSig(it)] = itineraryCost(it);
+    const keepSig = selId && itinsById[selId] ? itinSig(itinsById[selId]) : null;
     rider = b.dataset.rider;
-    document.querySelectorAll("#riderSeg button").forEach(x =>
-      x.classList.toggle("on", x === b));
-    refreshPrices();
+    document.querySelectorAll("#riderSeg button").forEach(x => {
+      x.classList.toggle("on", x === b);
+      x.setAttribute("aria-pressed", x === b ? "true" : "false");
+    });
+    // full re-rank, not repricing in place: youth prices can change which
+    // options win, and the Cheapest badge must never point at a hidden card
+    if (lastParts) renderResults(lastParts,
+      { selectSig: keepSig, noFit: true, noSweep: true, animateFrom: oldCosts });
     if (document.body.classList.contains("detail-open")
         && selId && itinsById[selId]) renderDetail(selId);
   };
@@ -1306,6 +1452,7 @@ document.getElementById("clear").onclick = () => {
   if (fromMarker) fromMarker.remove(); if (toMarker) toMarker.remove();
   fromPt = toPt = fromMarker = toMarker = null;
   lastParts = null; lastRouteFC = null;
+  localStorage.removeItem("pts");
   closeDetail();
   document.getElementById("fromBox").value = "";
   document.getElementById("toBox").value = "";
@@ -1333,10 +1480,53 @@ document.getElementById("clear").onclick = () => {
     const h12 = h % 12 === 0 ? 12 : h % 12;
     timeSel.add(new Option(`${h12}:${pad(m)} ${ampm}`, `${pad(h)}:${pad(m)}`));
   }
+  // rolling to the next quarter hour can cross midnight - let Date carry
+  // the day over, then move the day picker with it (else the default was
+  // "today at 12:00 AM", i.e. almost a full day in the PAST)
   const now = new Date(Date.now() + 5*60000);
-  let h = now.getHours(), m = Math.ceil(now.getMinutes()/15)*15;
-  if (m === 60){ m = 0; h = (h+1) % 24; }
-  timeSel.value = `${pad(h)}:${pad(m)}`;
+  now.setMinutes(Math.ceil(now.getMinutes()/15)*15, 0, 0);
+  const dval = now.getFullYear()+"-"+pad(now.getMonth()+1)+"-"+pad(now.getDate());
+  if ([...daySel.options].some(o => o.value === dval)) daySel.value = dval;
+  timeSel.value = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+})();
+
+/* restore the last trip's pins - the daily commute shouldn't be re-typed
+   every day. Planning stays one click away (no auto-query on load). */
+(function(){
+  const j = loadStored("pts", {});
+  const ok = p => p && isFinite(p.lng) && isFinite(p.lat);
+  if (ok(j.from)) setPoint("from", { lng: j.from.lng, lat: j.from.lat }, j.from.label);
+  if (ok(j.to)) setPoint("to", { lng: j.to.lng, lat: j.to.lat }, j.to.label);
+  if (ok(j.from) && ok(j.to)){
+    try {
+      const b = new maplibregl.LngLatBounds(
+        [j.from.lng, j.from.lat], [j.from.lng, j.from.lat]);
+      b.extend([j.to.lng, j.to.lat]);
+      map.fitBounds(b, { padding: 120, maxZoom: 12 });
+    } catch (e){}
+  }
+})();
+
+/* warn when the loaded schedules are close to running out - GTFS data rots
+   and the app must not keep answering confidently from expired timetables */
+(async function(){
+  try {
+    const r = await fetch(OTP, { method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: "{serviceTimeRange{end}}" }) });
+    const js = await r.json();
+    const raw = ((js.data || {}).serviceTimeRange || {}).end;
+    const end = typeof raw === "string" ? Date.parse(raw) : (raw || 0) * 1000;
+    if (!end) return;
+    const days = Math.round((end - Date.now()) / 86400000);
+    if (days > 14) return;
+    const div = document.createElement("div");
+    div.className = "warnbar";
+    div.textContent = days <= 0
+      ? "The schedule data has expired — answers may be wrong. Re-run setup.sh."
+      : `Schedule data runs out in ${Math.max(1, days)} day${days === 1 ? "" : "s"} — re-run setup.sh soon.`;
+    document.querySelector(".wordmark").after(div);
+  } catch (e){ /* engine down - plan() already explains that */ }
 })();
 
 /* ===================== REACH MODE =====================
@@ -1434,14 +1624,24 @@ document.getElementById("clear").onclick = () => {
       const url = ISO_API + "?location=" + lngLat.lat + "," + lngLat.lng
         + "&time=" + encodeURIComponent(iso) + "&modes=WALK,TRANSIT&arriveBy=false"
         + CUTS.map(c => "&cutoff=" + MINS[c] + "M").join("");
-      const fc = await fetch(url).then(r => { if(!r.ok) throw new Error(r.status); return r.json(); });
+      // timeout so a hung engine can't leave reach stuck on "busy" forever
+      const sig = AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined;
+      const r = await fetch(url, { signal: sig });
+      if (!r.ok) throw new Error("http " + r.status);
+      const fc = await r.json();
       hidePulse();
       ensureLayers(fc);
       ripple();
       setStatus("Weekday-morning reach. Tap elsewhere to move it.");
     } catch (err) {
       hidePulse();
-      setStatus("Reach engine isn't running yet — restart the app (Ctrl+C, then bash run.sh).");
+      // tell the truth about WHAT failed - a bad tap spot is not a dead engine
+      if (String(err.message).startsWith("http"))
+        setStatus("Couldn't map that spot — try tapping near a street.");
+      else if (err.name === "TimeoutError" || err.name === "AbortError")
+        setStatus("That took too long — try again in a moment.");
+      else
+        setStatus("Reach engine isn't running yet — restart the app (Ctrl+C, then bash run.sh).");
     } finally { busy = false; }
   };
 
@@ -1451,7 +1651,8 @@ document.getElementById("clear").onclick = () => {
   card.innerHTML = `
     <button id="reachToggle" type="button">
       <span class="rt-dot"></span> Reach map</button>
-    <button id="reachClose" type="button" title="Hide the reach map">${icn("x")}</button>
+    <button id="reachClose" type="button" title="Hide the reach map"
+      aria-label="Hide the reach map">${icn("x")}</button>
     <div id="reachBody" hidden>
       <div class="reach-hint" id="reachStatus">Tap anywhere to see how far you can travel by transit on a weekday morning.</div>
       <div class="reach-schemes" id="reachSchemes"></div>
@@ -1465,6 +1666,7 @@ document.getElementById("clear").onclick = () => {
   launcher.id = "reachLauncher";
   launcher.type = "button";
   launcher.title = "Show the reach map";
+  launcher.setAttribute("aria-label", "Show the reach map");
   launcher.innerHTML = `<svg class="icn" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>`;
   document.body.appendChild(launcher);
   const bodyEl = card.querySelector("#reachBody");
