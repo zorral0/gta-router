@@ -1,0 +1,11 @@
+{
+  // Feature toggles, read at server startup.
+  "otpFeatures": {
+    // Trust min_transfer_time from GTFS transfers.txt instead of
+    // street-routing every transfer. We inject 3-minute transfers for
+    // TTC subway interchanges (patch_ttc_transfers.py); without this
+    // flag the router still walks you out to the sidewalk at
+    // Bloor-Yonge and the subway loses to streetcars.
+    "MinimumTransferTimeIsDefinitive": true
+  }
+}

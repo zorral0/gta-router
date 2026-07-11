@@ -1,0 +1,1526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>GTA Router</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<style>
+  :root {
+    --panel: rgba(248,248,250,.85); --card: rgba(255,255,255,.92);
+    --card-solid: #ffffff; --text: #1d1d1f; --muted: #6e6e73;
+    --accent: #007aff; --good: #248a3d; --bad: #ff3b30;
+    --line: rgba(0,0,0,.08); --chip: rgba(120,120,128,.12);
+    --shadow: 0 0 0 .5px rgba(0,0,0,.06), 0 8px 30px rgba(0,0,0,.14);
+    --card-shadow: 0 1px 2px rgba(0,0,0,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --panel: rgba(28,28,30,.82); --card: rgba(44,44,46,.92);
+      --card-solid: #2c2c2e; --text: #f5f5f7; --muted: #98989d;
+      --accent: #0a84ff; --good: #30d158; --bad: #ff453a;
+      --line: rgba(255,255,255,.1); --chip: rgba(120,120,128,.24);
+      --shadow: 0 0 0 .5px rgba(255,255,255,.08), 0 8px 30px rgba(0,0,0,.55);
+      --card-shadow: 0 1px 2px rgba(0,0,0,.3);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { font: 13.5px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text",
+         "Segoe UI", Roboto, sans-serif; color: var(--text);
+         -webkit-font-smoothing: antialiased; overflow: hidden; }
+  #map { position: absolute; inset: 0; }
+
+  /* floating panel */
+  #panel { position: absolute; top: 14px; left: 14px; width: 384px;
+    max-height: calc(100% - 28px); display: flex; flex-direction: column;
+    background: var(--panel); backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; }
+  #panelScroll { overflow-y: auto; padding: 14px 14px 16px; }
+  #panelScroll::-webkit-scrollbar { width: 8px; }
+  #panelScroll::-webkit-scrollbar-thumb { background: var(--chip); border-radius: 4px; }
+
+  .wordmark { font-size: 12px; font-weight: 700; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--muted); margin: 2px 2px 10px; }
+
+  /* search fields */
+  .search { background: var(--card); border-radius: 12px;
+    box-shadow: 0 0 0 .5px var(--line), var(--card-shadow);
+    padding: 4px 12px; margin-bottom: 10px; }
+  .srow { display: flex; align-items: center; gap: 10px; position: relative; }
+  .srow + .srow { border-top: .5px solid var(--line); }
+  .srow .pt { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .srow input { flex: 1; border: none; outline: none; background: transparent;
+    color: var(--text); font: inherit; padding: 11px 0; min-width: 0; }
+  .srow input::placeholder { color: var(--muted); }
+
+  /* search suggestions */
+  .sug { position: absolute; left: -12px; right: -12px; top: calc(100% + 1px);
+    background: var(--card-solid); border-radius: 12px; z-index: 40;
+    box-shadow: 0 0 0 .5px var(--line), 0 10px 30px rgba(0,0,0,.22);
+    overflow: hidden; display: none; }
+  .sug.open { display: block; }
+  .sug .item { padding: 9px 14px; cursor: pointer; }
+  .sug .item + .item { border-top: .5px solid var(--line); }
+  .sug .item.hi, .sug .item:hover { background: var(--accent); }
+  .sug .item.hi .p1, .sug .item:hover .p1,
+  .sug .item.hi .p2, .sug .item:hover .p2 { color: #fff; }
+  .sug .p1 { font-size: 13px; font-weight: 600; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
+  .sug .p2 { font-size: 11.5px; color: var(--muted); white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
+
+  /* controls */
+  .ctrls { display: flex; gap: 7px; align-items: center; flex-wrap: wrap;
+    margin-bottom: 12px; }
+  .ctrls select { appearance: none; -webkit-appearance: none; border: none;
+    background: var(--chip); color: var(--text); font: inherit; font-size: 12.5px;
+    font-weight: 590; padding: 7px 24px 7px 12px; border-radius: 999px;
+    cursor: pointer;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='6'%3E%3Cpath d='M1 1l3.5 3.5L8 1' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center; }
+  .seg { display: inline-flex; background: var(--chip); border-radius: 999px;
+    padding: 2px; }
+  .seg button { border: none; background: transparent; padding: 5.5px 11px;
+    border-radius: 999px; font: inherit; font-size: 12px; font-weight: 600;
+    color: var(--muted); cursor: pointer; }
+  .seg button.on { background: var(--card-solid); color: var(--text);
+    box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+  .ibtn { border: none; background: var(--chip); color: var(--text);
+    width: 30px; height: 30px; border-radius: 999px; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; }
+  .ibtn:hover, .ctrls select:hover { filter: brightness(.96); }
+  @media (prefers-color-scheme: dark) { .ibtn:hover, .ctrls select:hover { filter: brightness(1.25); } }
+  #go { border: none; background: var(--accent); color: #fff; font: inherit;
+    font-size: 13px; font-weight: 650; padding: 7px 16px; border-radius: 999px;
+    cursor: pointer; margin-left: auto; }
+  #go:active { filter: brightness(.9); }
+
+  .icn { width: 1em; height: 1em; vertical-align: -0.12em; fill: none;
+    stroke: currentColor; stroke-width: 2; stroke-linecap: round;
+    stroke-linejoin: round; }
+
+  /* result sections */
+  .sect { margin-top: 14px; }
+  .sect h2 { display: flex; align-items: center; gap: 7px; margin: 0 2px 7px;
+    font-size: 12px; font-weight: 650; letter-spacing: .04em;
+    text-transform: uppercase; color: var(--muted); }
+  .sect h2 .icn { font-size: 14px; }
+  .card { background: var(--card); border-radius: 14px;
+    box-shadow: 0 0 0 .5px var(--line), 0 1px 1.5px rgba(0,0,0,.04),
+                0 4px 14px rgba(0,0,0,.05);
+    padding: 11px 13px; cursor: pointer; margin-bottom: 7px;
+    transition: transform .14s ease, box-shadow .14s ease;
+    animation: rise .3s cubic-bezier(.2,.7,.3,1) both; }
+  .card:hover { transform: translateY(-1px);
+    box-shadow: 0 0 0 .5px var(--line), 0 2px 4px rgba(0,0,0,.06),
+                0 10px 24px rgba(0,0,0,.1); }
+  .card:active { transform: scale(.985); }
+  .card.sel { box-shadow: 0 0 0 2px var(--accent), 0 4px 14px rgba(0,0,0,.08); }
+  @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
+  .head { display: flex; align-items: baseline; gap: 8px; }
+  .mins { font-size: 19px; font-weight: 700; letter-spacing: -.02em;
+    font-variant-numeric: tabular-nums; }
+  .times { color: var(--muted); font-size: 11.5px;
+    font-variant-numeric: tabular-nums; }
+  .cost { margin-left: auto; font-size: 15px; font-weight: 700;
+    color: var(--good); font-variant-numeric: tabular-nums; }
+  .badges { display: flex; gap: 5px; margin-top: 5px; }
+  .badge { font-size: 10px; font-weight: 700; letter-spacing: .05em;
+    text-transform: uppercase; padding: 2px 8px; border-radius: 999px; }
+  .badge.fast { background: color-mix(in srgb, var(--accent) 16%, transparent);
+    color: var(--accent); }
+  .badge.cheap { background: color-mix(in srgb, var(--good) 16%, transparent);
+    color: var(--good); }
+  .legs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+    margin-top: 8px; }
+  .rt { color: #fff; font-weight: 700; font-size: 11.5px; padding: 2.5px 8px;
+    border-radius: 6px; box-shadow: inset 0 -1px 0 rgba(0,0,0,.18); }
+  .gchip { display: inline-flex; align-items: center; gap: 4px;
+    color: var(--muted); font-size: 11.5px; font-weight: 550;
+    background: var(--chip); border-radius: 6px; padding: 2.5px 7px; }
+  .sep { color: var(--muted); opacity: .5; font-size: 9px; }
+  .morebtn { display: block; width: 100%; border: none; background: transparent;
+    color: var(--accent); font: inherit; font-size: 12.5px; font-weight: 600;
+    padding: 4px; cursor: pointer; border-radius: 8px; }
+  .morebtn:hover { background: var(--chip); }
+  .extra { display: none; }
+  .extra.open { display: block; }
+
+  /* "what you have" toggles - gate which mode mixes get searched */
+  .have { border: none; cursor: pointer; font: inherit; font-size: 12px;
+    font-weight: 600; display: inline-flex; align-items: center; gap: 5px;
+    padding: 6.5px 12px; border-radius: 999px; background: var(--chip);
+    color: var(--muted); }
+  .have.on { background: color-mix(in srgb, var(--accent) 15%, transparent);
+    color: var(--accent); box-shadow: 0 0 0 1.5px var(--accent) inset; }
+  .have:active { transform: scale(.96); }
+  .havelbl { font-size: 11.5px; font-weight: 600; color: var(--muted); }
+
+  /* one-line mode summary on mixed-mode cards */
+  .via { font-size: 11px; font-weight: 600; color: var(--muted); margin-top: 4px; }
+
+  .hint { color: var(--muted); font-size: 12.5px; text-align: center;
+    padding: 22px 10px; }
+  .none { color: var(--muted); font-size: 12px; padding: 10px;
+    border: 1px dashed var(--line); border-radius: 12px; text-align: center; }
+  .err { color: var(--bad); font-size: 12.5px; padding: 6px 2px;
+    white-space: pre-wrap; }
+  .loading { display: flex; align-items: center; justify-content: center;
+    gap: 10px; color: var(--muted); padding: 28px 0; font-size: 12.5px; }
+  .spinner { width: 16px; height: 16px; border-radius: 50%;
+    border: 2.5px solid var(--chip); border-top-color: var(--accent);
+    animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* detail view */
+  #detail { display: none; }
+  body.detail-open #results { display: none; }
+  body.detail-open #detail { display: block;
+    animation: slidein .26s cubic-bezier(.2,.7,.3,1); }
+  @keyframes slidein { from { opacity: 0; transform: translateX(22px); } }
+  .ibtn:active, #go:active, .seg button:active, .back:active,
+  .morebtn:active { transform: scale(.94); }
+
+  /* map markers - Apple "you are here" halo dots (start green, end red) */
+  .mk { cursor: grab; line-height: 0; }
+  .mk:active { cursor: grabbing; }
+  .mk svg { display: block; }
+  .mkbody { animation: pinpop .38s cubic-bezier(.2,.7,.3,1.5) both; }
+  @keyframes pinpop {
+    0% { transform: scale(.2); opacity: 0; }
+    70% { transform: scale(1.12); opacity: 1; }
+    100% { transform: scale(1); } }
+  .dhead { display: flex; align-items: center; gap: 10px; margin: 2px 0 12px; }
+  .back { border: none; background: var(--chip); color: var(--text);
+    width: 30px; height: 30px; border-radius: 999px; cursor: pointer;
+    font-size: 14px; flex: none; display: inline-flex; align-items: center;
+    justify-content: center; }
+  .dhead .mins { font-size: 20px; }
+  .dhead .dcost { margin-left: auto; font-size: 17px; font-weight: 700;
+    color: var(--good); }
+  .tl { background: var(--card); border: .5px solid var(--line);
+    border-radius: 14px; box-shadow: var(--card-shadow); padding: 14px 14px 6px; }
+  .step { display: grid; grid-template-columns: 52px 20px 1fr; gap: 0 8px; }
+  .step .t { font-size: 11px; font-weight: 650; color: var(--muted);
+    padding-top: 2px; text-align: right; font-variant-numeric: tabular-nums; }
+  .step .rail { position: relative; }
+  .step .rail .dot { width: 11px; height: 11px; border-radius: 50%;
+    background: var(--card-solid); border: 3px solid var(--rail, #9aa3b8);
+    position: absolute; left: 2px; top: 3px; }
+  .step .rail .bar { position: absolute; left: 6px; top: 16px; bottom: -3px;
+    width: 3px; border-radius: 2px; background: var(--rail, #9aa3b8); opacity: .9; }
+  .step.walkstep .rail .bar { background: repeating-linear-gradient(
+    var(--rail, #9aa3b8) 0 4px, transparent 4px 8px); }
+  .step:last-child .rail .bar { display: none; }
+  .step .body { padding-bottom: 16px; min-width: 0; }
+  .step .what { font-weight: 650; font-size: 13px; }
+  .step .what .icn { color: var(--muted); margin-right: 2px; }
+  .step .sub { color: var(--muted); font-size: 11.5px; margin-top: 1px; }
+  /* which-subway-car diagram (train drawn pointing right = direction of travel) */
+  .btrain { display: flex; align-items: center; gap: 2.5px; margin-top: 8px; }
+  .bcar { width: 26px; height: 13px; border-radius: 3.5px; background: var(--chip);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 9px; font-weight: 700; color: #fff; flex: none; }
+  .bcar.nose { border-radius: 3.5px 9px 9px 3.5px; }
+  .bcar.hot { background: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+  .bdir { color: var(--muted); display: inline-flex; margin-left: 2px; font-size: 11px; }
+  .bnote { color: var(--muted); font-size: 11px; margin-top: 5px; line-height: 1.45; }
+  .bnote b { color: var(--text); font-weight: 650; }
+
+  .fares { background: var(--card); border: .5px solid var(--line);
+    border-radius: 14px; box-shadow: var(--card-shadow); padding: 12px 14px;
+    margin-top: 10px; }
+  .fares h3 { margin: 0 0 6px; font-size: 11px; font-weight: 650;
+    text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  .fitem { display: flex; justify-content: space-between; gap: 10px;
+    font-size: 12.5px; padding: 2.5px 0; font-variant-numeric: tabular-nums; }
+  .fitem.total { border-top: .5px solid var(--line); margin-top: 5px;
+    padding-top: 7px; font-weight: 700; font-size: 13.5px; }
+  .fnote { color: var(--muted); font-size: 11px; margin-top: 7px; }
+
+  /* ---- Reach mode ---- */
+  #reachCard { position: absolute; top: 14px; right: 14px; z-index: 5;
+    width: 216px; background: var(--panel);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
+  #reachToggle { width: 100%; border: none; background: transparent;
+    color: var(--text); font: inherit; font-weight: 650; cursor: pointer;
+    padding: 11px 14px; display: flex; align-items: center; gap: 8px;
+    text-align: left; }
+  #reachToggle .rt-dot { width: 9px; height: 9px; border-radius: 50%;
+    background: var(--muted); flex: none; transition: background .2s; }
+  #reachToggle.on { background: var(--chip); }
+  #reachToggle.on .rt-dot { background: var(--accent); }
+  #reachToggle:active { transform: scale(.98); }
+  #reachBody { padding: 4px 14px 14px; }
+  .reach-hint { font-size: 11.5px; color: var(--muted); line-height: 1.35;
+    margin-bottom: 10px; }
+  .reach-schemes { display: flex; gap: 6px; margin-bottom: 12px; }
+  .reach-sw { flex: 1; border: 1px solid var(--line); background: transparent;
+    border-radius: 9px; padding: 4px 4px 3px; cursor: pointer; }
+  .reach-sw.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .reach-sw .sw-bar { display: flex; height: 8px; border-radius: 3px;
+    overflow: hidden; }
+  .reach-sw .sw-bar i { flex: 1; }
+  .reach-sw .sw-name { font-size: 10.5px; color: var(--text); margin-top: 3px;
+    text-align: center; }
+  .reach-bar { height: 9px; border-radius: 4px; }
+  .reach-scale { display: flex; justify-content: space-between;
+    font-size: 10px; color: var(--muted); margin-top: 4px; }
+  .reach-pulse { width: 16px; height: 16px; border-radius: 50%;
+    background: var(--accent); box-shadow: 0 0 0 0 rgba(10,132,255,.5);
+    animation: reachpulse 1.1s ease-out infinite; }
+  @keyframes reachpulse {
+    0% { box-shadow: 0 0 0 0 rgba(10,132,255,.5); }
+    100% { box-shadow: 0 0 0 22px rgba(10,132,255,0); } }
+  #reachClose { position: absolute; top: 9px; right: 10px; width: 22px;
+    height: 22px; border: none; background: transparent; color: var(--muted);
+    cursor: pointer; border-radius: 999px; padding: 0; font-size: 13px;
+    display: inline-flex; align-items: center; justify-content: center; }
+  #reachClose:hover { background: var(--chip); color: var(--text); }
+  #reachLauncher { position: absolute; top: 14px; right: 14px; z-index: 5;
+    width: 40px; height: 40px; border-radius: 999px; border: none;
+    background: var(--panel); backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    box-shadow: var(--shadow); color: var(--text); cursor: pointer;
+    display: none; align-items: center; justify-content: center; font-size: 20px; }
+  #reachLauncher.show { display: inline-flex; }
+  #reachLauncher:active { transform: scale(.94); }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div id="panel"><div id="panelScroll">
+  <div class="wordmark">GTA Router</div>
+  <div class="search">
+    <div class="srow"><span class="pt" style="background:#34c759"></span>
+      <input id="fromBox" type="text" placeholder="Start — click the map or type a place"></div>
+    <div class="srow"><span class="pt" style="background:#ff453a"></span>
+      <input id="toBox" type="text" placeholder="End — e.g. '155 College St' or 'Union Station'"></div>
+  </div>
+  <div class="ctrls">
+    <select id="daySel" title="Day"></select>
+    <select id="timeSel" title="Departure time"></select>
+    <button class="ibtn" id="swap" title="Swap start and end"></button>
+    <button class="ibtn" id="clear" title="Clear"></button>
+  </div>
+  <div class="ctrls">
+    <span class="havelbl">Using:</span>
+    <button class="have on" id="haveBike" data-have="bike"
+      title="I can bike to a stop and lock my bike there"></button>
+    <button class="have on" id="haveCarStart" data-have="carStart"
+      title="You can drive to a station and park (park and ride)"></button>
+    <button class="have on" id="haveCarEnd" data-have="carEnd"
+      title="A car for the last leg - a pickup, or your car waiting at the station"></button>
+    <button class="have on" id="haveShare" data-have="share"
+      title="OK with renting a Bike Share Toronto bike"></button>
+  </div>
+  <div class="ctrls">
+    <div class="seg" id="riderSeg" title="Fare type">
+      <button data-rider="adult" class="on">Adult</button>
+      <button data-rider="youth">Youth 13&ndash;19</button>
+    </div>
+    <select id="driveSel" title="Hide options with a longer drive (to the station, or at the end)">
+      <option value="8000">Drive &le; 8 km</option>
+      <option value="15000" selected>Drive &le; 15 km</option>
+      <option value="30000">Drive &le; 30 km</option>
+      <option value="9999000">Any drive</option>
+    </select>
+    <button id="go">Plan trip</button>
+  </div>
+  <div id="results">
+    <div class="hint">Pick a start and an end to compare every mix of
+      transit, driving, your bike and Bike Share &mdash; with real fares.</div>
+  </div>
+  <div id="detail"></div>
+</div></div>
+
+<script>
+"use strict";
+const OTP = "http://localhost:8080/otp/gtfs/v1";
+
+/* ---- inline icons (Lucide, ISC license — lucide.dev) ---- */
+const ICONS = {
+  walk: '<circle cx="12" cy="5" r="1"/><path d="m9 20 3-6 3 6"/><path d="m6 8 6 2 6-2"/><path d="M12 10v4"/>',
+  bike: '<circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/>',
+  car: '<path d="m21 8-2 2-1.5-3.7A2 2 0 0 0 15.646 5H8.4a2 2 0 0 0-1.903 1.257L5 10 3 8"/><path d="M7 14h.01"/><path d="M17 14h.01"/><rect width="18" height="8" x="3" y="10" rx="2"/><path d="M5 18v2"/><path d="M19 18v2"/>',
+  bus: '<path d="M4 6 2 7"/><path d="M10 6h4"/><path d="m22 7-2-1"/><rect width="16" height="16" x="4" y="3" rx="2"/><path d="M4 11h16"/><path d="M8 15h.01"/><path d="M16 15h.01"/><path d="M6 19v2"/><path d="M18 21v-2"/>',
+  rail: '<path d="M8 3.1V7a4 4 0 0 0 8 0V3.1"/><path d="m9 15-1-1"/><path d="m15 15 1-1"/><path d="M9 19c-2.8 0-5-2.2-5-5v-4a8 8 0 0 1 16 0v4c0 2.8-2.2 5-5 5Z"/><path d="m8 19-2 3"/><path d="m16 19 2 3"/>',
+  back: '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
+  swap: '<path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  chev: '<path d="m6 9 6 6 6-6"/>',
+  arrow: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>'
+};
+function icn(name, size){
+  return `<svg class="icn" ${size ? `style="font-size:${size}px"` : ""} viewBox="0 0 24 24">${ICONS[name] || ""}</svg>`;
+}
+const modeIcon = m => ({ WALK:"walk", BICYCLE:"bike", CAR:"car", BUS:"bus",
+  RAIL:"rail", SUBWAY:"rail", TRAM:"bus" }[m] || "bus");
+
+/* ---- fare model: keep in sync with costs.py ---- */
+// [name-match, adult fare, youth fare (null = youth rate not modelled)]
+const LOCAL_FARES = [["TTC",3.30,2.35],["TORONTO",3.30,2.35],["YORK",4.25,null],
+                     ["MIWAY",3.50,null],["DURHAM",3.25,null],["BRAMPTON",4.75,null]];
+const GO_BASE = 3.70, GO_PER_KM = 0.11, UP_FARE = 12.35, ONE_FARE = true;
+const GO_YOUTH_FACTOR = 0.60;  // 40% off, gotransit.com youth discount
+const GAS_PER_KM = 0.14, WEAR_PER_KM = 0.10, DOWNTOWN_PARKING = 25.0, GO_PARKING = 0.0;
+// Bike Share Toronto pay-as-you-go, classic bike: $1 unlock + 12 cents/min
+// (verified Jul 2026, bikesharetoronto.com/pricing; e-bikes 20 cents/min
+// not modelled - OTP doesn't tell us which kind we'd get)
+const BIKESHARE_UNLOCK = 1.00, BIKESHARE_PER_MIN = 0.12;
+const TRANSIT = new Set(["BUS","RAIL","SUBWAY","TRAM","FERRY"]);
+let rider = "adult";
+let maxDriveM = 15000;  // hide drive-to-station options with a longer drive
+
+/* GO's real station-to-station fare table (made by make_go_fares.py). */
+let GO_FARES = null;
+fetch("go-fares.json").then(r => r.json()).then(j => { GO_FARES = j; })
+  .catch(() => {});
+
+/* Which subway car to ride, per station + direction (see the file's _about
+   for the source and its limits). Missing station = no diagram, no harm. */
+let BOARDING = null;
+fetch("subway-boarding.json").then(r => r.json()).then(j => { BOARDING = j; })
+  .catch(() => {});
+
+const normStation = n =>
+  (n || "").split(" Station")[0].toLowerCase().replace(/['.’]/g, "").trim();
+function subwayDirToken(l){
+  const hs = (l.headsign || "").toLowerCase();
+  for (const t of ["vaughan","finch","kipling","kennedy","don mills","sheppard-yonge"])
+    if (hs.includes(t)) return t.replace(/[ -]/g, "");
+  return null;
+}
+/* best car for subway leg i: the exit position at the station you get OFF
+   at - or the transfer position if the next ride is another subway line */
+function boardingInfo(legs, i){
+  const l = legs[i];
+  if (!BOARDING || l.mode !== "SUBWAY") return null;
+  const st = BOARDING.stations[normStation(l.to.name)];
+  const tok = subwayDirToken(l);
+  const e = st && tok ? st[tok] : null;
+  if (!e) return null;
+  let pick = { car: e.car, of: e.of || 6, why: e.why };
+  const nxt = legs.slice(i + 1).find(x => x.mode !== "WALK");
+  if (e.transfer && nxt && nxt.mode === "SUBWAY"){
+    const tr = e.transfer[((nxt.route || {}).shortName || "") + ":" + subwayDirToken(nxt)]
+            || e.transfer[(nxt.route || {}).shortName || ""];
+    if (tr) pick = { car: tr.car, of: tr.of || e.of || 6, why: tr.why };
+  }
+  return pick;
+}
+function trainDiagram(p, stationName){
+  let cars = "";
+  for (let c = p.of; c >= 1; c--)  // front of the train is drawn on the right
+    cars += `<span class="bcar${c === p.car ? " hot" : ""}${c === 1 ? " nose" : ""}">${c === p.car ? p.car : ""}</span>`;
+  const ord = ["", "1st", "2nd", "3rd"][p.car] || p.car + "th";
+  return `<div class="btrain">${cars}<span class="bdir">${icn("arrow", 11)}</span></div>
+    <div class="bnote">Get on the <b>${ord} car from the front</b> (of ${p.of})
+      &mdash; at ${esc(stationName)} it lines up with ${esc(p.why)}.</div>`;
+}
+
+function stopIdOf(place){
+  const id = ((place || {}).stop || {}).gtfsId || "";
+  return id.startsWith("GO:") ? id.slice(3) : null;
+}
+function goTableFare(fromStop, toStop){
+  if (!GO_FARES || !fromStop || !toStop) return null;
+  const o = GO_FARES.zones[fromStop], d = GO_FARES.zones[toStop];
+  if (!o || !d) return null;
+  const p = GO_FARES.fares[o + "|" + d] ?? GO_FARES.fares[d + "|" + o];
+  return p ?? null;
+}
+
+function agencyOf(l){ return ((l.agency||{}).name||"").toUpperCase(); }
+function prettyAgency(a){
+  if (a.includes("GO")) return "GO Transit";
+  if (a.includes("UP")) return "UP Express";
+  if (a.includes("TTC") || a.includes("TORONTO")) return "TTC";
+  if (a.includes("YORK")) return "YRT";
+  if (a.includes("MIWAY")) return "MiWay";
+  if (a.includes("DURHAM")) return "DRT";
+  if (a.includes("BRAMPTON")) return "Brampton Transit";
+  return a;
+}
+
+function itineraryCostDetail(it){
+  const legs = it.legs, tlegs = legs.filter(l => TRANSIT.has(l.mode));
+  const items = [];
+  const goLegs = tlegs.filter(l => agencyOf(l).includes("GO"));
+  const usedGo = goLegs.length > 0;
+  if (usedGo){
+    const exact = goTableFare(stopIdOf(goLegs[0].from),
+                              stopIdOf(goLegs[goLegs.length-1].to));
+    let f, label;
+    if (exact != null){ f = exact; label = "GO Transit"; }
+    else {
+      const goKm = goLegs.reduce((s,l) => s + (l.distance||0)/1000, 0);
+      f = GO_BASE + GO_PER_KM * goKm;
+      label = "GO Transit (estimated)";
+    }
+    if (rider === "youth"){ f *= GO_YOUTH_FACTOR; label += " — youth 40% off"; }
+    items.push({ label, amount: f });
+  }
+  if (tlegs.some(l => agencyOf(l).includes("UP")))
+    items.push({ label: "UP Express", amount: UP_FARE });
+  const ridden = [];
+  for (const l of tlegs){
+    const a = agencyOf(l);
+    const hit = LOCAL_FARES.find(([k]) => a.includes(k));
+    if (hit && !ridden.some(r => r.a === a))
+      ridden.push({ a, fare: (rider === "youth" && hit[2] != null) ? hit[2] : hit[1] });
+  }
+  ridden.forEach((r, i) => {
+    const free = ONE_FARE && (usedGo || i > 0);
+    items.push({ label: prettyAgency(r.a)
+      + (free ? " — free (One Fare transfer)" : ""), amount: free ? 0 : r.fare });
+  });
+  legs.forEach((l,i) => {
+    if (l.mode === "BICYCLE" && l.rentedBike){
+      const mins = Math.ceil((l.duration||0)/60);
+      items.push({ label: `Bike Share (${mins} min, $1 + 12¢/min)`,
+                   amount: BIKESHARE_UNLOCK + mins * BIKESHARE_PER_MIN });
+    }
+    if (l.mode === "CAR"){
+      const later = legs.slice(i+1).some(x => TRANSIT.has(x.mode));
+      const earlier = legs.slice(0,i).some(x => TRANSIT.has(x.mode));
+      const km = (l.distance||0)/1000;
+      items.push({ label: `Driving (${km.toFixed(1)} km, gas + wear)`,
+                   amount: km * (GAS_PER_KM + WEAR_PER_KM) });
+      if (later){ if (GO_PARKING > 0) items.push({ label: "Station parking", amount: GO_PARKING }); }
+      // car AFTER transit = a pickup or your car already waiting - no
+      // parking fee; only a start-of-trip drive to the destination pays it
+      else if (!earlier) items.push({ label: "Downtown parking", amount: DOWNTOWN_PARKING });
+    }
+  });
+  return { total: items.reduce((s,x) => s + x.amount, 0), items };
+}
+function itineraryCost(it){ return itineraryCostDetail(it).total; }
+
+/* ---- map (vector, light/dark follows the system) ---- */
+const darkMql = matchMedia("(prefers-color-scheme: dark)");
+const styleURL = () => darkMql.matches
+  ? "https://tiles.openfreemap.org/styles/fiord"   // soft blue-gray dark
+  : "https://tiles.openfreemap.org/styles/liberty";
+const map = new maplibregl.Map({
+  container: "map", style: styleURL(),
+  center: [-79.5, 43.75], zoom: 9.2, attributionControl: { compact: true }
+});
+map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
+darkMql.addEventListener("change", () => map.setStyle(styleURL()));
+
+/* route layers survive style swaps: whenever the style (re)loads and our
+   source is gone, put it back. styledata fires many times; the re-add is
+   idempotent and wrapped so a mid-load call just retries shortly after. */
+let lastRouteFC = null;
+function ensureRoute(){
+  if (!lastRouteFC || map.getSource("route")) return;
+  try { addRouteLayers(lastRouteFC); }
+  catch (e){ setTimeout(ensureRoute, 250); }
+}
+map.on("styledata", ensureRoute);
+map.on("style.load", ensureRoute);
+function addRouteLayers(fc){
+  if (map.getSource("route")){ map.getSource("route").setData(fc); return; }
+  map.addSource("route", { type: "geojson", data: fc });
+  map.addLayer({ id: "route-casing", type: "line", source: "route",
+    layout: { "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": darkMql.matches ? "#1c1c1e" : "#ffffff",
+             "line-width": 8 } });
+  const previewOpacity = ["case", ["==", ["get","preview"], 1], 0.55, 1];
+  map.addLayer({ id: "route-solid", type: "line", source: "route",
+    filter: ["!=", ["get","dash"], 1],
+    layout: { "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": ["get","color"], "line-width": 4.5,
+             "line-opacity": previewOpacity } });
+  map.addLayer({ id: "route-walk", type: "line", source: "route",
+    filter: ["==", ["get","dash"], 1],
+    paint: { "line-color": ["get","color"], "line-width": 4.5,
+             "line-dasharray": [0.2, 1.6],
+             "line-opacity": previewOpacity } });
+}
+function drawRoute(fc){
+  lastRouteFC = fc;
+  if (map.isStyleLoaded()) addRouteLayers(fc);
+  // if the style is mid-load, the style.load handler above draws it
+}
+
+/* ---- Bike Share docks on the map (small green dots, zoom in to see).
+   Loaded once from the router; if the server hasn't been restarted since
+   the GBFS updater was added, the list is empty and no dots appear. ---- */
+let dockFC = null;
+async function loadDocks(){
+  try {
+    const r = await fetch(OTP, { method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: "{vehicleRentalStations{name lat lon}}" }) });
+    const js = await r.json();
+    const st = ((js.data || {}).vehicleRentalStations) || [];
+    if (!st.length) return;
+    dockFC = { type: "FeatureCollection", features: st.map(s => ({
+      type: "Feature", properties: { name: s.name },
+      geometry: { type: "Point", coordinates: [s.lon, s.lat] } })) };
+    ensureDocks();
+  } catch (e){ /* engine down - the plan() error path already tells the user */ }
+}
+function ensureDocks(){
+  if (!dockFC || map.getSource("docks")) return;
+  try {
+    map.addSource("docks", { type: "geojson", data: dockFC });
+    // slide under the route lines when they exist; routes added later go on top
+    map.addLayer({ id: "docks", type: "circle", source: "docks", minzoom: 12.5,
+      paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 12.5, 2.5, 16, 5],
+               "circle-color": "#34c759",
+               "circle-stroke-color": darkMql.matches ? "#1c1c1e" : "#ffffff",
+               "circle-stroke-width": 1.25 } },
+      map.getLayer("route-casing") ? "route-casing" : undefined);
+  } catch (e){ setTimeout(ensureDocks, 250); }
+}
+map.on("style.load", ensureDocks);
+map.on("styledata", ensureDocks);
+map.on("click", "docks", e => {
+  new maplibregl.Popup({ closeButton: false, offset: 8 })
+    .setLngLat(e.features[0].geometry.coordinates)
+    .setHTML(`<b>${esc(e.features[0].properties.name)}</b><br>Bike Share dock`)
+    .addTo(map);
+});
+map.on("mouseenter", "docks", () => map.getCanvas().style.cursor = "pointer");
+map.on("mouseleave", "docks", () => map.getCanvas().style.cursor = "");
+loadDocks();
+
+/* sweep the route on from start to end when an option is selected */
+let sweepToken = 0;
+function animateRoute(fc){
+  lastRouteFC = fc;
+  if (!map.isStyleLoaded()){ ensureRoute(); return; }
+  if (!map.getSource("route")){
+    try { addRouteLayers(fc); } catch (e){ return; }
+  }
+  const src = map.getSource("route");
+  const token = ++sweepToken;
+  // animation frames don't run in hidden tabs - just draw it whole
+  if (document.hidden){ src.setData(fc); return; }
+  const feats = fc.features;
+  const total = feats.reduce((s,f) => s + f.geometry.coordinates.length, 0);
+  const t0 = performance.now(), dur = 650;
+  setTimeout(() => { if (token === sweepToken) src.setData(fc); }, dur + 200);
+  (function frame(now){
+    if (token !== sweepToken) return;        // superseded by a newer selection
+    const p = Math.min((now - t0) / dur, 1);
+    const eased = 1 - Math.pow(1 - p, 3);
+    let budget = Math.max(2, Math.round(total * eased));
+    const partial = [];
+    for (const f of feats){
+      if (budget <= 0) break;
+      const c = f.geometry.coordinates;
+      if (c.length <= budget){ partial.push(f); budget -= c.length; }
+      else {
+        partial.push({ ...f, geometry: { type: "LineString",
+          coordinates: c.slice(0, Math.max(2, budget)) } });
+        budget = 0;
+      }
+    }
+    src.setData({ type: "FeatureCollection", features: partial });
+    if (p < 1) requestAnimationFrame(frame);
+    else src.setData(fc);
+  })(performance.now());
+}
+
+let fromPt = null, toPt = null, fromMarker = null, toMarker = null;
+function haloDotSVG(color, id){
+  // "you are here" halo dot: soft colored halo, white ring, colored core.
+  // Flat fills (no gradient/sheen); a single soft shadow lifts the white
+  // ring + core off the map. Same mark for start and end - only the hue
+  // differs (green start / red end), matching the panel's from/to dots.
+  return `<svg width="34" height="34" viewBox="0 0 34 34"
+      xmlns="http://www.w3.org/2000/svg">
+    <defs><filter id="${id}" x="-60%" y="-60%" width="220%" height="220%">
+      <feDropShadow dx="0" dy="1.4" stdDeviation="1.4"
+        flood-color="#000" flood-opacity="0.35"/>
+    </filter></defs>
+    <circle cx="17" cy="17" r="16" fill="${color}" opacity="0.22"/>
+    <g filter="url(#${id})">
+      <circle cx="17" cy="17" r="9.5" fill="#fff"/>
+      <circle cx="17" cy="17" r="6.3" fill="${color}"/>
+    </g></svg>`;
+}
+function markerEl(which){
+  const el = document.createElement("div");
+  el.className = "mk";
+  const isFrom = which === "from";
+  el.innerHTML = '<div class="mkbody">' +
+    haloDotSVG(isFrom ? "#34c759" : "#ff453a", "mkds-" + which) + "</div>";
+  return el;
+}
+function setPoint(which, lngLat, label){
+  const old = which === "from" ? fromMarker : toMarker;
+  if (old) old.remove();
+  const m = new maplibregl.Marker({ element: markerEl(which),
+    anchor: "center", draggable: true }).setLngLat(lngLat).addTo(map);
+  m.on("dragend", () => {
+    const p = m.getLngLat();
+    if (which === "from") fromPt = p; else toPt = p;
+    document.getElementById(which + "Box").value = fmt(p);
+    plan();
+  });
+  if (which === "from"){ fromMarker = m; fromPt = lngLat; }
+  else { toMarker = m; toPt = lngLat; }
+  document.getElementById(which + "Box").value = label || fmt(lngLat);
+}
+const fmt = p => p.lat.toFixed(4) + ", " + p.lng.toFixed(4);
+map.on("click", e => {
+  // clicking a Bike Share dock opens its popup - don't also drop a pin
+  if (map.getLayer("docks") &&
+      map.queryRenderedFeatures(e.point, { layers: ["docks"] }).length) return;
+  // Reach mode: a tap paints a travel-time bloom instead of dropping pins
+  if (window.__reachMode) { window.__reachTap && window.__reachTap(e.lngLat); return; }
+  if (!fromPt) setPoint("from", e.lngLat);
+  else { setPoint("to", e.lngLat); plan(); }
+});
+
+/* ---- search with live suggestions (Photon, kept to the GTA) ---- */
+const GTA_BOX = { w: -80.30, s: 43.20, e: -78.40, n: 44.35 };
+function normalizeSuggestions(features){
+  const out = [], seen = new Set();
+  for (const f of features){
+    const c = f.geometry && f.geometry.coordinates;
+    if (!c) continue;
+    const [lon, lat] = c;
+    // keep it in the GTA - Photon's location bias alone lets far places leak in
+    if (lon < GTA_BOX.w || lon > GTA_BOX.e || lat < GTA_BOX.s || lat > GTA_BOX.n) continue;
+    const p = f.properties || {};
+    const addr = [p.housenumber, p.street].filter(Boolean).join(" ");
+    const p1 = p.name || addr || p.street || p.city || "Location";
+    const rest = [];
+    if (addr && p.name) rest.push(addr);
+    else if (p.street && p.name) rest.push(p.street);
+    if (p.city && p.city !== p1) rest.push(p.city);
+    else if (p.district && p.district !== p1) rest.push(p.district);
+    if (p.state) rest.push(p.state);
+    const p2 = [...new Set(rest)].slice(0, 3).join(", ");
+    const key = p1 + "|" + p2;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ p1, p2, lon, lat });
+    if (out.length >= 8) break;
+  }
+  return out;
+}
+function attachSuggest(which){
+  const input = document.getElementById(which + "Box");
+  const row = input.parentElement;
+  const box = document.createElement("div");
+  box.className = "sug";
+  row.appendChild(box);
+  let items = [], hi = -1, timer = null, ctrl = null;
+
+  const hide = () => { box.classList.remove("open"); hi = -1; };
+  const render = () => {
+    if (!items.length){ hide(); return; }
+    box.innerHTML = items.map((it, i) =>
+      `<div class="item ${i === hi ? "hi" : ""}" data-i="${i}">
+        <div class="p1">${esc(it.p1)}</div>
+        ${it.p2 ? `<div class="p2">${esc(it.p2)}</div>` : ""}</div>`).join("");
+    box.classList.add("open");
+  };
+  const pick = i => {
+    const it = items[i];
+    if (!it) return;
+    hide();
+    setPoint(which, { lng: it.lon, lat: it.lat }, it.p1);
+    map.flyTo({ center: [it.lon, it.lat], zoom: 13 });
+    input.blur();
+    plan();
+  };
+
+  input.addEventListener("input", () => {
+    clearTimeout(timer);
+    const q = input.value.trim();
+    if (q.length < 3){ hide(); return; }
+    // debounced; Photon is built for as-you-type search (partial words)
+    timer = setTimeout(async () => {
+      if (ctrl) ctrl.abort();
+      ctrl = new AbortController();
+      try {
+        const r = await fetch("https://photon.komoot.io/api/?lang=en&limit=12"
+          + "&lat=43.72&lon=-79.42&q=" + encodeURIComponent(q),
+          { signal: ctrl.signal });
+        const js = await r.json();
+        items = normalizeSuggestions(js.features || []);
+        hi = items.length ? 0 : -1;
+        render();
+      } catch (e){ /* aborted or offline - just keep quiet */ }
+    }, 350);
+  });
+  input.addEventListener("keydown", e => {
+    if (!box.classList.contains("open")){
+      if (e.key === "Enter" && input.value.trim().length >= 3)
+        input.dispatchEvent(new Event("input"));
+      return;
+    }
+    if (e.key === "ArrowDown"){ e.preventDefault(); hi = (hi + 1) % items.length; render(); }
+    else if (e.key === "ArrowUp"){ e.preventDefault(); hi = (hi - 1 + items.length) % items.length; render(); }
+    else if (e.key === "Enter"){ e.preventDefault(); pick(Math.max(hi, 0)); }
+    else if (e.key === "Escape") hide();
+  });
+  input.addEventListener("blur", () => setTimeout(hide, 180));
+  box.addEventListener("mousedown", e => {
+    const el = e.target.closest(".item");
+    if (el){ e.preventDefault(); pick(+el.dataset.i); }
+  });
+}
+attachSuggest("from");
+attachSuggest("to");
+
+/* ---- planning (OTP 2.9 planConnection: access and egress street modes
+   are separate lists, so any mix of start and end is one query) ----
+   need: which "Using:" toggles must be on (carStart = drive to a station,
+   carEnd = a car for the last leg). needsLeg: results must really contain
+   that leg (OTP pads with plain walk+transit trips otherwise).
+   carAfter/rentEnd: the car / rented-bike legs must come AFTER transit.
+   drive: run twice (car reluctance 30 + 2) and cap by the drive filter. */
+const COMBOS = [
+  { key: "Transit only",
+    access: ["WALK"], egress: ["WALK"], need: [] },
+  { key: "Bike to station",
+    access: ["BICYCLE_PARKING"], egress: ["WALK"],
+    need: ["bike"], needsLeg: "BICYCLE" },
+  { key: "Drive to station",
+    access: ["CAR_PARKING"], egress: ["WALK"],
+    need: ["carStart"], drive: true, needsLeg: "CAR" },
+  { key: "Drive at the end",
+    access: ["WALK"], egress: ["WALK", "CAR_PICKUP"],
+    need: ["carEnd"], drive: true, carAfter: true },
+  // walkReluctance 6: for end-walks under ~2 km the engine treats the
+  // walk ending and the Bike Share ending of the same ride as siblings
+  // and keeps the walk one (rental pays unlock/dock time internally), so
+  // Bike Share never surfaced. These queries EXIST to find the rental
+  // ending - make walking expensive inside them; the ranked list then
+  // compares the result fairly against everything else. (Same trick as
+  // carReluctance 30 for the near-station drive queries.)
+  { key: "Bike Share at the end",
+    access: ["WALK"], egress: ["WALK", "BICYCLE_RENTAL"],
+    need: ["share"], rentEnd: true, walkReluctance: 6.0 },
+  { key: "Drive + Bike Share at the end",
+    access: ["CAR_PARKING"], egress: ["WALK", "BICYCLE_RENTAL"],
+    need: ["carStart", "share"], drive: true, needsLeg: "CAR", rentEnd: true,
+    walkReluctance: 6.0 },
+  { key: "Bike + Bike Share at the end",
+    access: ["BICYCLE_PARKING"], egress: ["WALK", "BICYCLE_RENTAL"],
+    need: ["bike", "share"], needsLeg: "BICYCLE", rentEnd: true,
+    walkReluctance: 6.0 },
+  { key: "Bike + drive at the end",
+    access: ["BICYCLE_PARKING"], egress: ["WALK", "CAR_PICKUP"],
+    need: ["bike", "carEnd"], drive: true, needsLeg: "BICYCLE", carAfter: true },
+];
+
+/* which mode mixes the user has switched on (persisted) */
+const storedHave = JSON.parse(localStorage.getItem("have") || "{}");
+// migrate the old single "car" toggle -> separate start/end toggles
+if (storedHave.car !== undefined){
+  if (storedHave.carStart === undefined) storedHave.carStart = storedHave.car;
+  if (storedHave.carEnd === undefined) storedHave.carEnd = storedHave.car;
+  delete storedHave.car;
+}
+let have = Object.assign({ bike: true, carStart: true, carEnd: true, share: true },
+  storedHave);
+localStorage.setItem("have", JSON.stringify(have));
+
+/* true when the itinerary uses transit and every leg matching `match`
+   comes AFTER the last transit leg (i.e. it really is an "at the end" leg) */
+function endLegOnly(it, match){
+  let lastTransit = -1;
+  it.legs.forEach((l, i) => { if (TRANSIT.has(l.mode)) lastTransit = i; });
+  if (lastTransit < 0) return false;
+  const hits = it.legs.map((l, i) => match(l) ? i : -1).filter(i => i >= 0);
+  return hits.length > 0 && hits.every(i => i > lastTransit);
+}
+/* OTP 2.9: the old "plan" query is GONE - this is planConnection.
+   Coordinates are latitude/longitude here (the old API wanted lat/lon!),
+   times are ISO strings, legs carry start/end objects and stopCalls. */
+const PC_QUERY = `query PC($origin:PlanLabeledLocationInput!,
+    $destination:PlanLabeledLocationInput!,$dateTime:PlanDateTimeInput!,
+    $modes:PlanModesInput!,$first:Int,$prefs:PlanPreferencesInput){
+  planConnection(origin:$origin,destination:$destination,dateTime:$dateTime,
+                 modes:$modes,first:$first,preferences:$prefs){
+    edges{node{ duration start end
+      legs{ mode distance duration headsign rentedBike
+            start{scheduledTime} end{scheduledTime}
+            agency{name} route{shortName longName color}
+            from{name lat lon stop{gtfsId}} to{name lat lon stop{gtfsId}}
+            stopCalls{stopLocation{... on Stop {name}}}
+            legGeometry{points} } } } } }`;
+
+/* reshape a planConnection itinerary to the leg fields the rest of the
+   app has always used (startTime/endTime millis, intermediatePlaces) */
+function normalizeItin(n){
+  return { duration: n.duration,
+    startTime: Date.parse(n.start), endTime: Date.parse(n.end),
+    legs: n.legs.map(l => ({ ...l,
+      startTime: Date.parse((l.start || {}).scheduledTime),
+      endTime: Date.parse((l.end || {}).scheduledTime),
+      intermediatePlaces: (l.stopCalls || []).slice(1, -1) })) };
+}
+
+async function fetchCombo(combo, date, time, carReluctance){
+  const r = await fetch(OTP, { method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query: PC_QUERY, variables: {
+      origin: { location: { coordinate:
+        { latitude: fromPt.lat, longitude: fromPt.lng } } },
+      destination: { location: { coordinate:
+        { latitude: toPt.lat, longitude: toPt.lng } } },
+      dateTime: { earliestDeparture: new Date(date + "T" + time).toISOString() },
+      modes: { transit: { access: combo.access, egress: combo.egress } },
+      first: 8,
+      prefs: (carReluctance || combo.walkReluctance)
+        ? { street: Object.assign({},
+            carReluctance ? { car: { reluctance: carReluctance } } : {},
+            combo.walkReluctance ? { walk: { reluctance: combo.walkReluctance } } : {}) }
+        : null } }) });
+  const js = await r.json();
+  if (js.errors) throw new Error(js.errors.map(e => e.message).join("; "));
+  let its = (((js.data || {}).planConnection || {}).edges || [])
+    .map(e => normalizeItin(e.node));
+  // results must actually contain transit and the advertised access leg -
+  // OTP pads with plain walk+transit trips that belong to Transit only
+  its = its.filter(it => it.legs.some(l => TRANSIT.has(l.mode)));
+  if (combo.needsLeg)
+    its = its.filter(it =>
+      it.legs.some(l => l.mode === combo.needsLeg && !l.rentedBike));
+  if (combo.carAfter)
+    its = its.filter(it => endLegOnly(it, l => l.mode === "CAR"));
+  if (combo.rentEnd)
+    its = its.filter(it => endLegOnly(it, l => l.mode === "BICYCLE" && l.rentedBike));
+  const seen = new Set();
+  its = its.filter(it => {
+    const sig = itinSig(it);
+    if (seen.has(sig)) return false;
+    seen.add(sig); return true;
+  });
+  return its.slice(0, 4);
+}
+
+function agencyColor(a){
+  if (a.includes("GO")) return "#256434";
+  if (a.includes("UP")) return "#6d4c2f";
+  if (a.includes("TTC") || a.includes("TORONTO")) return "#c8102e";
+  if (a.includes("YORK")) return "#0072bc";
+  if (a.includes("MIWAY")) return "#e77817";
+  if (a.includes("DURHAM")) return "#00703c";
+  if (a.includes("BRAMPTON")) return "#005daa";
+  return "#666";
+}
+function legChip(l){
+  if (l.mode === "WALK")
+    return `<span class="gchip">${icn("walk")}${Math.round(l.distance)} m</span>`;
+  if (l.mode === "BICYCLE")
+    return `<span class="gchip">${icn("bike")}${(l.distance/1000).toFixed(1)} km</span>`;
+  if (l.mode === "CAR")
+    return `<span class="gchip">${icn("car")}${(l.distance/1000).toFixed(1)} km</span>`;
+  const r = l.route || {}, name = r.shortName || r.longName || l.mode;
+  const bg = r.color ? "#" + r.color : agencyColor(agencyOf(l));
+  return `<span class="rt" style="background:${bg}">${esc(name)}</span>`;
+}
+const esc = s => String(s).replace(/[&<>"]/g, c =>
+  ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+const hhmm = t => new Date(t).toLocaleTimeString([], { hour:"numeric", minute:"2-digit" });
+
+let itinsById = {}, selId = null, lastParts = null;
+
+async function plan(){
+  if (!fromPt || !toPt) return;
+  closeDetail();
+  const date = document.getElementById("daySel").value;
+  const time = document.getElementById("timeSel").value;
+  const box = document.getElementById("results");
+  box.innerHTML = '<div class="loading"><div class="spinner"></div>Comparing your options&hellip;</div>';
+  const active = COMBOS.filter(c => c.need.every(k => have[k]));
+  const parts = await Promise.all(active.map(async c => {
+    try {
+      if (!c.drive) return { c, its: await fetchCombo(c, date, time) };
+      // Drive-to-station twice: biased to short drives (nearby station,
+      // survives a tight "Drive <= N km" filter) and to long ones (drive
+      // to the best station outright). Merged, the drive filter always
+      // has both kinds to choose from without re-querying.
+      // (30 = "hate driving": mild values still let fast 40 km drives
+      // crowd short ones out of the result set entirely)
+      const [near, far] = await Promise.all([
+        fetchCombo(c, date, time, 30.0),
+        fetchCombo(c, date, time, 2.0)]);
+      const seen = new Set(), merged = [];
+      for (const it of near.concat(far)){
+        const sig = Math.round(it.duration/60) + "|" + it.legs.map(l =>
+          l.mode + ((l.route||{}).shortName || "")).join(",");
+        if (!seen.has(sig)){ seen.add(sig); merged.push(it); }
+      }
+      merged.sort((a, b) => a.duration - b.duration);
+      return { c, its: merged.slice(0, 6) };
+    }
+    catch (e){ return { c, err: e.message }; }
+  }));
+  lastParts = parts;
+  renderResults(parts);
+}
+
+/* one plain-words line for mixed-mode trips: "Drive → transit → Bike Share" */
+function viaLine(it){
+  const toks = [];
+  for (const l of it.legs){
+    let t = null;
+    if (l.mode === "CAR") t = "drive";
+    else if (l.mode === "BICYCLE") t = l.rentedBike ? "Bike Share" : "your bike";
+    else if (TRANSIT.has(l.mode)) t = "transit";
+    if (t && toks[toks.length - 1] !== t) toks.push(t);
+  }
+  if (!toks.some(t => t !== "transit")) return "";
+  return `<div class="via">${toks.map((t, i) =>
+    i === 0 ? t[0].toUpperCase() + t.slice(1) : t).join(" &rarr; ")}</div>`;
+}
+
+function cardHTML(it, cid, fastestIt, cheapestIt){
+  const cost = itineraryCost(it);
+  // badge the single winning card (ties go to the first), not every tie
+  const badges =
+    (it === fastestIt ? '<span class="badge fast">Fastest</span>' : "") +
+    (it === cheapestIt ? '<span class="badge cheap">Cheapest</span>' : "");
+  return `<div class="card" id="${cid}" onclick="openIt('${cid}')">
+    <div class="head"><span class="mins">${Math.round(it.duration/60)} min</span>
+      <span class="times">${hhmm(it.startTime)} &ndash; ${hhmm(it.endTime)}</span>
+      <span class="cost">$${cost.toFixed(2)}</span></div>
+    ${badges ? `<div class="badges">${badges}</div>` : ""}
+    ${viaLine(it)}
+    <div class="legs">${it.legs.filter(l => l.mode !== "WALK" || l.distance > 50)
+      .map(legChip).join('<span class="sep">&#9656;</span>')}</div></div>`;
+}
+
+function carDistance(it){
+  return it.legs.filter(l => l.mode === "CAR")
+                .reduce((s,l) => s + (l.distance||0), 0);
+}
+/* itineraries a part actually shows, after the "max drive" cap
+   (applies to both drive categories - "at the end" should stay short) */
+function visibleIts(p){
+  let its = p.its || [];
+  if (p.c.drive)
+    its = its.filter(it => carDistance(it) <= maxDriveM);
+  return its;
+}
+
+/* ---- results: ONE ranked list, every allowed mode mix pooled together.
+   Sam's rule (2026-07-10): an option that is slower AND not cheaper than
+   another visible option must never headline - it stays reachable under
+   "more options", but can't pose as a recommendation. */
+const itinSig = it => Math.round(it.duration/60) + "|" + it.legs.map(l =>
+  l.mode + ((l.route||{}).shortName || "")).join(",");
+
+function renderResults(parts){
+  itinsById = {}; selId = null;
+
+  // one pool, drive cap applied, deduped (the same trip often comes
+  // back from several of the mode-mix queries)
+  const seen = new Set(), pool = [];
+  for (const p of parts) for (const it of visibleIts(p)){
+    const sig = itinSig(it);
+    if (seen.has(sig)) continue;
+    seen.add(sig);
+    pool.push({ it, cost: itineraryCost(it) });
+  }
+  pool.sort((a,b) => a.it.duration - b.it.duration);
+
+  // keep only options nothing else beats on time AND price at once
+  const lead = pool.filter(x => !pool.some(y => y !== x
+    && y.it.duration <= x.it.duration && y.cost <= x.cost
+    && (y.it.duration < x.it.duration || y.cost < x.cost)));
+  const main = lead.slice(0, 5);
+  const rest = pool.filter(x => !main.includes(x));
+
+  const fastestIt = pool.length ? pool[0].it : null;
+  let cheapest = null;
+  for (const x of pool) if (!cheapest || x.cost < cheapest.cost) cheapest = x;
+  const cheapestIt = cheapest ? cheapest.it : null;
+
+  const errs = [...new Set(parts.filter(p => p.err).map(p => p.err))];
+  let html = errs.map(e => `<div class="err">${esc(e)}</div>`).join(""), id = 0;
+  const card = it => {
+    const cid = "it" + (id++); itinsById[cid] = it;
+    return cardHTML(it, cid, fastestIt, cheapestIt);
+  };
+
+  if (!pool.length){
+    html += `<div class="none">No sensible route found &mdash; try switching
+      on more of the "Using" toggles or raising the drive limit.</div>`;
+  } else {
+    html += main.map(x => card(x.it)).join("");
+    if (rest.length)
+      html += `<div class="extra" id="exAll">${rest.map(x => card(x.it)).join("")}</div>
+        <button class="morebtn" onclick="toggleMore('exAll', this,
+          ${rest.length})">${rest.length} more option${rest.length > 1 ? "s" : ""} ${icn("chev")}</button>`;
+  }
+  document.getElementById("results").innerHTML = html;
+  const first = Object.keys(itinsById)[0];
+  if (first) window.select(first);
+}
+window.toggleMore = function(exId, btn, n){
+  const el = document.getElementById(exId);
+  const open = el.classList.toggle("open");
+  btn.innerHTML = (open ? "Show fewer" : `${n} more option${n > 1 ? "s" : ""}`)
+    + " " + icn("chev");
+};
+
+/* ---- drawing ---- */
+function decodePolyline(str){ // Google encoded polyline, precision 5
+  let i = 0, lat = 0, lng = 0; const out = [];
+  while (i < str.length){
+    for (const which of [0,1]){
+      let shift = 0, result = 0, b;
+      do { b = str.charCodeAt(i++) - 63; result |= (b & 0x1f) << shift; shift += 5; }
+      while (b >= 0x20);
+      const d = (result & 1) ? ~(result >> 1) : result >> 1;
+      if (which === 0) lat += d; else lng += d;
+    }
+    out.push([lng / 1e5, lat / 1e5]);
+  }
+  return out;
+}
+function modeColor(l){
+  if (l.mode === "WALK") return darkMql.matches ? "#98989d" : "#8e8e93";
+  if (l.mode === "BICYCLE") return "#34c759";
+  if (l.mode === "CAR") return darkMql.matches ? "#aeaeb2" : "#48484a";
+  const r = l.route || {};
+  return r.color ? "#" + r.color : agencyColor(agencyOf(l));
+}
+function buildFC(it, preview){
+  return { type: "FeatureCollection", features: it.legs.map(l => ({
+    type: "Feature",
+    properties: { color: modeColor(l), dash: l.mode === "WALK" ? 1 : 0,
+                  preview: preview ? 1 : 0 },
+    geometry: { type: "LineString",
+                coordinates: decodePolyline(l.legGeometry.points) } })) };
+}
+window.select = function(cid){
+  document.querySelectorAll(".card.sel").forEach(el => el.classList.remove("sel"));
+  const el = document.getElementById(cid);
+  if (el) el.classList.add("sel");
+  selId = cid;
+  const fc = buildFC(itinsById[cid]);
+  animateRoute(fc);
+  const all = fc.features.flatMap(f => f.geometry.coordinates);
+  if (all.length){
+    const b = all.reduce((bb,c) => bb.extend(c),
+      new maplibregl.LngLatBounds(all[0], all[0]));
+    map.fitBounds(b, { padding: { top: 60, bottom: 60, right: 60, left: 430 },
+                       maxZoom: 14 });
+  }
+};
+
+/* hovering a card previews its route (dimmed); leaving restores selection */
+const resultsEl = document.getElementById("results");
+resultsEl.addEventListener("mouseover", e => {
+  const c = e.target.closest(".card");
+  if (!c || c.id === selId || !itinsById[c.id]) return;
+  sweepToken++;  // cancel any in-flight sweep so it can't fight the preview
+  if (map.getSource("route")) map.getSource("route").setData(buildFC(itinsById[c.id], true));
+});
+resultsEl.addEventListener("mouseout", e => {
+  const c = e.target.closest(".card");
+  if (!c) return;
+  const into = e.relatedTarget && e.relatedTarget.closest
+    ? e.relatedTarget.closest(".card") : null;
+  if (into === c) return;
+  if (map.getSource("route") && lastRouteFC) map.getSource("route").setData(lastRouteFC);
+});
+
+/* ---- trip detail view ---- */
+window.openIt = function(cid){
+  window.select(cid);
+  renderDetail(cid);
+  document.body.classList.add("detail-open");
+};
+function renderDetail(cid){
+  const it = itinsById[cid];
+  const { total, items } = itineraryCostDetail(it);
+  let steps = "", sawTransit = false;
+  for (let li = 0; li < it.legs.length; li++){
+    const l = it.legs[li];
+    const mins = Math.round(l.duration/60);
+    const col = modeColor(l);
+    let what, sub, extra = "";
+    if (l.mode === "WALK"){
+      what = `${icn("walk")} Walk ${Math.round(l.distance)} m`;
+      sub = `${mins} min &middot; to ${esc(l.to.name === "Destination" ? "your destination" : l.to.name)}`;
+    } else if (l.mode === "BICYCLE" && l.rentedBike){
+      what = `${icn("bike")} Bike Share ${(l.distance/1000).toFixed(1)} km`;
+      sub = `${mins} min &middot; grab a bike at ${esc(l.from.name)}, dock it at ${esc(l.to.name)}`;
+    } else if (l.mode === "BICYCLE"){
+      what = `${icn("bike")} Bike ${(l.distance/1000).toFixed(1)} km`;
+      sub = `${mins} min &middot; park your bike at ${esc(l.to.name)}`;
+    } else if (l.mode === "CAR"){
+      what = `${icn("car")} Drive ${(l.distance/1000).toFixed(1)} km`;
+      sub = sawTransit
+        ? `${mins} min &middot; to ${esc(l.to.name === "Destination" ? "your destination" : l.to.name)}`
+        : `${mins} min &middot; park at ${esc(l.to.name)}`;
+    } else {
+      sawTransit = true;
+      const r = l.route || {};
+      const stops = (l.intermediatePlaces || []).length + 1;
+      const bg = r.color ? "#" + r.color : agencyColor(agencyOf(l));
+      what = `<span class="rt" style="background:${bg}">${esc(r.shortName || r.longName || "")}</span>
+        ${esc(prettyAgency(agencyOf(l)))}`
+        + (l.headsign ? ` <span style="font-weight:500;color:var(--muted)">&middot; ${esc(l.headsign)}</span>` : "");
+      sub = `Board at ${esc(l.from.name)} &middot; ride ${stops} stop${stops>1?"s":""}
+             (${mins} min) &middot; get off at ${esc(l.to.name)}`;
+      const bi = boardingInfo(it.legs, li);
+      if (bi) extra = trainDiagram(bi, (l.to.name || "").split(" Station")[0]);
+    }
+    steps += `<div class="step ${l.mode === "WALK" ? "walkstep" : ""}" style="--rail:${col}">
+      <div class="t">${hhmm(l.startTime)}</div>
+      <div class="rail"><div class="dot"></div><div class="bar"></div></div>
+      <div class="body"><div class="what">${what}</div><div class="sub">${sub}</div>${extra}</div>
+    </div>`;
+  }
+  steps += `<div class="step"><div class="t">${hhmm(it.endTime)}</div>
+    <div class="rail"><div class="dot" style="--rail:#ff453a"></div></div>
+    <div class="body"><div class="what">Arrive</div></div></div>`;
+  const fares = items.map(x => `<div class="fitem"><span>${x.label}</span>
+      <span>${x.amount === 0 ? "free" : "$" + x.amount.toFixed(2)}</span></div>`).join("");
+  document.getElementById("detail").innerHTML = `
+    <div class="dhead">
+      <button class="back" onclick="closeDetail()" title="Back to results">${icn("back")}</button>
+      <span><span class="mins">${Math.round(it.duration/60)} min</span>
+        <span class="times">${hhmm(it.startTime)} &ndash; ${hhmm(it.endTime)}</span></span>
+      <span class="dcost">$${total.toFixed(2)}</span>
+    </div>
+    <div class="tl">${steps}</div>
+    <div class="fares"><h3>Cost breakdown${rider === "youth" ? " &middot; youth fare" : ""}</h3>
+      ${fares}
+      <div class="fitem total"><span>Total</span><span>$${total.toFixed(2)}</span></div>
+      <div class="fnote">Fares are estimates. One Fare makes local transit free when a
+        GO trip is part of the journey. Youth rates applied for TTC and GO; other
+        systems' youth fares aren't modelled yet.</div>
+    </div>`;
+}
+window.closeDetail = function(){
+  document.body.classList.remove("detail-open");
+};
+
+/* ---- controls ---- */
+document.getElementById("go").onclick = plan;
+document.getElementById("driveSel").addEventListener("change", e => {
+  maxDriveM = +e.target.value;
+  if (lastParts) renderResults(lastParts);   // re-filter, no re-query
+});
+document.getElementById("daySel").addEventListener("change", plan);
+document.getElementById("timeSel").addEventListener("change", plan);
+document.getElementById("swap").innerHTML = icn("swap", 14);
+document.getElementById("clear").innerHTML = icn("x", 13);
+/* animate a dollar figure rolling from its current value to a new one */
+function countTo(el, to){
+  const final = "$" + to.toFixed(2);
+  // animation frames don't run in hidden/background tabs - never let the
+  // displayed price depend on them
+  if (document.hidden){ el.textContent = final; return; }
+  const from = parseFloat((el.textContent || "").replace(/[^0-9.]/g, "")) || 0;
+  const t0 = performance.now(), dur = 450;
+  let done = false;
+  (function step(now){
+    const p = Math.min((now - t0) / dur, 1);
+    const eased = 1 - Math.pow(1 - p, 3);
+    el.textContent = "$" + (from + (to - from) * eased).toFixed(2);
+    if (p < 1) requestAnimationFrame(step); else done = true;
+  })(t0);
+  setTimeout(() => { if (!done) el.textContent = final; }, dur + 150);
+}
+
+/* re-price every visible card in place (no re-render, no map jump) */
+function refreshPrices(){
+  const entries = Object.entries(itinsById);
+  if (!entries.length) return;
+  const costs = {};
+  entries.forEach(([cid, it]) => costs[cid] = itineraryCost(it));
+  const cheapCid = entries.reduce((a, [cid]) =>
+    costs[cid] < costs[a] ? cid : a, entries[0][0]);
+  const fastCid = entries.reduce((a, [cid, it]) =>
+    it.duration < itinsById[a].duration ? cid : a, entries[0][0]);
+  for (const [cid, it] of entries){
+    const card = document.getElementById(cid);
+    if (!card) continue;
+    countTo(card.querySelector(".cost"), costs[cid]);
+    const badges =
+      (cid === fastCid ? '<span class="badge fast">Fastest</span>' : "") +
+      (cid === cheapCid ? '<span class="badge cheap">Cheapest</span>' : "");
+    let bd = card.querySelector(".badges");
+    if (badges){
+      if (!bd){
+        bd = document.createElement("div");
+        bd.className = "badges";
+        card.querySelector(".head").after(bd);
+      }
+      bd.innerHTML = badges;
+    } else if (bd) bd.remove();
+  }
+}
+
+/* the "Using:" toggles - flip one and the trip is re-planned with the
+   matching mode mixes included/excluded */
+const HAVE_LABEL = { bike:"My bike", carStart:"Car at start", carEnd:"Car at end", share:"Bike Share" };
+const HAVE_ICON  = { bike:"bike", carStart:"car", carEnd:"car", share:"bike" };
+for (const id of ["haveBike", "haveCarStart", "haveCarEnd", "haveShare"]){
+  const b = document.getElementById(id);
+  const k = b.dataset.have;
+  b.innerHTML = icn(HAVE_ICON[k], 13) + HAVE_LABEL[k];
+  b.classList.toggle("on", !!have[k]);
+  b.onclick = () => {
+    have[k] = !have[k];
+    localStorage.setItem("have", JSON.stringify(have));
+    b.classList.toggle("on", have[k]);
+    plan();
+  };
+}
+
+document.querySelectorAll("#riderSeg button").forEach(b => {
+  b.onclick = () => {
+    rider = b.dataset.rider;
+    document.querySelectorAll("#riderSeg button").forEach(x =>
+      x.classList.toggle("on", x === b));
+    refreshPrices();
+    if (document.body.classList.contains("detail-open")
+        && selId && itinsById[selId]) renderDetail(selId);
+  };
+});
+document.getElementById("swap").onclick = () => {
+  if (!fromPt || !toPt) return;
+  const f = { ...fromPt }, t = { ...toPt };
+  const fl = document.getElementById("fromBox").value,
+        tl = document.getElementById("toBox").value;
+  setPoint("from", t, tl); setPoint("to", f, fl);
+  plan();
+};
+document.getElementById("clear").onclick = () => {
+  if (fromMarker) fromMarker.remove(); if (toMarker) toMarker.remove();
+  fromPt = toPt = fromMarker = toMarker = null;
+  lastParts = null; lastRouteFC = null;
+  closeDetail();
+  document.getElementById("fromBox").value = "";
+  document.getElementById("toBox").value = "";
+  document.getElementById("results").innerHTML =
+    '<div class="hint">Pick a start and an end to compare every mix of transit, driving, your bike and Bike Share &mdash; with real fares.</div>';
+  if (map.getSource("route"))
+    map.getSource("route").setData({ type:"FeatureCollection", features: [] });
+};
+
+/* populate the day + time pickers (default: today, next quarter hour) */
+(function(){
+  const daySel = document.getElementById("daySel"),
+        timeSel = document.getElementById("timeSel");
+  const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const pad = n => String(n).padStart(2,"0");
+  for (let i = 0; i < 7; i++){
+    const d = new Date(Date.now() + i*86400000);
+    const val = d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+    const label = i === 0 ? "Today" : i === 1 ? "Tomorrow"
+      : days[d.getDay()] + " " + d.getDate();
+    daySel.add(new Option(label, val));
+  }
+  for (let h = 0; h < 24; h++) for (const m of [0,15,30,45]){
+    const ampm = h < 12 ? "AM" : "PM";
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+    timeSel.add(new Option(`${h12}:${pad(m)} ${ampm}`, `${pad(h)}:${pad(m)}`));
+  }
+  const now = new Date(Date.now() + 5*60000);
+  let h = now.getHours(), m = Math.ceil(now.getMinutes()/15)*15;
+  if (m === 60){ m = 0; h = (h+1) % 24; }
+  timeSel.value = `${pad(h)}:${pad(m)}`;
+})();
+
+/* ===================== REACH MODE =====================
+   Tap the map -> paint a travel-time "bloom" from that point. Colours
+   come from a switchable scheme. Isochrones from the read-only 2.5
+   "reach" engine on :8090 (walk+transit, tied to the app's date/time).
+   If that engine isn't running, the card says so and nothing else breaks. */
+(function(){
+  const ISO_API = "http://localhost:8090/otp/traveltime/isochrone";
+  const CUTS = ["900","1800","2700","3600","4500","5400","6300","7200","8100","9000"];
+  const MINS = { "900":"15","1800":"30","2700":"45","3600":"60","4500":"75","5400":"90",
+    "6300":"105","7200":"120","8100":"135","9000":"150" };
+  const NBANDS = CUTS.length;
+  const SCHEMES = {
+    A: { name:"Heat", ramp:{ "900":"#ff4d3f","1800":"#ff7a34","2700":"#ffa733","3600":"#ffcf3d","4500":"#d9d94f","5400":"#8fd14f","6300":"#46c4a0","7200":"#3fb6c4","8100":"#5a86d6","9000":"#6a6ad4" } },
+    B: { name:"Viridis", ramp:{ "900":"#fde725","1800":"#b5de2b","2700":"#6ece58","3600":"#35b779","4500":"#1f9e89","5400":"#26828e","6300":"#31688e","7200":"#3e4989","8100":"#482878","9000":"#440154" } },
+    C: { name:"Ocean", ramp:{ "900":"#afe0ff","1800":"#8fd3ff","2700":"#6ab8f5","3600":"#4aa9f0","4500":"#3d82db","5400":"#2f66c9","6300":"#2b5cba","7200":"#1e4aa5","8100":"#16388a","9000":"#0d2668" } }
+  };
+  let scheme = localStorage.getItem("reachScheme") || "B";
+  if (!SCHEMES[scheme]) scheme = "B";
+
+  // Transit reach depends on WHEN you travel (schedules), so we can't truly
+  // ignore time. Instead we anchor every bloom to 8:00 AM on a weekday -
+  // when service (incl. GO) runs fullest - so the map is stable and shows
+  // the best-case reach no matter when the user is looking.
+  function weekdayMorning(){
+    const d = new Date(); d.setHours(8,0,0,0);
+    const wd = d.getDay();                    // 0 Sun .. 6 Sat
+    if (wd === 0) d.setDate(d.getDate() + 1); // Sun -> Mon
+    if (wd === 6) d.setDate(d.getDate() + 2); // Sat -> Mon
+    return d.toISOString();
+  }
+
+  const colorExpr = () => {
+    const e = ["match", ["get","time"]];
+    for (const c of CUTS) e.push(c, SCHEMES[scheme].ramp[c]);
+    e.push("#888"); return e;
+  };
+  const opacityExpr = p =>
+    ["*", 0.82, ["max", 0, ["min", 1, ["-", p, ["get","ord"]]]]];
+
+  function firstSymbol(){
+    const ls = map.getStyle().layers;
+    const s = ls.find(l => l.type === "symbol");
+    return s && s.id;
+  }
+  function ensureLayers(fc){
+    for (const f of fc.features) f.properties.ord = f.properties.time/900 - 1;
+    if (map.getSource("reach")){
+      map.getSource("reach").setData(fc);
+    } else {
+      map.addSource("reach", { type:"geojson", data:fc });
+      map.addLayer({ id:"reach-fill", type:"fill", source:"reach",
+        paint:{ "fill-color":colorExpr(), "fill-opacity":opacityExpr(0) } }, firstSymbol());
+    }
+    map.setPaintProperty("reach-fill","fill-color", colorExpr());
+  }
+  function setProgress(p){
+    if (map.getLayer("reach-fill"))
+      map.setPaintProperty("reach-fill","fill-opacity", opacityExpr(p));
+  }
+  function ripple(){
+    const END = NBANDS + 0.6;   // fully revealed just past the outermost band
+    const dur = 1400, t0 = performance.now();
+    (function frame(nowT){
+      if (document.hidden){ setProgress(END); return; }   // don't freeze half-drawn
+      const p = Math.min(1, (nowT - t0)/dur) * END;
+      setProgress(p);
+      if (p < END) requestAnimationFrame(frame);
+    })(performance.now());
+  }
+  function clearReach(){
+    ["reach-fill"].forEach(l => map.getLayer(l) && map.removeLayer(l));
+    map.getSource("reach") && map.removeSource("reach");
+  }
+
+  // ---- pulsing "computing" dot at the tapped point ----
+  let pulseMarker = null;
+  function showPulse(lngLat){
+    hidePulse();
+    const el = document.createElement("div");
+    el.className = "reach-pulse";
+    pulseMarker = new maplibregl.Marker({ element: el, anchor:"center" })
+      .setLngLat(lngLat).addTo(map);
+  }
+  function hidePulse(){ if (pulseMarker){ pulseMarker.remove(); pulseMarker = null; } }
+
+  let busy = false;
+  window.__reachTap = async function(lngLat){
+    if (busy) return;
+    busy = true; setStatus("Working out how far you can go…");
+    showPulse(lngLat);
+    try {
+      const iso  = weekdayMorning();
+      const url = ISO_API + "?location=" + lngLat.lat + "," + lngLat.lng
+        + "&time=" + encodeURIComponent(iso) + "&modes=WALK,TRANSIT&arriveBy=false"
+        + CUTS.map(c => "&cutoff=" + MINS[c] + "M").join("");
+      const fc = await fetch(url).then(r => { if(!r.ok) throw new Error(r.status); return r.json(); });
+      hidePulse();
+      ensureLayers(fc);
+      ripple();
+      setStatus("Weekday-morning reach. Tap elsewhere to move it.");
+    } catch (err) {
+      hidePulse();
+      setStatus("Reach engine isn't running yet — restart the app (Ctrl+C, then bash run.sh).");
+    } finally { busy = false; }
+  };
+
+  // ---- floating control card ----
+  const card = document.createElement("div");
+  card.id = "reachCard";
+  card.innerHTML = `
+    <button id="reachToggle" type="button">
+      <span class="rt-dot"></span> Reach map</button>
+    <button id="reachClose" type="button" title="Hide the reach map">${icn("x")}</button>
+    <div id="reachBody" hidden>
+      <div class="reach-hint" id="reachStatus">Tap anywhere to see how far you can travel by transit on a weekday morning.</div>
+      <div class="reach-schemes" id="reachSchemes"></div>
+      <div class="reach-bar" id="reachBar"></div>
+      <div class="reach-scale"><span>15 min</span><span>2½ hr</span></div>
+    </div>`;
+  document.body.appendChild(card);
+
+  // a small launcher that brings the card back after it's hidden
+  const launcher = document.createElement("button");
+  launcher.id = "reachLauncher";
+  launcher.type = "button";
+  launcher.title = "Show the reach map";
+  launcher.innerHTML = `<svg class="icn" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>`;
+  document.body.appendChild(launcher);
+  const bodyEl = card.querySelector("#reachBody");
+  const toggle = card.querySelector("#reachToggle");
+  function setStatus(t){ const s = document.getElementById("reachStatus"); if (s) s.textContent = t; }
+
+  function paintSchemes(){
+    const wrap = card.querySelector("#reachSchemes"); wrap.innerHTML = "";
+    for (const k of ["A","B","C"]){
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "reach-sw" + (k===scheme ? " on" : "");
+      b.title = SCHEMES[k].name;
+      const bar = CUTS.map(c => `<i style="background:${SCHEMES[k].ramp[c]}"></i>`).join("");
+      b.innerHTML = `<div class="sw-bar">${bar}</div><div class="sw-name">${SCHEMES[k].name}</div>`;
+      b.onclick = () => {
+        scheme = k; localStorage.setItem("reachScheme", k);
+        paintSchemes(); paintLegend();
+        if (map.getLayer("reach-fill")) map.setPaintProperty("reach-fill","fill-color", colorExpr());
+      };
+      wrap.appendChild(b);
+    }
+  }
+  function paintLegend(){
+    const bar = card.querySelector("#reachBar");
+    const stops = CUTS.map((c,i) =>
+      SCHEMES[scheme].ramp[c] + " " + Math.round(i/(NBANDS-1)*100) + "%").join(",");
+    bar.style.background = "linear-gradient(to right," + stops + ")";
+  }
+
+  function setMode(on){
+    window.__reachMode = on;
+    toggle.classList.toggle("on", on);
+    bodyEl.hidden = !on;
+    if (!on){ clearReach(); hidePulse(); }
+    map.getCanvas().style.cursor = on ? "crosshair" : "";
+  }
+  toggle.onclick = () => setMode(!window.__reachMode);
+
+  // ---- hide / show the whole reach map (persisted) ----
+  function showReach(persist){
+    card.style.display = "";
+    launcher.classList.remove("show");
+    if (persist) localStorage.setItem("reachHidden", "0");
+  }
+  function hideReach(persist){
+    setMode(false);                 // stop tap-to-bloom + clear any bloom
+    card.style.display = "none";
+    launcher.classList.add("show");
+    if (persist) localStorage.setItem("reachHidden", "1");
+  }
+  card.querySelector("#reachClose").onclick = () => hideReach(true);
+  launcher.onclick = () => showReach(true);
+  if (localStorage.getItem("reachHidden") === "1") hideReach(false);
+
+  paintSchemes(); paintLegend();
+})();
+</script>
+</body>
+</html>

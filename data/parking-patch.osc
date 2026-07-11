@@ -1,0 +1,1128 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<osmChange version="0.6" generator="gta-router-parking-patch"><modify><way id="26537780" version="9" timestamp="2019-04-22T00:53:16Z">
+    <nd ref="290861534" />
+    <nd ref="3179937815" />
+    <nd ref="3179937814" />
+    <nd ref="3179937816" />
+    <nd ref="3179937817" />
+    <nd ref="1663091893" />
+    <nd ref="1663091913" />
+    <nd ref="1663091943" />
+    <nd ref="290861535" />
+    <nd ref="1663091917" />
+    <nd ref="290861536" />
+    <nd ref="304895540" />
+    <nd ref="2115117079" />
+    <nd ref="2115117080" />
+    <nd ref="290861537" />
+    <nd ref="1663091762" />
+    <nd ref="1663091802" />
+    <nd ref="1663091813" />
+    <nd ref="1663091821" />
+    <nd ref="290861534" />
+    <tag k="amenity" v="parking" />
+    <tag k="fee" v="no" />
+    <tag k="name" v="GO Transit" />
+    <tag k="parking" v="surface" />
+    <tag k="ref" v="P3" />
+    <tag k="surface" v="asphalt" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="32052153" version="12" timestamp="2024-04-16T12:05:52Z">
+    <nd ref="359792993" />
+    <nd ref="359792994" />
+    <nd ref="359792996" />
+    <nd ref="7061919932" />
+    <nd ref="7061919933" />
+    <nd ref="7061919934" />
+    <nd ref="359792998" />
+    <nd ref="359792999" />
+    <nd ref="359793003" />
+    <nd ref="359793005" />
+    <nd ref="359793008" />
+    <nd ref="359793009" />
+    <nd ref="359793012" />
+    <nd ref="359793014" />
+    <nd ref="7061919927" />
+    <nd ref="7061919925" />
+    <nd ref="7061919924" />
+    <nd ref="7061919926" />
+    <nd ref="359793016" />
+    <nd ref="359793017" />
+    <nd ref="359793020" />
+    <nd ref="359793023" />
+    <nd ref="359793025" />
+    <nd ref="7061919931" />
+    <nd ref="7061919930" />
+    <nd ref="7061919929" />
+    <nd ref="359793028" />
+    <nd ref="359792993" />
+    <tag k="addr:city" v="Etobicoke" />
+    <tag k="addr:housenumber" v="400" />
+    <tag k="addr:street" v="Munster Avenue" />
+    <tag k="alt_name" v="TTC commuter parking TPA 801" />
+    <tag k="amenity" v="parking" />
+    <tag k="capacity:disabled" v="yes" />
+    <tag k="fee" v="yes" />
+    <tag k="lit" v="yes" />
+    <tag k="name" v="TTC Parking - Kipling South Lot" />
+    <tag k="note" v="free after 3pm/weekends" />
+    <tag k="opendata:type" v="108006" />
+    <tag k="parking" v="surface" />
+    <tag k="payment:american_express" v="yes" />
+    <tag k="payment:coins" v="yes" />
+    <tag k="payment:mastercard" v="yes" />
+    <tag k="payment:visa" v="yes" />
+    <tag k="ref" v="801" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="33195552" version="7" timestamp="2023-09-08T22:40:12Z">
+    <nd ref="376266918" />
+    <nd ref="376266921" />
+    <nd ref="376266924" />
+    <nd ref="376266927" />
+    <nd ref="11094589354" />
+    <nd ref="376266928" />
+    <nd ref="376266918" />
+    <tag k="addr:city" v="Etobicoke" />
+    <tag k="addr:housenumber" v="20" />
+    <tag k="addr:street" v="Lomond Drive" />
+    <tag k="alt_name" v="TTC Islington Station Lomond Lot" />
+    <tag k="amenity" v="parking" />
+    <tag k="name" v="TTC commuter parking TPA 804" />
+    <tag k="opendata:type" v="108006" />
+    <tag k="parking" v="surface" />
+    <tag k="surface" v="asphalt" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="33195554" version="5" timestamp="2024-12-26T17:05:55Z">
+    <nd ref="376266942" />
+    <nd ref="376266944" />
+    <nd ref="376266947" />
+    <nd ref="376266952" />
+    <nd ref="376266955" />
+    <nd ref="376266956" />
+    <nd ref="376266959" />
+    <nd ref="376266962" />
+    <nd ref="12453381700" />
+    <nd ref="376266965" />
+    <nd ref="376266942" />
+    <tag k="amenity" v="parking" />
+    <tag k="name" v="TTC Islington Station Main Lot" />
+    <tag k="parking" v="surface" />
+    <tag k="source" v="yahoo" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="33761827" version="5" timestamp="2025-01-13T21:29:41Z">
+    <nd ref="1565127330" />
+    <nd ref="1565127315" />
+    <nd ref="1565127317" />
+    <nd ref="1565127311" />
+    <nd ref="1565127297" />
+    <nd ref="1565127292" />
+    <nd ref="1565127293" />
+    <nd ref="1565127288" />
+    <nd ref="1565127282" />
+    <nd ref="1565127279" />
+    <nd ref="1565127281" />
+    <nd ref="1565127256" />
+    <nd ref="1565127227" />
+    <nd ref="1565127219" />
+    <nd ref="1565127220" />
+    <nd ref="1565127207" />
+    <nd ref="1565127196" />
+    <nd ref="1565127187" />
+    <nd ref="1565127184" />
+    <nd ref="1565127172" />
+    <nd ref="1565127160" />
+    <nd ref="1565127152" />
+    <nd ref="1565127150" />
+    <nd ref="1565127143" />
+    <nd ref="1565127122" />
+    <nd ref="1565127120" />
+    <nd ref="1565127091" />
+    <nd ref="1565127053" />
+    <nd ref="1565127044" />
+    <nd ref="1565127040" />
+    <nd ref="1565127051" />
+    <nd ref="1565127055" />
+    <nd ref="386268555" />
+    <nd ref="386268556" />
+    <nd ref="1565127162" />
+    <nd ref="1565127188" />
+    <nd ref="1565127190" />
+    <nd ref="1565127214" />
+    <nd ref="386268557" />
+    <nd ref="1565127300" />
+    <nd ref="1565127314" />
+    <nd ref="1565127319" />
+    <nd ref="386268558" />
+    <nd ref="1565127411" />
+    <nd ref="1565127410" />
+    <nd ref="386268559" />
+    <nd ref="386268560" />
+    <nd ref="1565127393" />
+    <nd ref="1565127343" />
+    <nd ref="1565127341" />
+    <nd ref="1565127376" />
+    <nd ref="1565127360" />
+    <nd ref="1565127338" />
+    <nd ref="1565127330" />
+    <tag k="amenity" v="parking" />
+    <tag k="capacity:disabled" v="yes" />
+    <tag k="fee" v="no" />
+    <tag k="operator" v="GO Transit" />
+    <tag k="parking" v="surface" />
+    <tag k="surface" v="asphalt" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="33761829" version="5" timestamp="2017-02-02T16:11:46Z">
+    <nd ref="386268564" />
+    <nd ref="4656764052" />
+    <nd ref="386268565" />
+    <nd ref="4159420971" />
+    <nd ref="4159420970" />
+    <nd ref="386268566" />
+    <nd ref="4159420982" />
+    <nd ref="4159420984" />
+    <nd ref="386268567" />
+    <nd ref="4159420987" />
+    <nd ref="4159420985" />
+    <nd ref="4159420986" />
+    <nd ref="4159420979" />
+    <nd ref="4159420980" />
+    <nd ref="4159420978" />
+    <nd ref="386268568" />
+    <nd ref="4159420977" />
+    <nd ref="4159420976" />
+    <nd ref="386268564" />
+    <tag k="addr:housenumber" v="2390" />
+    <tag k="addr:street" v="Argentia Road" />
+    <tag k="amenity" v="parking" />
+    <tag k="name" v="GO Transit Meadowvale Parking" />
+    <tag k="parking" v="surface" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="180665731" version="6" timestamp="2026-05-17T19:55:28Z">
+    <nd ref="1911109126" />
+    <nd ref="1911109157" />
+    <nd ref="1911109129" />
+    <nd ref="1911109117" />
+    <nd ref="1911109073" />
+    <nd ref="1911109126" />
+    <tag k="access" v="yes" />
+    <tag k="amenity" v="parking" />
+    <tag k="capacity" v="42" />
+    <tag k="capacity:disabled" v="4" />
+    <tag k="fee" v="no" />
+    <tag k="name" v="MTO Carpool Lot" />
+    <tag k="parking" v="surface" />
+    <tag k="surface" v="asphalt" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="201514758" version="5" timestamp="2019-10-20T16:09:19Z">
+    <nd ref="2115117298" />
+    <nd ref="2682706748" />
+    <nd ref="2682706725" />
+    <nd ref="2682706724" />
+    <nd ref="2115117295" />
+    <nd ref="2115117294" />
+    <nd ref="2682706721" />
+    <nd ref="2115117292" />
+    <nd ref="2682706732" />
+    <nd ref="2115117296" />
+    <nd ref="2115117297" />
+    <nd ref="2115117940" />
+    <nd ref="2682706751" />
+    <nd ref="2682706746" />
+    <nd ref="2115117298" />
+    <tag k="amenity" v="parking" />
+    <tag k="building" v="parking" />
+    <tag k="operator" v="GO Transit" />
+    <tag k="parking" v="multi-storey" />
+    <tag k="source" v="usgs" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="201514901" version="2" timestamp="2013-01-17T02:04:52Z">
+    <nd ref="2115118112" />
+    <nd ref="2115118111" />
+    <nd ref="2115118109" />
+    <nd ref="2115118110" />
+    <nd ref="2115118107" />
+    <nd ref="2115118108" />
+    <nd ref="2115118113" />
+    <nd ref="2115118112" />
+    <tag k="amenity" v="parking" />
+    <tag k="fee" v="no" />
+    <tag k="name" v="GO Transit" />
+    <tag k="parking" v="surface" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="273786105" version="3" timestamp="2015-05-31T17:09:25Z">
+    <nd ref="2786018765" />
+    <nd ref="2786018761" />
+    <nd ref="2786018728" />
+    <nd ref="2786018715" />
+    <nd ref="2786018713" />
+    <nd ref="2786018711" />
+    <nd ref="2786018719" />
+    <nd ref="2786018730" />
+    <nd ref="2786018731" />
+    <nd ref="2786018736" />
+    <nd ref="2786018739" />
+    <nd ref="2786018732" />
+    <nd ref="2786018734" />
+    <nd ref="2786018740" />
+    <nd ref="2786018742" />
+    <nd ref="2786018749" />
+    <nd ref="2786018751" />
+    <nd ref="2786018747" />
+    <nd ref="2786018744" />
+    <nd ref="2786018735" />
+    <nd ref="2786018733" />
+    <nd ref="2786018723" />
+    <nd ref="2786018717" />
+    <nd ref="2786018721" />
+    <nd ref="2786018726" />
+    <nd ref="2786018729" />
+    <nd ref="2786018753" />
+    <nd ref="2786018755" />
+    <nd ref="2786018757" />
+    <nd ref="2786018759" />
+    <nd ref="2786018763" />
+    <nd ref="2786018773" />
+    <nd ref="2786018770" />
+    <nd ref="2786018768" />
+    <nd ref="2786018767" />
+    <nd ref="2786018772" />
+    <nd ref="2786018765" />
+    <tag k="amenity" v="parking" />
+    <tag k="name" v="Malton South Lot" />
+    <tag k="operator" v="GO Transit" />
+    <tag k="parking" v="surface" />
+    <tag k="surface" v="asphalt" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="285825372" version="5" timestamp="2025-07-21T00:11:11Z">
+    <nd ref="2894540396" />
+    <nd ref="2894540707" />
+    <nd ref="13014539026" />
+    <nd ref="13014539027" />
+    <nd ref="13014539028" />
+    <nd ref="2894540711" />
+    <nd ref="2894540712" />
+    <nd ref="13014539030" />
+    <nd ref="13014539029" />
+    <nd ref="2894540713" />
+    <nd ref="13014539031" />
+    <nd ref="13014539032" />
+    <nd ref="13014539033" />
+    <nd ref="13014539034" />
+    <nd ref="2894540396" />
+    <tag k="amenity" v="parking" />
+    <tag k="fee" v="no" />
+    <tag k="lit" v="yes" />
+    <tag k="maxstay" v="120 hours" />
+    <tag k="name" v="QEW &amp; Erin Mills Parkway Carpool Lot" />
+    <tag k="operator" v="Ministry of Transportation of Ontario" />
+    <tag k="parking" v="surface" />
+    <tag k="surface" v="asphalt" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="379666847" version="3" timestamp="2016-01-01T00:53:55Z">
+    <nd ref="3829946863" />
+    <nd ref="3829946864" />
+    <nd ref="3829946865" />
+    <nd ref="3829946866" />
+    <nd ref="3829946867" />
+    <nd ref="3829946868" />
+    <nd ref="3829946869" />
+    <nd ref="3829946870" />
+    <nd ref="3829946871" />
+    <nd ref="3829946872" />
+    <nd ref="3829946873" />
+    <nd ref="3829946874" />
+    <nd ref="3829946863" />
+    <tag k="amenity" v="parking" />
+    <tag k="name" v="Square One Park and Ride" />
+    <tag k="parking" v="surface" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="438679218" version="3" timestamp="2021-04-14T15:37:27Z">
+    <nd ref="4363796326" />
+    <nd ref="8629578607" />
+    <nd ref="8629578608" />
+    <nd ref="8629578609" />
+    <nd ref="8629578610" />
+    <nd ref="4363796326" />
+    <tag k="amenity" v="parking" />
+    <tag k="name" v="Newcastle Carpool Lot" />
+    <tag k="operator" v="GO Transit" />
+    <tag k="parking" v="surface" />
+    <tag k="surface" v="asphalt" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="550148905" version="7" timestamp="2020-12-30T06:35:40Z">
+    <nd ref="5313810803" />
+    <nd ref="8272997647" />
+    <nd ref="5313810804" />
+    <nd ref="5313810805" />
+    <nd ref="8272997641" />
+    <nd ref="8272997642" />
+    <nd ref="5313810806" />
+    <nd ref="8272930730" />
+    <nd ref="8272930729" />
+    <nd ref="8272930732" />
+    <nd ref="8272930731" />
+    <nd ref="5313810807" />
+    <nd ref="8272997612" />
+    <nd ref="5313810808" />
+    <nd ref="5313810809" />
+    <nd ref="5313810810" />
+    <nd ref="5313810811" />
+    <nd ref="5313810812" />
+    <nd ref="5313810813" />
+    <nd ref="5313810814" />
+    <nd ref="8272997613" />
+    <nd ref="8272997631" />
+    <nd ref="8272997633" />
+    <nd ref="8272997632" />
+    <nd ref="7996094359" />
+    <nd ref="7996094360" />
+    <nd ref="7996094361" />
+    <nd ref="7996094362" />
+    <nd ref="7996094363" />
+    <nd ref="7996094364" />
+    <nd ref="7996094365" />
+    <nd ref="7996094366" />
+    <nd ref="7996094346" />
+    <nd ref="8272930742" />
+    <nd ref="8272930741" />
+    <nd ref="8272930740" />
+    <nd ref="8272930739" />
+    <nd ref="8272930738" />
+    <nd ref="5313810818" />
+    <nd ref="8272930724" />
+    <nd ref="8272930723" />
+    <nd ref="8272930725" />
+    <nd ref="5313810819" />
+    <nd ref="8272930726" />
+    <nd ref="8272930722" />
+    <nd ref="8272930727" />
+    <nd ref="5313810820" />
+    <nd ref="6543153986" />
+    <nd ref="8272930728" />
+    <nd ref="8272997655" />
+    <nd ref="8272997645" />
+    <nd ref="7427978299" />
+    <nd ref="8272997651" />
+    <nd ref="8272997652" />
+    <nd ref="8272997646" />
+    <nd ref="5313810803" />
+    <tag k="access" v="yes" />
+    <tag k="amenity" v="parking" />
+    <tag k="capacity" v="583" />
+    <tag k="capacity:disabled" v="25" />
+    <tag k="fee" v="yes" />
+    <tag k="operator" v="Toronto Transit Commission" />
+    <tag k="operator:type" v="government_facility-public" />
+    <tag k="parking" v="surface" />
+    <tag k="surface" v="asphalt" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="550750945" version="4" timestamp="2025-11-23T15:05:42Z">
+    <nd ref="5319348540" />
+    <nd ref="13326323487" />
+    <nd ref="13326323486" />
+    <nd ref="13326323488" />
+    <nd ref="13326323485" />
+    <nd ref="13326323480" />
+    <nd ref="13326323477" />
+    <nd ref="13326323478" />
+    <nd ref="13326323476" />
+    <nd ref="13326323479" />
+    <nd ref="13326323482" />
+    <nd ref="13326323481" />
+    <nd ref="5319348539" />
+    <nd ref="13326323483" />
+    <nd ref="5319348538" />
+    <nd ref="5319348521" />
+    <nd ref="5319348320" />
+    <nd ref="13326323484" />
+    <nd ref="5319348319" />
+    <nd ref="5319348318" />
+    <nd ref="13326323490" />
+    <nd ref="13326323489" />
+    <nd ref="5319348317" />
+    <nd ref="13326323491" />
+    <nd ref="13326323492" />
+    <nd ref="5319348316" />
+    <nd ref="5319348315" />
+    <nd ref="5319348314" />
+    <nd ref="13326323493" />
+    <nd ref="13326323494" />
+    <nd ref="5319348313" />
+    <nd ref="13326323495" />
+    <nd ref="13326323496" />
+    <nd ref="5319348312" />
+    <nd ref="5444010795" />
+    <nd ref="5319348311" />
+    <nd ref="5319348540" />
+    <tag k="amenity" v="parking" />
+    <tag k="fee" v="no" />
+    <tag k="name" v="Finch West Parking" />
+    <tag k="operator" v="Toronto Transit Commision" />
+    <tag k="parking" v="surface" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="565169487" version="3" timestamp="2020-04-20T23:41:22Z">
+    <nd ref="5444015924" />
+    <nd ref="5444015926" />
+    <nd ref="5444015928" />
+    <nd ref="5444015925" />
+    <nd ref="5444015927" />
+    <nd ref="5444010817" />
+    <nd ref="5444010811" />
+    <nd ref="5444010818" />
+    <nd ref="5444010815" />
+    <nd ref="5444010802" />
+    <nd ref="5444010798" />
+    <nd ref="7427978511" />
+    <nd ref="5444015924" />
+    <tag k="amenity" v="parking" />
+    <tag k="fee" v="no" />
+    <tag k="name" v="Pioneer Village Parking" />
+    <tag k="operator" v="Toronto Transit Commision" />
+    <tag k="parking" v="surface" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="630791081" version="3" timestamp="2025-01-13T21:29:41Z">
+    <nd ref="5955750428" />
+    <nd ref="5955750427" />
+    <nd ref="5955750426" />
+    <nd ref="5955750425" />
+    <nd ref="5955750424" />
+    <nd ref="5955750423" />
+    <nd ref="5955750422" />
+    <nd ref="5955750421" />
+    <nd ref="5955750420" />
+    <nd ref="5955750419" />
+    <nd ref="5955750418" />
+    <nd ref="5955750417" />
+    <nd ref="5955750416" />
+    <nd ref="5955750415" />
+    <nd ref="5955750414" />
+    <nd ref="5955750413" />
+    <nd ref="12499047952" />
+    <nd ref="5955750412" />
+    <nd ref="1565127485" />
+    <nd ref="5955750411" />
+    <nd ref="5955750410" />
+    <nd ref="5955750409" />
+    <nd ref="5955750408" />
+    <nd ref="5955750407" />
+    <nd ref="5955750406" />
+    <nd ref="5955750405" />
+    <nd ref="5955750428" />
+    <tag k="amenity" v="parking" />
+    <tag k="capacity:disabled" v="yes" />
+    <tag k="fee" v="no" />
+    <tag k="operator" v="GO Transit" />
+    <tag k="parking" v="surface" />
+    <tag k="surface" v="asphalt" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="940834681" version="2" timestamp="2021-05-08T22:05:41Z">
+    <nd ref="8713132411" />
+    <nd ref="8713132412" />
+    <nd ref="8713132413" />
+    <nd ref="8713132414" />
+    <nd ref="8713132415" />
+    <nd ref="8713132416" />
+    <nd ref="8713132411" />
+    <tag k="amenity" v="parking" />
+    <tag k="capacity" v="39" />
+    <tag k="name" v="Ellesmere Station Parking" />
+    <tag k="operator" v="Toronto Transit Commission" />
+    <tag k="operator:type" v="public" />
+    <tag k="parking" v="surface" />
+    <tag k="surface" v="asphalt" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="940834689" version="2" timestamp="2021-05-08T22:05:41Z">
+    <nd ref="8713180857" />
+    <nd ref="8713180858" />
+    <nd ref="8713180859" />
+    <nd ref="8713180860" />
+    <nd ref="8713180861" />
+    <nd ref="8713180862" />
+    <nd ref="8713180863" />
+    <nd ref="8713180864" />
+    <nd ref="8713180865" />
+    <nd ref="8713180857" />
+    <tag k="amenity" v="parking" />
+    <tag k="capacity" v="29" />
+    <tag k="name" v="Ellesmere Station Parking" />
+    <tag k="operator" v="Toronto Transit Commission" />
+    <tag k="operator:type" v="public" />
+    <tag k="parking" v="surface" />
+    <tag k="surface" v="asphalt" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="969650378" version="3" timestamp="2021-08-03T21:56:52Z">
+    <nd ref="8972986059" />
+    <nd ref="8972986058" />
+    <nd ref="8972986057" />
+    <nd ref="8972986056" />
+    <nd ref="8972986055" />
+    <nd ref="8972986059" />
+    <tag k="amenity" v="parking" />
+    <tag k="fee" v="yes" />
+    <tag k="name" v="TTC Parking - Kipling South Lot" />
+    <tag k="parking" v="surface" />
+    <tag k="surface" v="asphalt" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="969650692" version="6" timestamp="2025-02-16T15:30:02Z">
+    <nd ref="8973031020" />
+    <nd ref="8973031051" />
+    <nd ref="8973031050" />
+    <nd ref="8973031049" />
+    <nd ref="8973031048" />
+    <nd ref="8973031047" />
+    <nd ref="8973031046" />
+    <nd ref="8973031045" />
+    <nd ref="8973031044" />
+    <nd ref="8973031043" />
+    <nd ref="8973031042" />
+    <nd ref="8973031041" />
+    <nd ref="8973031040" />
+    <nd ref="8973031039" />
+    <nd ref="8973031038" />
+    <nd ref="8973031037" />
+    <nd ref="8973031036" />
+    <nd ref="8973031035" />
+    <nd ref="8973031034" />
+    <nd ref="8973031033" />
+    <nd ref="8973031032" />
+    <nd ref="8973031031" />
+    <nd ref="8973031030" />
+    <nd ref="8973031029" />
+    <nd ref="8973031028" />
+    <nd ref="8973031027" />
+    <nd ref="8973031026" />
+    <nd ref="8973031025" />
+    <nd ref="8973031024" />
+    <nd ref="8973031023" />
+    <nd ref="8973031022" />
+    <nd ref="8973031021" />
+    <nd ref="8973031020" />
+    <tag k="amenity" v="parking" />
+    <tag k="fee" v="yes" />
+    <tag k="lit" v="yes" />
+    <tag k="name" v="TTC Islington Station Fieldway Lot" />
+    <tag k="operator" v="Toronto Parking Authority" />
+    <tag k="operator:type" v="public" />
+    <tag k="operator:wikidata" v="Q7826466" />
+    <tag k="parking" v="surface" />
+    <tag k="ref" v="831" />
+    <tag k="surface" v="asphalt" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="1025054041" version="7" timestamp="2023-10-05T23:07:18Z">
+    <nd ref="9451595974" />
+    <nd ref="9451595954" />
+    <nd ref="9451595952" />
+    <nd ref="9451595951" />
+    <nd ref="9451595953" />
+    <nd ref="11225950333" />
+    <nd ref="11209291888" />
+    <nd ref="9451595973" />
+    <nd ref="9451595957" />
+    <nd ref="9451595956" />
+    <nd ref="9451595955" />
+    <nd ref="9451595958" />
+    <nd ref="11209291887" />
+    <nd ref="10810750016" />
+    <nd ref="9451595972" />
+    <nd ref="9451595961" />
+    <nd ref="9451595960" />
+    <nd ref="9451595959" />
+    <nd ref="9451595962" />
+    <nd ref="11226102707" />
+    <nd ref="9451595971" />
+    <nd ref="9451595965" />
+    <nd ref="9451595964" />
+    <nd ref="9451595963" />
+    <nd ref="9451595966" />
+    <nd ref="11226087598" />
+    <nd ref="10810750019" />
+    <nd ref="9451595969" />
+    <nd ref="9451595968" />
+    <nd ref="9451595967" />
+    <nd ref="9451595970" />
+    <nd ref="9451595974" />
+    <tag k="access" v="yes" />
+    <tag k="amenity" v="parking" />
+    <tag k="building" v="yes" />
+    <tag k="building:levels" v="6" />
+    <tag k="capacity:disabled" v="yes" />
+    <tag k="fee" v="no" />
+    <tag k="lit" v="yes" />
+    <tag k="name" v="Bramalea GO Parkade" />
+    <tag k="operator" v="Metrolinx" />
+    <tag k="operator:wikidata" v="Q3307451" />
+    <tag k="operator:wikipedia" v="en:Metrolinx" />
+    <tag k="parking" v="multi-storey" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="1026257279" version="4" timestamp="2024-12-21T17:23:44Z">
+    <nd ref="9461918111" />
+    <nd ref="9461918110" />
+    <nd ref="9461918109" />
+    <nd ref="9461918108" />
+    <nd ref="9461918107" />
+    <nd ref="9461918106" />
+    <nd ref="9461918105" />
+    <nd ref="9461918104" />
+    <nd ref="9461918103" />
+    <nd ref="9461918102" />
+    <nd ref="9461918101" />
+    <nd ref="9461918100" />
+    <nd ref="9461918099" />
+    <nd ref="9461918111" />
+    <tag k="access" v="yes" />
+    <tag k="amenity" v="parking" />
+    <tag k="maxstay" v="48 hours" />
+    <tag k="operator" v="GO Transit" />
+    <tag k="parking" v="surface" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="1026257280" version="3" timestamp="2024-12-21T17:23:44Z">
+    <nd ref="9461937219" />
+    <nd ref="9461937218" />
+    <nd ref="9461937217" />
+    <nd ref="9461918116" />
+    <nd ref="9461918115" />
+    <nd ref="9461918114" />
+    <nd ref="9461918113" />
+    <nd ref="9461918112" />
+    <nd ref="12438966412" />
+    <nd ref="9461937219" />
+    <tag k="amenity" v="parking" />
+    <tag k="maxstay" v="48 hours" />
+    <tag k="operator" v="GO Transit" />
+    <tag k="parking" v="surface" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="1220546363" version="4" timestamp="2024-07-06T23:01:35Z">
+    <nd ref="4318399165" />
+    <nd ref="6334709895" />
+    <nd ref="11309972381" />
+    <nd ref="11309972382" />
+    <nd ref="11309972383" />
+    <nd ref="11309972384" />
+    <nd ref="11309972385" />
+    <nd ref="4318399146" />
+    <nd ref="4318399154" />
+    <nd ref="4318399155" />
+    <nd ref="4318399165" />
+    <tag k="amenity" v="parking" />
+    <tag k="operator" v="GO Transit" />
+    <tag k="parking" v="surface" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="1257927718" version="2" timestamp="2024-03-05T18:46:05Z">
+    <nd ref="11694754715" />
+    <nd ref="11694754716" />
+    <nd ref="11694754717" />
+    <nd ref="11694754718" />
+    <nd ref="11694754715" />
+    <tag k="amenity" v="parking" />
+    <tag k="capacity" v="5" />
+    <tag k="operator" v="Metrolinx" />
+    <tag k="parking" v="surface" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="1278372980" version="5" timestamp="2025-10-27T22:10:54Z">
+    <nd ref="11867871806" />
+    <nd ref="11867871807" />
+    <nd ref="11867871808" />
+    <nd ref="11867871809" />
+    <nd ref="11867871806" />
+    <tag k="amenity" v="parking" />
+    <tag k="fixme" v="not present on aerial yet" />
+    <tag k="name" v="Confederation GO Station" />
+    <tag k="opening_date" v="2025-10-27" />
+    <tag k="operator" v="Metrolinx" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="1308063367" version="3" timestamp="2024-08-19T12:34:38Z">
+    <nd ref="12113802182" />
+    <nd ref="12113802181" />
+    <nd ref="12113802180" />
+    <nd ref="12113802179" />
+    <nd ref="12113802182" />
+    <tag k="amenity" v="parking" />
+    <tag k="fee" v="no" />
+    <tag k="operator" v="GO Transit" />
+    <tag k="parking" v="surface" />
+    <tag k="surface" v="asphalt" />
+  <tag k="park_ride" v="yes" /></way>
+<way id="27046918" version="10" timestamp="2026-05-06T14:05:06Z">
+    <nd ref="1446751935" />
+    <nd ref="296507022" />
+    <nd ref="13801491368" />
+    <nd ref="13801491369" />
+    <nd ref="13801491354" />
+    <nd ref="13801491356" />
+    <nd ref="13801491358" />
+    <nd ref="13798973368" />
+    <nd ref="1446751920" />
+    <nd ref="13798659522" />
+    <nd ref="5952634376" />
+    <nd ref="1446751921" />
+    <nd ref="1446751924" />
+    <nd ref="1446751925" />
+    <nd ref="1446751926" />
+    <nd ref="1446751927" />
+    <nd ref="1446751929" />
+    <nd ref="1446751928" />
+    <nd ref="1446751930" />
+    <nd ref="1446751931" />
+    <nd ref="1446751932" />
+    <nd ref="13796665784" />
+    <nd ref="1446751933" />
+    <nd ref="13801464535" />
+    <nd ref="13801464537" />
+    <nd ref="13801464571" />
+    <nd ref="13801491314" />
+    <nd ref="1446751935" />
+    <tag k="access" v="customers" />
+    <tag k="amenity" v="parking" />
+    <tag k="capacity:disabled" v="yes" />
+    <tag k="fee" v="no" />
+    <tag k="name" v="Old Cummer GO Parking" />
+    <tag k="parking" v="surface" />
+    <tag k="surface" v="asphalt" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="27822734" version="10" timestamp="2026-04-29T13:37:42Z">
+    <nd ref="11815233155" />
+    <nd ref="11815233156" />
+    <nd ref="11815233157" />
+    <nd ref="13768312089" />
+    <nd ref="12396607157" />
+    <nd ref="12396607156" />
+    <nd ref="12396607155" />
+    <nd ref="12396607154" />
+    <nd ref="13768312004" />
+    <nd ref="13768312007" />
+    <nd ref="11815233159" />
+    <nd ref="11815233160" />
+    <nd ref="305490217" />
+    <nd ref="305490221" />
+    <nd ref="305490220" />
+    <nd ref="4401298475" />
+    <nd ref="4401298474" />
+    <nd ref="4401298472" />
+    <nd ref="4401298473" />
+    <nd ref="305490219" />
+    <nd ref="305490218" />
+    <nd ref="11815233155" />
+    <tag k="access" v="customers" />
+    <tag k="amenity" v="parking" />
+    <tag k="fee" v="no" />
+    <tag k="name" v="Agincourt GO Parking" />
+    <tag k="parking" v="surface" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="34920424" version="4" timestamp="2024-05-13T16:40:06Z">
+    <nd ref="409729836" />
+    <nd ref="409729837" />
+    <nd ref="409729838" />
+    <nd ref="409729839" />
+    <nd ref="409729840" />
+    <nd ref="409729841" />
+    <nd ref="409729842" />
+    <nd ref="409729843" />
+    <nd ref="3376485715" />
+    <nd ref="3376485714" />
+    <nd ref="409729836" />
+    <tag k="access" v="customers" />
+    <tag k="amenity" v="parking" />
+    <tag k="fee" v="no" />
+    <tag k="parking" v="surface" />
+    <tag k="surface" v="asphalt" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="59411501" version="6" timestamp="2026-05-04T15:40:38Z">
+    <nd ref="736762094" />
+    <nd ref="736762112" />
+    <nd ref="736762132" />
+    <nd ref="736762142" />
+    <nd ref="736762164" />
+    <nd ref="736762184" />
+    <nd ref="736762201" />
+    <nd ref="4264632922" />
+    <nd ref="13795730093" />
+    <nd ref="4264632921" />
+    <nd ref="13795730094" />
+    <nd ref="9543815560" />
+    <nd ref="9543815561" />
+    <nd ref="736762214" />
+    <nd ref="13795730521" />
+    <nd ref="13795730520" />
+    <nd ref="13795730522" />
+    <nd ref="736762229" />
+    <nd ref="736762248" />
+    <nd ref="9543815559" />
+    <nd ref="13795730443" />
+    <nd ref="736762267" />
+    <nd ref="9543815555" />
+    <nd ref="13795730434" />
+    <nd ref="9543815557" />
+    <nd ref="9543815554" />
+    <nd ref="736762094" />
+    <tag k="amenity" v="parking" />
+    <tag k="name" v="Milliken" />
+    <tag k="parking" v="surface" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="87332308" version="5" timestamp="2015-09-16T18:07:00Z">
+    <nd ref="1015511559" />
+    <nd ref="1015511573" />
+    <nd ref="1015511570" />
+    <nd ref="1015511569" />
+    <nd ref="1015511572" />
+    <nd ref="1015511574" />
+    <nd ref="1015511567" />
+    <nd ref="1015511583" />
+    <nd ref="1015511581" />
+    <nd ref="1015511565" />
+    <nd ref="1015511571" />
+    <nd ref="1015511585" />
+    <nd ref="1015511559" />
+    <tag k="access" v="customers" />
+    <tag k="amenity" v="parking" />
+    <tag k="parking" v="surface" />
+    <tag k="surface" v="asphalt" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="88883400" version="5" timestamp="2026-03-12T19:19:17Z">
+    <nd ref="1031672733" />
+    <nd ref="1031672714" />
+    <nd ref="1031672665" />
+    <nd ref="1031672761" />
+    <nd ref="1031672668" />
+    <nd ref="1031672651" />
+    <nd ref="1031672728" />
+    <nd ref="1031672725" />
+    <nd ref="1031672687" />
+    <nd ref="1031672747" />
+    <nd ref="1031672719" />
+    <nd ref="1031672708" />
+    <nd ref="1031672689" />
+    <nd ref="1031672685" />
+    <nd ref="7472494983" />
+    <nd ref="7472494984" />
+    <nd ref="7472525385" />
+    <nd ref="7472525386" />
+    <nd ref="7472494982" />
+    <nd ref="1031672756" />
+    <nd ref="1031672751" />
+    <nd ref="1031672731" />
+    <nd ref="1031672676" />
+    <nd ref="13643525345" />
+    <nd ref="13643525346" />
+    <nd ref="13643525347" />
+    <nd ref="13643525348" />
+    <nd ref="13643525349" />
+    <nd ref="13643525350" />
+    <nd ref="13643525351" />
+    <nd ref="13643525352" />
+    <nd ref="13643525353" />
+    <nd ref="1031672679" />
+    <nd ref="1031672733" />
+    <tag k="amenity" v="parking" />
+    <tag k="parking" v="surface" />
+    <tag k="surface" v="asphalt" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="101290808" version="6" timestamp="2024-11-09T17:14:22Z">
+    <nd ref="12327132304" />
+    <nd ref="12327132303" />
+    <nd ref="1169085468" />
+    <nd ref="1987195625" />
+    <nd ref="1169085482" />
+    <nd ref="12327132318" />
+    <nd ref="1169085472" />
+    <nd ref="12327132317" />
+    <nd ref="12327132316" />
+    <nd ref="12327132315" />
+    <nd ref="12327132314" />
+    <nd ref="12327132313" />
+    <nd ref="12327132312" />
+    <nd ref="12327119643" />
+    <nd ref="12327132304" />
+    <tag k="amenity" v="parking" />
+    <tag k="parking" v="surface" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="143103795" version="7" timestamp="2025-01-16T14:03:45Z">
+    <nd ref="1566012516" />
+    <nd ref="12507057446" />
+    <nd ref="1566012509" />
+    <nd ref="1566012510" />
+    <nd ref="3833354731" />
+    <nd ref="1566012480" />
+    <nd ref="1566012478" />
+    <nd ref="1566012463" />
+    <nd ref="1566012467" />
+    <nd ref="1566012470" />
+    <nd ref="1566012476" />
+    <nd ref="3832947495" />
+    <nd ref="1566012483" />
+    <nd ref="3832947496" />
+    <nd ref="1566012486" />
+    <nd ref="3832947497" />
+    <nd ref="3832947498" />
+    <nd ref="1566012488" />
+    <nd ref="1566012491" />
+    <nd ref="1566012494" />
+    <nd ref="1566012496" />
+    <nd ref="9881627014" />
+    <nd ref="1566012512" />
+    <nd ref="1566012511" />
+    <nd ref="11471924782" />
+    <nd ref="1566012516" />
+    <tag k="access" v="permissive" />
+    <tag k="amenity" v="parking" />
+    <tag k="parking" v="surface" />
+    <tag k="source" v="Bing" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="146987576" version="10" timestamp="2025-06-22T21:49:44Z">
+    <nd ref="1601805071" />
+    <nd ref="12918286795" />
+    <nd ref="12918337148" />
+    <nd ref="12918336556" />
+    <nd ref="12918336692" />
+    <nd ref="12918336588" />
+    <nd ref="3057890224" />
+    <nd ref="12918336786" />
+    <nd ref="6384674993" />
+    <nd ref="12918336967" />
+    <nd ref="6384674994" />
+    <nd ref="6384674995" />
+    <nd ref="1601805050" />
+    <nd ref="6495470150" />
+    <nd ref="9653029389" />
+    <nd ref="7430745980" />
+    <nd ref="3057890216" />
+    <nd ref="3057890215" />
+    <nd ref="3722043121" />
+    <nd ref="12918336969" />
+    <nd ref="7430757912" />
+    <nd ref="12945437123" />
+    <nd ref="1273770698" />
+    <nd ref="9653029380" />
+    <nd ref="7430757911" />
+    <nd ref="7430757909" />
+    <nd ref="12918336626" />
+    <nd ref="12918336836" />
+    <nd ref="12918336571" />
+    <nd ref="7344355205" />
+    <nd ref="12918337142" />
+    <nd ref="1601805056" />
+    <nd ref="12918336742" />
+    <nd ref="1601805071" />
+    <tag k="access" v="customers" />
+    <tag k="amenity" v="parking" />
+    <tag k="lit" v="yes" />
+    <tag k="parking" v="surface" />
+    <tag k="surface" v="asphalt" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="185738639" version="5" timestamp="2016-09-30T02:11:29Z">
+    <nd ref="1964034435" />
+    <nd ref="1964034438" />
+    <nd ref="4424447472" />
+    <nd ref="4424447473" />
+    <nd ref="1964034436" />
+    <nd ref="1964034433" />
+    <nd ref="4424447463" />
+    <nd ref="4424447466" />
+    <nd ref="4424447457" />
+    <nd ref="4424447459" />
+    <nd ref="4424447465" />
+    <nd ref="1964034435" />
+    <tag k="amenity" v="parking" />
+    <tag k="parking" v="surface" />
+    <tag k="source" v="Bing" />
+    <tag k="surface" v="asphalt" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="274976756" version="3" timestamp="2018-07-25T19:15:10Z">
+    <nd ref="2796424161" />
+    <nd ref="2796424168" />
+    <nd ref="2796424672" />
+    <nd ref="2796424671" />
+    <nd ref="2796424670" />
+    <nd ref="5784941249" />
+    <nd ref="5784941248" />
+    <nd ref="2796424669" />
+    <nd ref="2796424165" />
+    <nd ref="2796424164" />
+    <nd ref="2796424166" />
+    <nd ref="2796424162" />
+    <nd ref="2796424161" />
+    <tag k="access" v="customers" />
+    <tag k="amenity" v="parking" />
+    <tag k="parking" v="surface" />
+    <tag k="source" v="Bing" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="384442022" version="2" timestamp="2015-12-04T23:43:36Z">
+    <nd ref="3877306360" />
+    <nd ref="3877306357" />
+    <nd ref="3877306056" />
+    <nd ref="3877306052" />
+    <nd ref="3877306040" />
+    <nd ref="3877306048" />
+    <nd ref="3877306049" />
+    <nd ref="3877306050" />
+    <nd ref="3877306051" />
+    <nd ref="3877306053" />
+    <nd ref="3877306358" />
+    <nd ref="3877306054" />
+    <nd ref="3877306055" />
+    <nd ref="3877306359" />
+    <nd ref="3877306360" />
+    <tag k="amenity" v="parking" />
+    <tag k="parking" v="surface" />
+    <tag k="surface" v="asphalt" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="766580050" version="7" timestamp="2026-06-02T17:40:37Z">
+    <nd ref="7159612322" />
+    <nd ref="7159612323" />
+    <nd ref="7159612324" />
+    <nd ref="10872571924" />
+    <nd ref="7159612325" />
+    <nd ref="7159612326" />
+    <nd ref="10872571861" />
+    <nd ref="13905212109" />
+    <nd ref="7159612327" />
+    <nd ref="7159612328" />
+    <nd ref="10872571858" />
+    <nd ref="7159612329" />
+    <nd ref="7159612330" />
+    <nd ref="7159612331" />
+    <nd ref="9834449168" />
+    <nd ref="7159612332" />
+    <nd ref="7159612322" />
+    <tag k="amenity" v="parking" />
+    <tag k="building" v="parking" />
+    <tag k="fee" v="no" />
+    <tag k="name" v="Bloomington GO Station" />
+    <tag k="parking" v="multi-storey" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="804376614" version="3" timestamp="2023-12-04T14:03:29Z">
+    <nd ref="7523772758" />
+    <nd ref="7523772757" />
+    <nd ref="7523772756" />
+    <nd ref="11394131574" />
+    <nd ref="7523772755" />
+    <nd ref="7523772754" />
+    <nd ref="11394131575" />
+    <nd ref="7523772753" />
+    <nd ref="7523772752" />
+    <nd ref="7523772751" />
+    <nd ref="11394131576" />
+    <nd ref="7523772750" />
+    <nd ref="7523772749" />
+    <nd ref="11394131577" />
+    <nd ref="7523772748" />
+    <nd ref="7523772747" />
+    <nd ref="7523772746" />
+    <nd ref="7523772745" />
+    <nd ref="7523772758" />
+    <tag k="amenity" v="parking" />
+    <tag k="building" v="yes" />
+    <tag k="parking" v="multi-storey" />
+  <tag k="park_ride" v="yes" /></way>
+  <way id="852076272" version="3" timestamp="2024-07-06T23:01:35Z">
+    <nd ref="7948207466" />
+    <nd ref="7948207467" />
+    <nd ref="7948207468" />
+    <nd ref="7948207469" />
+    <nd ref="7948207470" />
+    <nd ref="7948207466" />
+    <tag k="amenity" v="parking" />
+    <tag k="lit" v="yes" />
+    <tag k="parking" v="surface" />
+    <tag k="surface" v="asphalt" />
+  <tag k="park_ride" v="yes" /></way>
+</modify><create><node id="20000000001" version="1" lat="43.873450" lon="-79.288550"><tag k="amenity" v="parking" /><tag k="park_ride" v="yes" /><tag k="parking" v="multi-storey" /><tag k="fee" v="no" /><tag k="name" v="GO Centennial Station Parking" /><tag k="operator" v="GO Transit" /></node></create></osmChange>

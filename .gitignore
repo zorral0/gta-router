@@ -1,0 +1,13 @@
+.DS_Store
+*.log
+*.pbf
+*.pbf.orig
+*.zip
+*.jar
+*.jar.bak
+*.bak
+graph.obj*
+report/
+otp29/
+ttc-gtfs/
+ttc-gtfs 2/

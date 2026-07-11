@@ -1,0 +1,34 @@
+{
+  // Build-time settings. OTP allows comments in these JSON files.
+
+  // Don't crash the whole build on minor GTFS data errors (agencies
+  // publish imperfect feeds constantly; TTC especially).
+  "dataImportReport": true,
+
+  // Brampton's feed declares America/New_York (same clock as Toronto);
+  // without this line the build refuses to mix timezones.
+  "transitModelTimeZone": "America/Toronto",
+
+  // Car park-and-ride is built by default, but bike parking is NOT:
+  // without this flag the graph contains zero bike racks and every
+  // bike-to-station query fails, even though OSM has the racks mapped.
+  "staticBikeParkAndRide": true,
+
+  "osm": [
+    {
+      "source": "gta.osm.pbf",
+      "osmTagMapping": "default",
+      "timeZone": "America/Toronto"
+    }
+  ],
+
+  "transitFeeds": [
+    { "type": "gtfs", "source": "go-gtfs.zip",       "feedId": "GO"       },
+    { "type": "gtfs", "source": "up-gtfs.zip",       "feedId": "UP"       },
+    { "type": "gtfs", "source": "ttc-gtfs.zip",      "feedId": "TTC"      },
+    { "type": "gtfs", "source": "yrt-gtfs.zip",      "feedId": "YRT"      },
+    { "type": "gtfs", "source": "miway-gtfs.zip",    "feedId": "MIWAY"    },
+    { "type": "gtfs", "source": "brampton-gtfs.zip", "feedId": "BRAMPTON" },
+    { "type": "gtfs", "source": "drt-gtfs.zip",      "feedId": "DRT"      }
+  ]
+}

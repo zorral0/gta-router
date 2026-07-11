@@ -1,0 +1,145 @@
+{
+  "_about": [
+    "Which subway car (counted from the FRONT of the train, car 1 = front)",
+    "stops nearest the exit at each station, per direction of travel.",
+    "Transcribed by eye from the TTC Subway Rider Efficiency Guide",
+    "(Sean Lerner, ttc-rider.ca, Creative Commons, 2005 platform survey),",
+    "so positions are car-level estimates (+/- 1 car) and stations",
+    "renovated since 2005 may differ. Union is deliberately ABSENT - its",
+    "platforms were rebuilt in 2015 and the guide's data would be wrong.",
+    "Keys: station name lowercased, ' Station - ... Platform' stripped,",
+    "periods/apostrophes removed. Direction keys are the terminus the",
+    "train is heading toward (from the OTP leg headsign): vaughan/finch",
+    "for Line 1, kipling/kennedy for Line 2, donmills/sheppardyonge for",
+    "Line 4. 'of' = train length in cars (6, or 4 on Line 4).",
+    "'transfer' entries override the exit position when the NEXT leg is",
+    "another subway ride; keyed by next route number, or 'route:direction'",
+    "when the two onward directions have different stair positions."
+  ],
+  "stations": {
+    "college": {
+      "vaughan": { "car": 5, "of": 6, "why": "the stairs & escalator up to College St" },
+      "finch":   { "car": 2, "of": 6, "why": "the stairs & escalator up to College St" }
+    },
+    "dundas": {
+      "vaughan": { "car": 2, "of": 6, "why": "the exit to Dundas St & the Eaton Centre" },
+      "finch":   { "car": 5, "of": 6, "why": "the exit to Dundas St & the Eaton Centre" }
+    },
+    "queen": {
+      "vaughan": { "car": 1, "of": 6, "why": "the stairs & elevator up to Queen St" },
+      "finch":   { "car": 6, "of": 6, "why": "the stairs & elevator up to Queen St" }
+    },
+    "king": {
+      "vaughan": { "car": 4, "of": 6, "why": "the stairs up to King St" },
+      "finch":   { "car": 3, "of": 6, "why": "the escalator & stairs up to King St" }
+    },
+    "wellesley": {
+      "vaughan": { "car": 2, "of": 6, "why": "the exit to Wellesley St" },
+      "finch":   { "car": 5, "of": 6, "why": "the exit to Wellesley St" }
+    },
+    "bloor": {
+      "vaughan": { "car": 1, "of": 6, "why": "the stairs & elevator to Bloor St (south side)",
+        "transfer": { "2": { "car": 5, "why": "the stairs down to Line 2 trains" } } },
+      "finch":   { "car": 6, "of": 6, "why": "the stairs & elevator to Bloor St (south side)",
+        "transfer": { "2": { "car": 2, "why": "the stairs down to Line 2 trains" } } }
+    },
+    "eglinton": {
+      "vaughan": { "car": 4, "of": 6, "why": "the escalator up to the buses" },
+      "finch":   { "car": 3, "of": 6, "why": "the escalator up to the buses" }
+    },
+    "lawrence": {
+      "vaughan": { "car": 1, "of": 6, "why": "the exit to Lawrence Ave & the buses" },
+      "finch":   { "car": 6, "of": 6, "why": "the exit to Lawrence Ave & the buses" }
+    },
+    "york mills": {
+      "vaughan": { "car": 6, "of": 6, "why": "the exit to York Mills Centre, GO & TTC buses" },
+      "finch":   { "car": 1, "of": 6, "why": "the exit to York Mills Centre, GO & TTC buses" }
+    },
+    "sheppard-yonge": {
+      "vaughan": { "car": 6, "of": 6, "why": "the exit to Sheppard Centre & the buses",
+        "transfer": { "4": { "car": 3, "why": "the stairs to Line 4 (Sheppard) trains" } } },
+      "finch":   { "car": 1, "of": 6, "why": "the exit to Sheppard Centre & the buses",
+        "transfer": { "4": { "car": 4, "why": "the stairs to Line 4 (Sheppard) trains" } } },
+      "sheppardyonge": { "car": 1, "of": 4, "why": "the elevator & exit to Sheppard Ave / buses",
+        "transfer": { "1": { "car": 3, "why": "the stairs down to Line 1 trains" } } }
+    },
+    "finch": {
+      "finch": { "car": 3, "of": 6, "why": "the escalators & elevator up to the bus terminal" }
+    },
+    "queens park": {
+      "finch":   { "car": 2, "of": 6, "why": "the stairs & elevator up to the College St / University Ave exit" },
+      "vaughan": { "car": 5, "of": 6, "why": "the stairs & elevator up to the College St / University Ave exit" }
+    },
+    "st patrick": {
+      "finch":   { "car": 3, "of": 6, "why": "the stairs & escalator up to Dundas St W" },
+      "vaughan": { "car": 4, "of": 6, "why": "the stairs & escalator up to Dundas St W" }
+    },
+    "osgoode": {
+      "finch":   { "car": 2, "of": 6, "why": "the stairs & escalator up to Queen St W" },
+      "vaughan": { "car": 5, "of": 6, "why": "the stairs & escalator up to Queen St W" }
+    },
+    "st andrew": {
+      "finch":   { "car": 4, "of": 6, "why": "the escalator & stairs up to King St W" },
+      "vaughan": { "car": 3, "of": 6, "why": "the escalator & stairs up to King St W" }
+    },
+    "museum": {
+      "finch":   { "car": 6, "of": 6, "why": "the stairs & escalator up to the museum exit" },
+      "vaughan": { "car": 1, "of": 6, "why": "the stairs & escalator up to the museum exit" }
+    },
+    "st george": {
+      "vaughan": { "car": 1, "of": 6, "why": "the exit to St George St",
+        "transfer": { "2": { "car": 3, "why": "the stairs to Line 2 trains" } } },
+      "finch":   { "car": 6, "of": 6, "why": "the exit to St George St",
+        "transfer": { "2": { "car": 4, "why": "the stairs to Line 2 trains" } } },
+      "kipling": { "car": 2, "of": 6, "why": "the stairs & escalator to St George St",
+        "transfer": { "1": { "car": 3, "why": "the stairs to Line 1 trains" } } },
+      "kennedy": { "car": 5, "of": 6, "why": "the stairs & escalator to St George St",
+        "transfer": { "1": { "car": 4, "why": "the stairs to Line 1 trains" } } }
+    },
+    "spadina": {
+      "finch":   { "car": 1, "of": 6, "why": "the exit to Bloor St W & the streetcars",
+        "transfer": { "2": { "car": 1, "why": "the walkway to Line 2 trains" } } },
+      "vaughan": { "car": 6, "of": 6, "why": "the exit to Bloor St W & the streetcars",
+        "transfer": { "2": { "car": 6, "why": "the walkway to Line 2 trains" } } },
+      "kipling": { "car": 6, "of": 6, "why": "the exit to Spadina Ave & the streetcars",
+        "transfer": { "1": { "car": 4, "why": "the stairs to Line 1 trains" } } },
+      "kennedy": { "car": 1, "of": 6, "why": "the exit to Spadina Ave & the streetcars",
+        "transfer": { "1": { "car": 3, "why": "the stairs to Line 1 trains" } } }
+    },
+    "yorkdale": {
+      "finch":   { "car": 6, "of": 6, "why": "the exit to Yorkdale mall & GO buses" },
+      "vaughan": { "car": 1, "of": 6, "why": "the exit to Yorkdale mall & GO buses" }
+    },
+    "sheppard west": {
+      "finch":   { "car": 1, "of": 6, "why": "the exit to the buses & Sheppard Ave" },
+      "vaughan": { "car": 6, "of": 6, "why": "the exit to the buses & Sheppard Ave" }
+    },
+    "yonge": {
+      "kipling": { "car": 1, "of": 6, "why": "the stairs up to Yonge St",
+        "transfer": {
+          "1:vaughan": { "car": 2, "why": "the stairs to southbound Line 1 trains (toward Union)" },
+          "1:finch":   { "car": 5, "why": "the stairs to northbound Line 1 trains" } } },
+      "kennedy": { "car": 6, "of": 6, "why": "the stairs up to Yonge St",
+        "transfer": {
+          "1:vaughan": { "car": 5, "why": "the stairs to southbound Line 1 trains (toward Union)" },
+          "1:finch":   { "car": 2, "why": "the stairs to northbound Line 1 trains" } } }
+    },
+    "bathurst": {
+      "kipling": { "car": 4, "of": 6, "why": "the exit to Bathurst St, buses & streetcars" },
+      "kennedy": { "car": 3, "of": 6, "why": "the exit to Bathurst St, buses & streetcars" }
+    },
+    "bay": {
+      "kipling": { "car": 6, "of": 6, "why": "the exit to Bay St & Bellair St" },
+      "kennedy": { "car": 1, "of": 6, "why": "the exit to Bay St & Bellair St" }
+    },
+    "kipling": {
+      "kipling": { "car": 1, "of": 6, "why": "the exit to GO Transit trains & the parking lot" }
+    },
+    "kennedy": {
+      "kennedy": { "car": 1, "of": 6, "why": "the escalator straight up to the bus terminal" }
+    },
+    "don mills": {
+      "donmills": { "car": 4, "of": 4, "why": "the escalator up to the buses & Sheppard Ave" }
+    }
+  }
+}
