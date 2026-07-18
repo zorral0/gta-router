@@ -63,8 +63,12 @@
     },
 
     "bicycle": {
-      // Prefer safer streets over absolute shortest path
-      "optimization": { "type": "safest-streets" },
+      // Prefer safer streets over absolute shortest path.
+      // NOTE 2026-07-18: the old { "type": "safest-streets" } object was
+      // the 2.5 spelling - 2.9 SILENTLY IGNORED it (startup log said
+      // "The enum value '' is not legal"). This enum form is verified
+      // warning-free on 2.9.
+      "optimization": "SAFEST_STREETS",
       "speed": 4.5
     },
 
@@ -85,6 +89,25 @@
       "network": "bikeshare-toronto",
       "url": "https://tor.publicbikesystem.net/customer/gbfs/v2/gbfs.json",
       "frequency": "1m"
-    }
+    },
+
+    // LIVE BUS DELAYS (GTFS-RT TripUpdates), added 2026-07-18. A restart
+    // picks these up - no graph rebuild. Validated on a throwaway engine:
+    // YRT 97.6% / MiWay 100% / DRT ~92% of updates applied (the failures
+    // are malformed entries in the agencies' own feeds; those trips just
+    // stay on schedule times). After a restart the log shows per-feed
+    // "X of Y update messages were applied" lines every minute.
+    // TTC is deliberately ABSENT: its RT trip ids belong to a NEWER
+    // schedule generation than our Jul 6 static zip - every update is
+    // TRIP_NOT_FOUND until the TTC feed is re-downloaded and the graph
+    // rebuilt (and its feed's "NEW" trips crash OTP outright without
+    // ttc-rt-filter.py). See HANDOFF.md before wiring TTC.
+    // GO/UP waits on Sam's Metrolinx API key.
+    { "type": "stop-time-updater", "frequency": "1m", "feedId": "YRT",
+      "url": "http://rtu.york.ca/gtfsrealtime/TripUpdates" },
+    { "type": "stop-time-updater", "frequency": "1m", "feedId": "MIWAY",
+      "url": "https://www.miapp.ca/GTFS_RT/TripUpdate/TripUpdates.pb" },
+    { "type": "stop-time-updater", "frequency": "1m", "feedId": "DRT",
+      "url": "https://drtonline.durhamregiontransit.com/gtfsrealtime/TripUpdates" }
   ]
 }
