@@ -387,11 +387,15 @@ const modeIcon = m => ({ WALK:"walk", BICYCLE:"bike", CAR:"car", BUS:"bus",
 
 /* ---- fare model: keep in sync with costs.py ---- */
 // [name-match, adult fare, youth fare (null = not modelled), verified?]
-// verified = Sam or a source confirmed it; unverified fares say so in the UI
+// ALL verified 2026-07-18 against each agency's official fare page
+// (PRESTO-level; unverified fares would say so in the UI via the flag)
 const LOCAL_FARES = [["TTC",3.30,2.35,true],["TORONTO",3.30,2.35,true],
-                     ["YORK",4.25,null,false],["MIWAY",3.50,null,true],
-                     ["DURHAM",3.25,null,false],["BRAMPTON",4.75,null,false]];
-const GO_BASE = 3.70, GO_PER_KM = 0.11, UP_FARE = 12.35, ONE_FARE = true;
+                     ["YORK",4.24,3.29,true],["MIWAY",3.50,2.90,true],
+                     ["DURHAM",3.84,3.46,true],["BRAMPTON",3.55,2.95,true]];
+// UP: PRESTO fares, distance-based 4.71-5.02 - flat worst case modelled.
+// (12.35 was the paper/standard fare, not what a PRESTO rider pays.)
+const GO_BASE = 3.70, GO_PER_KM = 0.11, UP_FARE = 5.02, UP_YOUTH = 3.39,
+      ONE_FARE = true;
 const GO_YOUTH_FACTOR = 0.60;  // 40% off, gotransit.com youth discount
 const GAS_PER_KM = 0.14, WEAR_PER_KM = 0.10, DOWNTOWN_PARKING = 25.0, GO_PARKING = 0.0;
 // Bike Share Toronto pay-as-you-go, classic bike: $1 unlock + 12 cents/min
@@ -492,7 +496,8 @@ function itineraryCostDetail(it){
     items.push({ label, amount: f });
   }
   if (tlegs.some(l => agencyOf(l).includes("UP")))
-    items.push({ label: "UP Express — fare unverified", amount: UP_FARE });
+    items.push({ label: "UP Express" + (rider === "youth" ? " — youth" : ""),
+                 amount: rider === "youth" ? UP_YOUTH : UP_FARE });
   const ridden = [];
   for (const l of tlegs){
     const a = agencyOf(l);
@@ -1358,10 +1363,10 @@ function renderDetail(cid){
     <div class="fares"><h3>Cost breakdown${rider === "youth" ? " &middot; youth fare" : ""}</h3>
       ${fares}
       <div class="fitem total"><span>Total</span><span>$${total.toFixed(2)}</span></div>
-      <div class="fnote">Fares are estimates. One Fare makes local transit free when a
-        GO trip is part of the journey. Youth rates applied for TTC and GO; other
-        systems' youth fares aren't modelled yet. Driving times assume light
-        traffic &mdash; rush hour will be slower.</div>
+      <div class="fnote">PRESTO-level fares, verified July 2026. One Fare makes local
+        transit free when a GO trip is part of the journey. Youth rates applied
+        for every system. Driving times assume light traffic &mdash; rush hour
+        will be slower.</div>
     </div>`;
 }
 window.closeDetail = function(){
