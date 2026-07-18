@@ -319,8 +319,12 @@
       <input id="toBox" type="text" placeholder="End — e.g. '155 College St' or 'Union Station'"></div>
   </div>
   <div class="ctrls">
+    <div class="seg" id="whenSeg" title="Plan by when you leave, or when you need to be there">
+      <button data-when="depart" class="on" aria-pressed="true">Leave at</button>
+      <button data-when="arrive" aria-pressed="false">Arrive by</button>
+    </div>
     <select id="daySel" title="Day"></select>
-    <select id="timeSel" title="Departure time"></select>
+    <select id="timeSel" title="Time"></select>
     <button class="ibtn" id="swap" title="Swap start and end"
       aria-label="Swap start and end"></button>
     <button class="ibtn" id="clear" title="Clear"
@@ -424,6 +428,9 @@ let maxDriveM = 15000;  // hide drive-to-station options with a longer drive
 let bikePref = localStorage.getItem("bikePref") || "safest";
 if (!["safest", "balanced", "fastest"].includes(bikePref)) bikePref = "safest";
 const BIKE_OPT = { balanced: "SAFE_STREETS", fastest: "SHORTEST_DURATION" };
+/* "Leave at" (false) vs "Arrive by" (true) - which end of the trip the
+   picked time pins down. Not persisted: each visit starts on Leave at. */
+let arriveBy = false;
 
 /* GO's real station-to-station fare table (made by make_go_fares.py). */
 let GO_FARES = null;
@@ -983,9 +990,14 @@ async function fetchCombo(combo, date, time, carReluctance, signal){
         { latitude: fromPt.lat, longitude: fromPt.lng } } },
       destination: { location: { coordinate:
         { latitude: toPt.lat, longitude: toPt.lng } } },
-      dateTime: { earliestDeparture: new Date(date + "T" + time).toISOString() },
-      modes: { transit: { access: combo.access, egress: combo.egress } },
+      // Arrive by pins the ARRIVAL end. Verified live: "first" already
+      // returns the best (latest-departing) trips for latestArrival too;
+      // "last" pads in pointlessly-early departures - don't use it.
+      dateTime: arriveBy
+        ? { latestArrival: new Date(date + "T" + time).toISOString() }
+        : { earliestDeparture: new Date(date + "T" + time).toISOString() },
       first: 8,
+      modes: { transit: { access: combo.access, egress: combo.egress } },
       prefs: (() => {
         // per-request bike optimization only matters when this mode mix
         // actually rides a bike (own bike to a station, or Bike Share)
@@ -1123,7 +1135,8 @@ function cardHTML(it, cid, fastestIt, cheapestIt){
   const cost = itineraryCost(it);
   // badge the single winning card (ties go to the first), not every tie
   const badges =
-    (it === fastestIt ? '<span class="badge fast">Fastest</span>' : "") +
+    (it === fastestIt ? `<span class="badge fast">${
+      arriveBy ? "Latest leave" : "Fastest"}</span>` : "") +
     (it === cheapestIt ? '<span class="badge cheap">Cheapest</span>' : "");
   const alts = (it.altTimes || []).slice().sort((a,b) => a-b).slice(0, 2);
   return `<div class="card" id="${cid}" onclick="openIt('${cid}')"
@@ -1178,16 +1191,20 @@ function renderResults(parts, opts){
   opts = opts || {};
   itinsById = {}; selId = null; fcCache = {};
 
-  // one pool, drive cap applied, deduped (departure alts collected)
+  // one pool, drive cap applied, deduped (departure alts collected).
+  // Ranking metric matches the question being asked: "Leave at" ranks by
+  // trip duration; "Arrive by" ranks by how LATE you can leave (a longer
+  // trip that departs later is the better answer to "arrive by 9").
+  const metric = it => arriveBy ? -it.startTime : it.duration;
   const all = [];
   for (const p of parts) all.push(...visibleIts(p));
   const pool = dedupeAlts(all).map(it => ({ it, cost: itineraryCost(it) }));
-  pool.sort((a,b) => a.it.duration - b.it.duration);
+  pool.sort((a,b) => metric(a.it) - metric(b.it));
 
-  // keep only options nothing else beats on time AND price at once
+  // keep only options nothing else beats on the metric AND price at once
   const lead = pool.filter(x => !pool.some(y => y !== x
-    && y.it.duration <= x.it.duration && y.cost <= x.cost
-    && (y.it.duration < x.it.duration || y.cost < x.cost)));
+    && metric(y.it) <= metric(x.it) && y.cost <= x.cost
+    && (metric(y.it) < metric(x.it) || y.cost < x.cost)));
   let main = lead.slice(0, 5);
   let cheapest = null;
   for (const x of pool) if (!cheapest || x.cost < cheapest.cost) cheapest = x;
@@ -1196,9 +1213,9 @@ function renderResults(parts, opts){
     main = lead.slice(0, 4).concat([cheapest]);
   const rest = pool.filter(x => !main.includes(x));
 
-  // on duration ties, the badge goes to a card that actually headlines
+  // on metric ties, the badge goes to a card that actually headlines
   const fastestIt = pool.length
-    ? (lead.find(x => x.it.duration === pool[0].it.duration) || pool[0]).it
+    ? (lead.find(x => metric(x.it) === metric(pool[0].it)) || pool[0]).it
     : null;
   const cheapestIt = cheapest ? cheapest.it : null;
 
@@ -1436,6 +1453,18 @@ bikeSel.addEventListener("change", e => {
   bikePref = e.target.value;
   localStorage.setItem("bikePref", bikePref);
   plan();   // routing changes, not just filtering - re-query
+});
+document.querySelectorAll("#whenSeg button").forEach(b => {
+  b.onclick = () => {
+    const want = b.dataset.when === "arrive";
+    if (arriveBy === want) return;
+    arriveBy = want;
+    document.querySelectorAll("#whenSeg button").forEach(x => {
+      x.classList.toggle("on", x === b);
+      x.setAttribute("aria-pressed", x === b ? "true" : "false");
+    });
+    plan();
+  };
 });
 document.getElementById("swap").innerHTML = icn("swap", 14);
 document.getElementById("clear").innerHTML = icn("x", 13);
