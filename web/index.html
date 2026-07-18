@@ -136,6 +136,14 @@
     color: var(--accent); }
   .badge.cheap { background: color-mix(in srgb, var(--good) 16%, transparent);
     color: var(--good); }
+  /* real-time markers: "live" on cards, late/early notes on detail legs */
+  .livechip { color: var(--good); font-size: 9.5px; font-weight: 700;
+    letter-spacing: .06em; text-transform: uppercase; margin-left: 2px; }
+  .livechip::before { content: "●"; font-size: 7px; vertical-align: 1px;
+    margin-right: 3px; animation: livepulse 1.6s ease-in-out infinite; }
+  @keyframes livepulse { 50% { opacity: .35; } }
+  .late { color: #ff9f0a; font-weight: 600; }
+  .early { color: var(--accent); font-weight: 600; }
   .legs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
     margin-top: 8px; }
   .rt { color: #fff; font-weight: 700; font-size: 11.5px; padding: 2.5px 8px;
@@ -926,21 +934,34 @@ const PC_QUERY = `query PC($origin:PlanLabeledLocationInput!,
                  modes:$modes,first:$first,preferences:$prefs){
     edges{node{ duration start end
       legs{ mode distance duration headsign rentedBike
-            start{scheduledTime} end{scheduledTime}
+            start{scheduledTime estimated{time}}
+            end{scheduledTime estimated{time}}
             agency{name} route{shortName longName color}
             from{name lat lon stop{gtfsId}} to{name lat lon stop{gtfsId}}
             stopCalls{stopLocation{... on Stop {name}}}
             legGeometry{points} } } } } }`;
 
 /* reshape a planConnection itinerary to the leg fields the rest of the
-   app has always used (startTime/endTime millis, intermediatePlaces) */
+   app has always used (startTime/endTime millis, intermediatePlaces).
+   When the engine has LIVE data (GTFS-RT updaters running), each LegTime
+   carries estimated.time - prefer it, and keep the delay in seconds
+   (computed from the two timestamps, so the Duration scalar format
+   never matters). estimated == null means schedule-only. */
 function normalizeItin(n){
   return { duration: n.duration,
     startTime: Date.parse(n.start), endTime: Date.parse(n.end),
-    legs: n.legs.map(l => ({ ...l,
-      startTime: Date.parse((l.start || {}).scheduledTime),
-      endTime: Date.parse((l.end || {}).scheduledTime),
-      intermediatePlaces: (l.stopCalls || []).slice(1, -1) })) };
+    legs: n.legs.map(l => {
+      const sSched = (l.start || {}).scheduledTime,
+            eSched = (l.end || {}).scheduledTime;
+      const sEst = ((l.start || {}).estimated || {}).time,
+            eEst = ((l.end || {}).estimated || {}).time;
+      return { ...l,
+        startTime: Date.parse(sEst || sSched),
+        endTime: Date.parse(eEst || eSched),
+        live: !!(sEst || eEst),
+        rtDelaySec: sEst ? Math.round((Date.parse(sEst) - Date.parse(sSched)) / 1000) : null,
+        intermediatePlaces: (l.stopCalls || []).slice(1, -1) };
+    }) };
 }
 
 async function fetchCombo(combo, date, time, carReluctance, signal){
@@ -1090,7 +1111,8 @@ function cardHTML(it, cid, fastestIt, cheapestIt){
       tabindex="0" role="button">
     <div class="head"><span class="mins">${Math.round(it.duration/60)} min</span>
       <span class="times">${hhmm(it.startTime)} &ndash; ${hhmm(it.endTime)}${
-        alts.length ? " &middot; also " + alts.map(hhmm).join(", ") : ""}</span>
+        alts.length ? " &middot; also " + alts.map(hhmm).join(", ") : ""}${
+        it.legs.some(l => l.live) ? '<span class="livechip">live</span>' : ""}</span>
       <span class="cost">$${cost.toFixed(2)}</span></div>
     ${badges ? `<div class="badges">${badges}</div>` : ""}
     ${viaLine(it)}
@@ -1338,6 +1360,14 @@ function renderDetail(cid){
         + (l.headsign ? ` <span style="font-weight:500;color:var(--muted)">&middot; ${esc(l.headsign)}</span>` : "");
       sub = `Board at ${esc(l.from.name)} &middot; ride ${stops} stop${stops>1?"s":""}
              (${mins} min) &middot; get off at ${esc(l.to.name)}`;
+      // live delay note (rtDelaySec set only when the engine had real-time
+      // data for this leg; shown times already include the delay)
+      if (l.rtDelaySec != null){
+        const dm = Math.round(l.rtDelaySec / 60);
+        sub += dm >= 2 ? ` &middot; <span class="late">running ${dm} min late</span>`
+             : dm <= -2 ? ` &middot; <span class="early">running ${-dm} min early</span>`
+             : ` &middot; on time`;
+      }
       const bi = boardingInfo(it.legs, li);
       if (bi) extra = trainDiagram(bi, (l.to.name || "").split(" Station")[0]);
     }
