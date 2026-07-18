@@ -348,6 +348,11 @@
       <option value="30000">Drive &le; 30 km</option>
       <option value="9999000">Any drive</option>
     </select>
+    <select id="bikeSel" title="Safest sticks to bike lanes and quiet streets; fastest allows busier roads when they save time">
+      <option value="safest" selected>Bike: safest</option>
+      <option value="balanced">Bike: balanced</option>
+      <option value="fastest">Bike: fastest</option>
+    </select>
     <button id="go">Plan trip</button>
   </div>
   <div id="results">
@@ -413,6 +418,12 @@ const BIKESHARE_UNLOCK = 1.00, BIKESHARE_PER_MIN = 0.12;
 const TRANSIT = new Set(["BUS","RAIL","SUBWAY","TRAM","FERRY"]);
 let rider = "adult";
 let maxDriveM = 15000;  // hide drive-to-station options with a longer drive
+/* bike routing trade-off: the ENGINE default is safest-streets
+   (router-config.json); "balanced"/"fastest" override it per request so
+   busier roads are allowed when they save time */
+let bikePref = localStorage.getItem("bikePref") || "safest";
+if (!["safest", "balanced", "fastest"].includes(bikePref)) bikePref = "safest";
+const BIKE_OPT = { balanced: "SAFE_STREETS", fastest: "SHORTEST_DURATION" };
 
 /* GO's real station-to-station fare table (made by make_go_fares.py). */
 let GO_FARES = null;
@@ -975,11 +986,19 @@ async function fetchCombo(combo, date, time, carReluctance, signal){
       dateTime: { earliestDeparture: new Date(date + "T" + time).toISOString() },
       modes: { transit: { access: combo.access, egress: combo.egress } },
       first: 8,
-      prefs: (carReluctance || combo.walkReluctance)
-        ? { street: Object.assign({},
-            carReluctance ? { car: { reluctance: carReluctance } } : {},
-            combo.walkReluctance ? { walk: { reluctance: combo.walkReluctance } } : {}) }
-        : null } }) });
+      prefs: (() => {
+        // per-request bike optimization only matters when this mode mix
+        // actually rides a bike (own bike to a station, or Bike Share)
+        const usesBike = combo.access.includes("BICYCLE_PARKING")
+          || combo.egress.includes("BICYCLE_RENTAL");
+        const bikeOpt = usesBike && BIKE_OPT[bikePref]
+          ? { bicycle: { optimization: { type: BIKE_OPT[bikePref] } } } : {};
+        const street = Object.assign({},
+          carReluctance ? { car: { reluctance: carReluctance } } : {},
+          combo.walkReluctance ? { walk: { reluctance: combo.walkReluctance } } : {},
+          bikeOpt);
+        return Object.keys(street).length ? { street } : null;
+      })() } }) });
   const js = await r.json();
   if (js.errors) throw new Error(js.errors.map(e => e.message).join("; "));
   let its = (((js.data || {}).planConnection || {}).edges || [])
@@ -1411,6 +1430,13 @@ document.getElementById("driveSel").addEventListener("change", e => {
 });
 document.getElementById("daySel").addEventListener("change", plan);
 document.getElementById("timeSel").addEventListener("change", plan);
+const bikeSel = document.getElementById("bikeSel");
+bikeSel.value = bikePref;
+bikeSel.addEventListener("change", e => {
+  bikePref = e.target.value;
+  localStorage.setItem("bikePref", bikePref);
+  plan();   // routing changes, not just filtering - re-query
+});
 document.getElementById("swap").innerHTML = icn("swap", 14);
 document.getElementById("clear").innerHTML = icn("x", 13);
 /* animate a dollar figure rolling from its current value to a new one */
