@@ -208,6 +208,30 @@
     0% { transform: scale(.2); opacity: 0; }
     70% { transform: scale(1.12); opacity: 1; }
     100% { transform: scale(1); } }
+  /* labeled Bike Share dock pin for the selected trip */
+  .dockmk { animation: pinpop .38s cubic-bezier(.2,.7,.3,1.5) both;
+    display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
+    background: #1e9e4a; color: #fff; font-size: 12px; font-weight: 650;
+    padding: 4px 9px 4px 7px; border-radius: 999px; white-space: nowrap;
+    box-shadow: 0 1.4px 5px rgba(0,0,0,.4); border: 1.6px solid #fff; }
+  .dockmk .icn { width: 14px; height: 14px; }
+  /* nearby-dock list in the trip detail */
+  .docklist { margin-top: 12px; }
+  .docklist h3 { font-size: 12px; font-weight: 650; color: var(--muted);
+    margin: 0 0 7px; }
+  .dockrow { display: flex; align-items: center; gap: 8px; width: 100%;
+    background: var(--card); border: .5px solid var(--line); text-align: left;
+    border-radius: 12px; padding: 9px 11px; margin-bottom: 6px; cursor: pointer;
+    color: var(--text); font: inherit; box-shadow: var(--card-shadow); }
+  .dockrow:hover { background: var(--chip); }
+  .dockrow.here { border-color: #34c759; border-width: 1px; }
+  .dockrow .dot { width: 9px; height: 9px; border-radius: 999px;
+    background: #34c759; flex: none; }
+  .dockrow .nm { font-size: 13px; font-weight: 600; flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dockrow .cnt { font-size: 12px; color: var(--muted); flex: none; }
+  .dockrow .tag { font-size: 10px; font-weight: 700; color: #fff;
+    background: #34c759; padding: 1px 7px; border-radius: 999px; flex: none; }
   .dhead { display: flex; align-items: center; gap: 10px; margin: 2px 0 12px; }
   .back { border: none; background: var(--chip); color: var(--text);
     width: 30px; height: 30px; border-radius: 999px; cursor: pointer;
@@ -647,11 +671,11 @@ function ensureDocks(){
   try {
     map.addSource("docks", { type: "geojson", data: dockFC });
     // slide under the route lines when they exist; routes added later go on top
-    map.addLayer({ id: "docks", type: "circle", source: "docks", minzoom: 12.5,
-      paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 12.5, 2.5, 16, 5],
+    map.addLayer({ id: "docks", type: "circle", source: "docks", minzoom: 10.5,
+      paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 10.5, 3, 14, 6.5, 16, 8.5],
                "circle-color": "#34c759",
                "circle-stroke-color": darkMql.matches ? "#1c1c1e" : "#ffffff",
-               "circle-stroke-width": 1.25 } },
+               "circle-stroke-width": 1.6 } },
       map.getLayer("route-casing") ? "route-casing" : undefined);
     dockRetry = 0;
   } catch (e){ if (dockRetry++ < 40) setTimeout(ensureDocks, 250); }
@@ -669,11 +693,60 @@ map.on("click", "docks", e => {
     .setHTML(`<b>${esc(p.name)}</b><br>Bike Share dock${counts}`)
     .addTo(map);
 });
-map.on("mouseenter", "docks", () => map.getCanvas().style.cursor = "pointer");
-map.on("mouseleave", "docks", () => map.getCanvas().style.cursor = "");
+// hover shows the station name straight away (no click needed)
+let dockHover = null;
+map.on("mouseenter", "docks", e => {
+  map.getCanvas().style.cursor = "pointer";
+  const p = e.features[0].properties;
+  if (dockHover) dockHover.remove();
+  dockHover = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 8 })
+    .setLngLat(e.features[0].geometry.coordinates)
+    .setHTML(`<b>${esc(p.name)}</b>`).addTo(map);
+});
+map.on("mouseleave", "docks", () => {
+  map.getCanvas().style.cursor = "";
+  if (dockHover){ dockHover.remove(); dockHover = null; }
+});
 loadDocks();
 // the GBFS feed updates server-side every minute - keep the dots honest
 setInterval(() => { if (!document.hidden) loadDocks(); }, 120000);
+
+/* ---- the exact Bike Share dock(s) a selected trip uses ---- */
+let tripDockMarkers = [];
+function clearTripDocks(){ tripDockMarkers.forEach(m => m.remove()); tripDockMarkers = []; }
+/* label the ride's real touch point: pickup dock if the rental is at the
+   start of the trip, drop-off dock if it's at the end */
+function showTripDocks(it){
+  clearTripDocks();
+  if (!it) return;
+  const firstTransit = it.legs.findIndex(x => TRANSIT.has(x.mode));
+  it.legs.forEach((l, i) => {
+    if (!(l.mode === "BICYCLE" && l.rentedBike)) return;
+    const isStart = firstTransit < 0 || i < firstTransit;
+    const pt = isStart ? l.from : l.to;
+    if (!isFinite(pt.lon) || !isFinite(pt.lat)) return;
+    // the marker element must NOT carry the pop animation - MapLibre keeps
+    // the positioning transform on it, and a transform-animating class would
+    // override it (snapping the pin to 0,0). Animate an inner pill instead.
+    const el = document.createElement("div");
+    el.style.cursor = "pointer";
+    el.title = pt.name || "Bike Share dock";
+    el.innerHTML = `<div class="dockmk">${icn("bike")}<span>${isStart ? "Rent here" : "Dock here"}</span></div>`;
+    el.addEventListener("click", () => map.flyTo({ center: [pt.lon, pt.lat], zoom: 15.5 }));
+    tripDockMarkers.push(new maplibregl.Marker({ element: el, anchor: "bottom", offset: [0, -3] })
+      .setLngLat([pt.lon, pt.lat]).addTo(map));
+  });
+}
+/* Bike Share stations nearest a point (for the detail list) */
+function nearestDocks(lng, lat, n){
+  if (!dockFC) return [];
+  return dockFC.features.map(f => {
+    const [dl, dt] = f.geometry.coordinates;
+    const dx = (dl - lng) * Math.cos(lat * Math.PI / 180), dy = dt - lat;
+    return { f, d: dx * dx + dy * dy };
+  }).sort((a, b) => a.d - b.d).slice(0, n).map(x => x.f);
+}
+window.flyDock = function(lng, lat){ map.flyTo({ center: [lng, lat], zoom: 15.5 }); };
 
 /* sweep the route on from start to end when an option is selected */
 let sweepToken = 0;
@@ -891,6 +964,13 @@ const COMBOS = [
   { key: "Bike to station",
     access: ["BICYCLE_PARKING"], egress: ["WALK"],
     need: ["bike"], needsLeg: "BICYCLE" },
+  // Bike Share ridden TO the boarding station (rental as ACCESS - the
+  // mirror of "Bike Share at the end"). Same walkReluctance-6 trick: for
+  // short accesses the engine otherwise keeps the plain-walk sibling
+  // (rental pays unlock time internally) and the rental never surfaces.
+  { key: "Bike Share at the start",
+    access: ["BICYCLE_RENTAL", "WALK"], egress: ["WALK"],
+    need: ["share"], rentStart: true, walkReluctance: 6.0 },
   { key: "Drive to station",
     access: ["CAR_PARKING"], egress: ["WALK"],
     need: ["carStart"], drive: true, needsLeg: "CAR" },
@@ -941,6 +1021,16 @@ function endLegOnly(it, match){
   if (lastTransit < 0) return false;
   const hits = it.legs.map((l, i) => match(l) ? i : -1).filter(i => i >= 0);
   return hits.length > 0 && hits.every(i => i > lastTransit);
+}
+/* mirror of endLegOnly for the START: transit is used and every leg
+   matching `match` comes BEFORE the first transit leg (a real "at the
+   start" access leg - e.g. a rented Bike Share bike ridden to the station) */
+function startLegOnly(it, match){
+  let firstTransit = -1;
+  it.legs.forEach((l, i) => { if (firstTransit < 0 && TRANSIT.has(l.mode)) firstTransit = i; });
+  if (firstTransit < 0) return false;
+  const hits = it.legs.map((l, i) => match(l) ? i : -1).filter(i => i >= 0);
+  return hits.length > 0 && hits.every(i => i < firstTransit);
 }
 /* OTP 2.9: the old "plan" query is GONE - this is planConnection.
    Coordinates are latitude/longitude here (the old API wanted lat/lon!),
@@ -1002,6 +1092,7 @@ async function fetchCombo(combo, date, time, carReluctance, signal){
         // per-request bike optimization only matters when this mode mix
         // actually rides a bike (own bike to a station, or Bike Share)
         const usesBike = combo.access.includes("BICYCLE_PARKING")
+          || combo.access.includes("BICYCLE_RENTAL")
           || combo.egress.includes("BICYCLE_RENTAL");
         const bikeOpt = usesBike && BIKE_OPT[bikePref]
           ? { bicycle: { optimization: { type: BIKE_OPT[bikePref] } } } : {};
@@ -1025,6 +1116,8 @@ async function fetchCombo(combo, date, time, carReluctance, signal){
     its = its.filter(it => endLegOnly(it, l => l.mode === "CAR"));
   if (combo.rentEnd)
     its = its.filter(it => endLegOnly(it, l => l.mode === "BICYCLE" && l.rentedBike));
+  if (combo.rentStart)
+    its = its.filter(it => startLegOnly(it, l => l.mode === "BICYCLE" && l.rentedBike));
   return dedupeAlts(its).slice(0, 4);
 }
 
@@ -1312,6 +1405,7 @@ window.select = function(cid, opts){
   if (el) el.classList.add("sel");
   selId = cid;
   const fc = cachedFC(cid);
+  showTripDocks(itinsById[cid]);
   if (opts.sweep === false) drawRoute(fc); else animateRoute(fc);
   if (opts.fit === false) return;
   const all = fc.features.flatMap(f => f.geometry.coordinates);
@@ -1416,6 +1510,26 @@ function renderDetail(cid){
   steps += `<div class="step"><div class="t">${hhmm(it.endTime)}</div>
     <div class="rail"><div class="dot" style="--rail:#ff453a"></div></div>
     <div class="body"><div class="what">Arrive</div></div></div>`;
+  // Bike Share dock list: the exact dock this trip uses (live counts) plus a
+  // few nearby alternatives, each clickable to fly the map straight there
+  let dockSection = "";
+  const rentLeg = it.legs.find(l => l.mode === "BICYCLE" && l.rentedBike);
+  if (rentLeg && dockFC){
+    const firstTransit = it.legs.findIndex(x => TRANSIT.has(x.mode));
+    const isStart = firstTransit < 0 || it.legs.indexOf(rentLeg) < firstTransit;
+    const pt = isStart ? rentLeg.from : rentLeg.to;
+    const rows = nearestDocks(pt.lon, pt.lat, 4).map((f, idx) => {
+      const p = f.properties, c = f.geometry.coordinates;
+      const cnt = (p.bikes != null && p.bikes !== "null")
+        ? `${p.bikes} bike${p.bikes == 1 ? "" : "s"} &middot; ${p.spaces} dock${p.spaces == 1 ? "" : "s"}` : "";
+      return `<button class="dockrow ${idx === 0 ? "here" : ""}" onclick="flyDock(${c[0]},${c[1]})">
+        <span class="dot"></span><span class="nm">${esc(p.name)}</span>
+        ${idx === 0 ? `<span class="tag">${isStart ? "Rent here" : "Dock here"}</span>` : ""}
+        <span class="cnt">${cnt}</span></button>`;
+    }).join("");
+    dockSection = `<div class="docklist">
+      <h3>Bike Share ${isStart ? "pickup" : "drop-off"} &middot; live availability</h3>${rows}</div>`;
+  }
   const fares = items.map(x => `<div class="fitem"><span>${x.label}</span>
       <span>${x.amount === 0 ? "free" : "$" + x.amount.toFixed(2)}</span></div>`).join("");
   document.getElementById("detail").innerHTML = `
@@ -1426,6 +1540,7 @@ function renderDetail(cid){
       <span class="dcost">$${total.toFixed(2)}</span>
     </div>
     <div class="tl">${steps}</div>
+    ${dockSection}
     <div class="fares"><h3>Cost breakdown${rider === "youth" ? " &middot; youth fare" : ""}</h3>
       ${fares}
       <div class="fitem total"><span>Total</span><span>$${total.toFixed(2)}</span></div>
@@ -1542,6 +1657,7 @@ document.getElementById("clear").onclick = () => {
   if (fromMarker) fromMarker.remove(); if (toMarker) toMarker.remove();
   fromPt = toPt = fromMarker = toMarker = null;
   lastParts = null; lastRouteFC = null;
+  clearTripDocks();
   localStorage.removeItem("pts");
   closeDetail();
   document.getElementById("fromBox").value = "";
