@@ -329,6 +329,12 @@
     display: none; align-items: center; justify-content: center; font-size: 20px; }
   #reachLauncher.show { display: inline-flex; }
   #reachLauncher:active { transform: scale(.94); }
+  #toast { position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 12px);
+    background: var(--card-solid); color: var(--text); font-size: 13px; font-weight: 600;
+    padding: 9px 15px; border-radius: 999px; box-shadow: 0 6px 22px rgba(0,0,0,.22);
+    z-index: 60; opacity: 0; pointer-events: none;
+    transition: opacity .18s ease, transform .18s ease; }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
 </style>
 </head>
 <body>
@@ -351,6 +357,8 @@
     <select id="timeSel" title="Time"></select>
     <button class="ibtn" id="swap" title="Swap start and end"
       aria-label="Swap start and end"></button>
+    <button class="ibtn" id="share" title="Copy a link to this trip"
+      aria-label="Copy a shareable link to this trip"></button>
     <button class="ibtn" id="clear" title="Clear"
       aria-label="Clear start, end and results"></button>
   </div>
@@ -418,7 +426,9 @@ const ICONS = {
   swap: '<path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/>',
   x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
   chev: '<path d="m6 9 6 6 6-6"/>',
-  arrow: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>'
+  arrow: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+  link: '<path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" x2="16" y1="12" y2="12"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>'
 };
 function icn(name, size){
   return `<svg class="icn" ${size ? `style="font-size:${size}px"` : ""} viewBox="0 0 24 24">${ICONS[name] || ""}</svg>`;
@@ -1583,6 +1593,65 @@ document.querySelectorAll("#whenSeg button").forEach(b => {
 });
 document.getElementById("swap").innerHTML = icn("swap", 14);
 document.getElementById("clear").innerHTML = icn("x", 13);
+document.getElementById("share").innerHTML = icn("link", 14);
+
+/* a brief floating message (e.g. "Link copied") - no dependency, self-removes */
+let toastTimer = null;
+function toast(msg){
+  let t = document.getElementById("toast");
+  if (!t){
+    t = document.createElement("div");
+    t.id = "toast";
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 1900);
+}
+
+/* Build a link that reopens THIS trip on someone else's device: the two
+   ends (with their labels) plus when/who, so the shared trip matches. */
+function buildShareURL(){
+  const q = new URLSearchParams();
+  q.set("f", fromPt.lng.toFixed(5) + "," + fromPt.lat.toFixed(5));
+  q.set("t", toPt.lng.toFixed(5) + "," + toPt.lat.toFixed(5));
+  const fl = document.getElementById("fromBox").value,
+        tl = document.getElementById("toBox").value;
+  if (fl) q.set("fl", fl);
+  if (tl) q.set("tl", tl);
+  if (arriveBy) q.set("when", "arrive");
+  q.set("d", document.getElementById("daySel").value);
+  q.set("tm", document.getElementById("timeSel").value);
+  if (rider !== "adult") q.set("r", rider);
+  return location.origin + location.pathname + "?" + q.toString();
+}
+
+document.getElementById("share").onclick = async () => {
+  if (!fromPt || !toPt){ toast("Pick a start and an end first"); return; }
+  const url = buildShareURL();
+  const done = () => {
+    toast("Link copied");
+    const b = document.getElementById("share");
+    b.innerHTML = icn("check", 14);
+    setTimeout(() => b.innerHTML = icn("link", 14), 1600);
+  };
+  try {
+    await navigator.clipboard.writeText(url);
+    done();
+  } catch (e){
+    // clipboard API needs a secure context / permission - fall back to a
+    // hidden textarea + execCommand, and if THAT fails, show the raw link
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = url; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      const ok = document.execCommand("copy");
+      ta.remove();
+      ok ? done() : prompt("Copy this link to your trip:", url);
+    } catch (e2){ prompt("Copy this link to your trip:", url); }
+  }
+};
 /* animate a dollar figure rolling from its current value to a new one */
 function countTo(el, to){
   const final = "$" + to.toFixed(2);
@@ -1696,13 +1765,57 @@ document.getElementById("clear").onclick = () => {
   timeSel.value = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
 })();
 
+/* Open a trip from a shared ?f=..&t=.. link. This WINS over the saved pins
+   below: someone sent this exact trip, so show it and plan it right away.
+   A malformed/half link falls through to the normal restore. Returns the
+   two points (so we know a link was consumed) or null. */
+function tripFromURL(){
+  const q = new URLSearchParams(location.search);
+  const parse = s => {
+    if (!s) return null;
+    const [lng, lat] = s.split(",").map(Number);
+    if (!isFinite(lng) || !isFinite(lat)) return null;
+    // keep it in/near the GTA - a junk link shouldn't fling the map
+    if (lng < -81 || lng > -78 || lat < 43 || lat > 45) return null;
+    return { lng, lat };
+  };
+  const f = parse(q.get("f")), t = parse(q.get("t"));
+  if (!f || !t) return null;
+  // when: arrive/depart toggle
+  if (q.get("when") === "arrive"){
+    const btn = document.querySelector('#whenSeg button[data-when="arrive"]');
+    if (btn) btn.click();   // reuses the existing handler (sets arriveBy + UI)
+  }
+  const daySel = document.getElementById("daySel"),
+        timeSel = document.getElementById("timeSel");
+  const d = q.get("d"), tm = q.get("tm");
+  if (d && [...daySel.options].some(o => o.value === d)) daySel.value = d;
+  if (tm && [...timeSel.options].some(o => o.value === tm)) timeSel.value = tm;
+  const r = q.get("r");
+  if (r === "youth"){
+    const btn = document.querySelector('#riderSeg button[data-rider="youth"]');
+    if (btn) btn.click();
+  }
+  setPoint("from", f, q.get("fl") || undefined);
+  setPoint("to", t, q.get("tl") || undefined);
+  // clean the query out of the address bar so a reload/re-share is clean
+  try { history.replaceState(null, "", location.origin + location.pathname); } catch (e){}
+  return { from: f, to: t };
+}
+
 /* restore the last trip's pins - the daily commute shouldn't be re-typed
-   every day. Planning stays one click away (no auto-query on load). */
+   every day. Planning stays one click away (no auto-query on load) UNLESS
+   a shared link is present, in which case we plan it straight away. */
 (function(){
-  const j = loadStored("pts", {});
+  const shared = tripFromURL();
+  const j = shared
+    ? { from: { ...shared.from }, to: { ...shared.to } }
+    : loadStored("pts", {});
   const ok = p => p && isFinite(p.lng) && isFinite(p.lat);
-  if (ok(j.from)) setPoint("from", { lng: j.from.lng, lat: j.from.lat }, j.from.label);
-  if (ok(j.to)) setPoint("to", { lng: j.to.lng, lat: j.to.lat }, j.to.label);
+  if (!shared){
+    if (ok(j.from)) setPoint("from", { lng: j.from.lng, lat: j.from.lat }, j.from.label);
+    if (ok(j.to)) setPoint("to", { lng: j.to.lng, lat: j.to.lat }, j.to.label);
+  }
   if (ok(j.from) && ok(j.to)){
     try {
       const b = new maplibregl.LngLatBounds(
@@ -1711,6 +1824,7 @@ document.getElementById("clear").onclick = () => {
       map.fitBounds(b, { padding: 120, maxZoom: 12 });
     } catch (e){}
   }
+  if (shared) plan();   // a shared trip plans itself; a restored one waits
 })();
 
 /* warn when the loaded schedules are close to running out - GTFS data rots
