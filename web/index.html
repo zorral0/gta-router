@@ -247,24 +247,27 @@
   .ibtn:active, #go:active, .seg button:active, .back:active,
   .morebtn:active { transform: scale(.94); }
 
-  /* map-look switcher (layers button above the zoom controls) */
-  #lookBtn { position: absolute; right: 10px; bottom: 112px; z-index: 30;
-    width: 32px; height: 32px; border: none; border-radius: 10px;
-    background: var(--card-solid); color: var(--text); cursor: pointer;
-    box-shadow: var(--shadow); display: flex; align-items: center;
-    justify-content: center; }
-  #lookBtn:active { transform: scale(.94); }
-  #lookPop { position: absolute; right: 48px; bottom: 112px; z-index: 31;
-    background: var(--card-solid); border-radius: 12px; box-shadow: var(--shadow);
-    padding: 5px; display: none; min-width: 150px; }
-  #lookPop.open { display: block; }
-  #lookPop button { display: flex; align-items: center; width: 100%;
-    border: none; background: none; color: var(--text); font: inherit;
-    font-size: 12.5px; font-weight: 600; padding: 7px 10px;
-    border-radius: 8px; cursor: pointer; text-align: left; }
-  #lookPop button:hover { background: var(--chip); }
-  #lookPop button.on { color: var(--accent); }
-  #lookPop button.on::after { content: "\2713"; margin-left: auto; }
+  /* zoom controls restyled to match the app (Sam 2026-07-20: the stock
+     +/- felt cheap): app card material, rounded, our own +/- glyphs */
+  .maplibregl-ctrl-group { background: var(--card-solid) !important;
+    border-radius: 12px !important; box-shadow: var(--shadow) !important;
+    overflow: hidden; }
+  .maplibregl-ctrl-group button { width: 34px !important; height: 34px !important;
+    background: transparent !important; }
+  .maplibregl-ctrl-group button + button {
+    border-top: .5px solid var(--line) !important; }
+  .maplibregl-ctrl-group button:hover { background: var(--chip) !important; }
+  .maplibregl-ctrl-group button:active { background: var(--chip) !important; }
+  /* hide MapLibre's baked-in icon images; draw crisp glyphs instead */
+  .maplibregl-ctrl-zoom-in .maplibregl-ctrl-icon,
+  .maplibregl-ctrl-zoom-out .maplibregl-ctrl-icon { background-image: none !important; }
+  .maplibregl-ctrl-zoom-in, .maplibregl-ctrl-zoom-out { position: relative; }
+  .maplibregl-ctrl-zoom-in::after, .maplibregl-ctrl-zoom-out::after {
+    position: absolute; inset: 0; display: flex; align-items: center;
+    justify-content: center; color: var(--text); font-size: 19px;
+    font-weight: 400; line-height: 1; }
+  .maplibregl-ctrl-zoom-in::after { content: "+"; }
+  .maplibregl-ctrl-zoom-out::after { content: "\2212"; }
 
   /* map markers - Apple "you are here" halo dots (start green, end red) */
   .mk { cursor: grab; line-height: 0; }
@@ -460,6 +463,7 @@
       <option value="balanced">Bike: balanced</option>
       <option value="fastest">Bike: fastest</option>
     </select>
+    <select id="lookSel" title="Change the map's look"></select>
   </div>
   <div id="results">
     <div class="hint">Pick a start and an end to compare every mix of
@@ -499,8 +503,7 @@ const ICONS = {
   arrow: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
   link: '<path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" x2="16" y1="12" y2="12"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
-  warn: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
-  layers: '<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>'
+  warn: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>'
 };
 function icn(name, size){
   return `<svg class="icn" ${size ? `style="font-size:${size}px"` : ""} viewBox="0 0 24 24">${ICONS[name] || ""}</svg>`;
@@ -824,31 +827,19 @@ darkMql.addEventListener("change", applyLook);
 // first visit with a non-classic look: upgrade as soon as the JSON arrives
 if (!libertyBase && mapLook[themeMode()] !== "classic") applyLook();
 
-/* the little "map look" switcher, bottom-right above the zoom buttons */
-(function(){
-  const btn = document.createElement("button");
-  btn.id = "lookBtn"; btn.title = "Map look";
-  btn.setAttribute("aria-label", "Choose the map's look");
-  btn.innerHTML = icn("layers", 16);
-  const pop = document.createElement("div"); pop.id = "lookPop";
-  document.body.append(btn, pop);
-  function renderPop(){
-    const mode = themeMode();
-    pop.innerHTML = LOOKS[mode].map(k =>
-      `<button data-look="${k}" class="${k === mapLook[mode] ? "on" : ""}">
-         ${LOOK_NAME[k]}${k === "classic" ? " (the old map)" : ""}</button>`).join("");
-  }
-  btn.onclick = () => { renderPop(); pop.classList.toggle("open"); };
-  pop.onclick = e => {
-    const b = e.target.closest("[data-look]"); if (!b) return;
-    mapLook[themeMode()] = b.dataset.look; saveLook(); applyLook();
-    pop.classList.remove("open");
-  };
-  document.addEventListener("click", e => {
-    if (!pop.contains(e.target) && !btn.contains(e.target))
-      pop.classList.remove("open");
-  });
-})();
+/* the "map look" picker lives in the Options drawer (Sam 2026-07-20: the
+   floating layers button was too hidden). It offers the looks for the
+   CURRENT theme and re-lists itself if the system flips light/dark. */
+const lookSel = document.getElementById("lookSel");
+function renderLookSel(){
+  const mode = themeMode();
+  lookSel.innerHTML = LOOKS[mode].map(k =>
+    `<option value="${k}"${k === mapLook[mode] ? " selected" : ""}>Map: ${
+      LOOK_NAME[k]}${k === "classic" ? " (old)" : ""}</option>`).join("");
+}
+renderLookSel();
+lookSel.onchange = () => { mapLook[themeMode()] = lookSel.value; saveLook(); applyLook(); };
+darkMql.addEventListener("change", renderLookSel);
 
 /* route layers survive style swaps: whenever the style (re)loads and our
    source is gone, put it back. styledata fires many times; the re-add is
@@ -940,29 +931,22 @@ function ensureDocks(){
 }
 map.on("style.load", ensureDocks);
 map.on("styledata", ensureDocks);
-map.on("click", "docks", e => {
+/* dock info is HOVER-only (Sam 2026-07-20: downtown is so dense that
+   dock clicks made it impossible to drop a pin anywhere) - clicking a
+   dot now places your pin like anywhere else on the map */
+let dockHover = null;
+map.on("mouseenter", "docks", e => {
   const p = e.features[0].properties;
   // counts refresh every 2 min below; null/"null" = engine had no counts
   const counts = (p.bikes != null && p.bikes !== "null")
     ? `<br>${p.bikes} bike${p.bikes == 1 ? "" : "s"} &middot; ${p.spaces} free dock${p.spaces == 1 ? "" : "s"}`
     : "";
-  new maplibregl.Popup({ closeButton: false, offset: 8 })
-    .setLngLat(e.features[0].geometry.coordinates)
-    .setHTML(`<b>${esc(p.name)}</b><br>Bike Share dock${counts}`)
-    .addTo(map);
-});
-// hover shows the station name straight away (no click needed)
-let dockHover = null;
-map.on("mouseenter", "docks", e => {
-  map.getCanvas().style.cursor = "pointer";
-  const p = e.features[0].properties;
   if (dockHover) dockHover.remove();
   dockHover = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 8 })
     .setLngLat(e.features[0].geometry.coordinates)
-    .setHTML(`<b>${esc(p.name)}</b>`).addTo(map);
+    .setHTML(`<b>${esc(p.name)}</b><br>Bike Share dock${counts}`).addTo(map);
 });
 map.on("mouseleave", "docks", () => {
-  map.getCanvas().style.cursor = "";
   if (dockHover){ dockHover.remove(); dockHover = null; }
 });
 loadDocks();
@@ -1098,9 +1082,7 @@ function savePts(){
 }
 const fmt = p => p.lat.toFixed(4) + ", " + p.lng.toFixed(4);
 map.on("click", e => {
-  // clicking a Bike Share dock opens its popup - don't also drop a pin
-  if (map.getLayer("docks") &&
-      map.queryRenderedFeatures(e.point, { layers: ["docks"] }).length) return;
+  // (dock dots are hover-only now - a click on one still drops a pin)
   // Reach mode: a tap paints a travel-time bloom instead of dropping pins
   if (window.__reachMode) { window.__reachTap && window.__reachTap(e.lngLat); return; }
   if (!fromPt) setPoint("from", e.lngLat);
