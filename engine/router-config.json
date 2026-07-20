@@ -108,6 +108,27 @@
     { "type": "stop-time-updater", "frequency": "1m", "feedId": "MIWAY",
       "url": "https://www.miapp.ca/GTFS_RT/TripUpdate/TripUpdates.pb" },
     { "type": "stop-time-updater", "frequency": "1m", "feedId": "DRT",
-      "url": "https://drtonline.durhamregiontransit.com/gtfsrealtime/TripUpdates" }
+      "url": "https://drtonline.durhamregiontransit.com/gtfsrealtime/TripUpdates" },
+
+    // LIVE SERVICE ALERTS (GTFS-RT ServiceAlerts), added 2026-07-19. These
+    // are the TEXT disruptions ("Line 1: no service Bloor-St George"), a
+    // SEPARATE feed from the TripUpdates above. A restart picks them up - no
+    // graph rebuild. feedId must match the static feed ids in
+    // build-config.json (TTC/YRT/MIWAY). Feeds probed live 2026-07-19: TTC
+    // 8.7KB active, MiWay 11KB active, YRT valid-but-empty.
+    // TTC IS INCLUDED here even though TTC TripUpdates are NOT (see above):
+    // alerts reference ROUTES and STOPS (stable ids like "1", "Kennedy"),
+    // not the mismatched live TRIP ids that make TripUpdates TRIP_NOT_FOUND -
+    // so there's no "NEW trip" crash and ttc-rt-filter.py is NOT needed here.
+    // (Verified on a throwaway engine before shipping - TTC alerts ingested
+    // without aborting the batch.)
+    // DRT alerts: no public endpoint found (every path 403s) - omitted.
+    // GO/UP alerts wait on Sam's Metrolinx Open Data API key (one line each).
+    { "type": "real-time-alerts", "frequency": "1m", "feedId": "TTC",
+      "url": "https://bustime.ttc.ca/gtfsrt/alerts" },
+    { "type": "real-time-alerts", "frequency": "1m", "feedId": "YRT",
+      "url": "http://rtu.york.ca/gtfsrealtime/ServiceAlerts" },
+    { "type": "real-time-alerts", "frequency": "1m", "feedId": "MIWAY",
+      "url": "https://www.miapp.ca/GTFS_RT/Alerts/Alerts.pb" }
   ]
 }
