@@ -268,6 +268,42 @@
     font-weight: 400; line-height: 1; }
   .maplibregl-ctrl-zoom-in::after { content: "+"; }
   .maplibregl-ctrl-zoom-out::after { content: "\2212"; }
+  /* map popups (Bike Share dock hover) - match the app card so the text
+     is readable in dark mode (Sam 2026-07-20: was invisible before) */
+  .maplibregl-popup-content { background: var(--card-solid) !important;
+    color: var(--text) !important; border-radius: 10px !important;
+    box-shadow: var(--shadow) !important; padding: 8px 11px !important;
+    font: inherit; font-size: 12.5px; }
+  .maplibregl-popup-content b { color: var(--text); }
+  .maplibregl-popup-tip { border-top-color: var(--card-solid) !important;
+    border-bottom-color: var(--card-solid) !important; }
+  .maplibregl-popup-anchor-top .maplibregl-popup-tip,
+  .maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+  .maplibregl-popup-anchor-top-right .maplibregl-popup-tip
+    { border-bottom-color: var(--card-solid) !important; }
+
+  /* map-look button - standalone, top-right, Apple-style (Sam 2026-07-20) */
+  #lookBtn { position: absolute; top: 14px; right: 14px; z-index: 6;
+    width: 40px; height: 40px; border: none; border-radius: 12px;
+    background: var(--card-solid); color: var(--text); cursor: pointer;
+    box-shadow: var(--shadow); display: flex; align-items: center;
+    justify-content: center; }
+  #lookBtn:hover { background: var(--chip); }
+  #lookBtn:active { transform: scale(.94); }
+  #lookPop { position: absolute; top: 62px; right: 14px; z-index: 7;
+    background: var(--card-solid); border-radius: 12px; box-shadow: var(--shadow);
+    padding: 6px; display: none; min-width: 172px; }
+  #lookPop.open { display: block; }
+  #lookPop .lp-h { font-size: 11px; font-weight: 700; letter-spacing: .02em;
+    color: var(--muted); padding: 4px 9px 6px; }
+  #lookPop button { display: flex; align-items: center; width: 100%;
+    border: none; background: none; color: var(--text); font: inherit;
+    font-size: 13px; font-weight: 550; padding: 8px 10px;
+    border-radius: 8px; cursor: pointer; text-align: left; }
+  #lookPop button:hover { background: var(--chip); }
+  #lookPop button.on { font-weight: 700; color: var(--accent); }
+  #lookPop button.on::after { content: "\2713"; margin-left: auto;
+    font-weight: 700; }
 
   /* map markers - Apple "you are here" halo dots (start green, end red) */
   .mk { cursor: grab; line-height: 0; }
@@ -351,7 +387,7 @@
   .fnote { color: var(--muted); font-size: 11px; margin-top: 7px; }
 
   /* ---- Reach mode ---- */
-  #reachCard { position: absolute; top: 14px; right: 14px; z-index: 5;
+  #reachCard { position: absolute; top: 62px; right: 14px; z-index: 5;
     width: 216px; background: var(--panel);
     backdrop-filter: blur(24px) saturate(180%);
     -webkit-backdrop-filter: blur(24px) saturate(180%);
@@ -391,7 +427,7 @@
     cursor: pointer; border-radius: 999px; padding: 0; font-size: 13px;
     display: inline-flex; align-items: center; justify-content: center; }
   #reachClose:hover { background: var(--chip); color: var(--text); }
-  #reachLauncher { position: absolute; top: 14px; right: 14px; z-index: 5;
+  #reachLauncher { position: absolute; top: 62px; right: 14px; z-index: 5;
     width: 40px; height: 40px; border-radius: 999px; border: none;
     background: var(--panel); backdrop-filter: blur(24px) saturate(180%);
     -webkit-backdrop-filter: blur(24px) saturate(180%);
@@ -463,7 +499,6 @@
       <option value="balanced">Bike: balanced</option>
       <option value="fastest">Bike: fastest</option>
     </select>
-    <select id="lookSel" title="Change the map's look"></select>
   </div>
   <div id="results">
     <div class="hint">Pick a start and an end to compare every mix of
@@ -503,7 +538,8 @@ const ICONS = {
   arrow: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
   link: '<path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" x2="16" y1="12" y2="12"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
-  warn: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>'
+  warn: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  layers: '<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>'
 };
 function icn(name, size){
   return `<svg class="icn" ${size ? `style="font-size:${size}px"` : ""} viewBox="0 0 24 24">${ICONS[name] || ""}</svg>`;
@@ -696,8 +732,8 @@ const PALETTES = {
     casing1: "#141416", road1: "#2e2e33", casing15: "#141416", road15: "#38383f",
     casing2: "#17171a", road2: "#43434b", casing3: "#1a1a1e", road3: "#514d3e",
     rail: "#2b2b31", path: "#2a2a2e", boundary: "#3d3d47",
-    label: "#a8a8af", strong: "#d8d8dd", roadLabel: "#8e8e96",
-    waterLabel: "#51708a", poiLabel: "#7c7c85", halo: "#161618" },
+    label: "#a8a8af", strong: "#d8d8dd", roadLabel: "#c6c6cc",
+    waterLabel: "#51708a", poiLabel: "#7c7c85", halo: "#111113" },
   graphite: { dark: true, dropPois: true,
     land: "#1c1c1e", residential: "#202023", civic: "#232327",
     water: "#101014", wood: "#202422", park: "#212623", grass: "#1f2321",
@@ -705,8 +741,8 @@ const PALETTES = {
     casing1: "#151517", road1: "#303036", casing15: "#151517", road15: "#3a3a41",
     casing2: "#18181b", road2: "#46464f", casing3: "#1b1b1f", road3: "#5c5c66",
     rail: "#2c2c32", path: "#2b2b30", boundary: "#40404a",
-    label: "#a2a2aa", strong: "#dcdce0", roadLabel: "#90909a",
-    waterLabel: "#4a5a6a", poiLabel: "#7a7a84", halo: "#141416" },
+    label: "#a2a2aa", strong: "#dcdce0", roadLabel: "#c8c8ce",
+    waterLabel: "#4a5a6a", poiLabel: "#7a7a84", halo: "#101012" },
   daylight: { dark: false, dropPois: false,
     land: "#f4f1ea", residential: "#efece4", civic: "#eae6dc",
     water: "#9ec7e8", wood: "#c9dfc0", park: "#cfe6c2", grass: "#d6e6c8",
@@ -779,14 +815,14 @@ function recolorStyle(base, p){
       continue;
     }
     if (l.type === "symbol"){
-      let c = p.label;
+      let c = p.label, halo = 1.2;
       if (sl === "place") c = /city|capital|state/.test(id) ? p.strong : p.label;
-      else if (sl === "transportation_name") c = p.roadLabel;
+      else if (sl === "transportation_name"){ c = p.roadLabel; halo = 1.6; }
       else if (sl === "water_name" || sl === "waterway") c = p.waterLabel;
       else if (sl === "poi" || sl === "aerodrome_label") c = p.poiLabel;
       l.paint["text-color"] = c;
       l.paint["text-halo-color"] = p.halo;
-      l.paint["text-halo-width"] = 1.1;
+      l.paint["text-halo-width"] = halo;
     }
   }
   return s;
@@ -827,19 +863,33 @@ darkMql.addEventListener("change", applyLook);
 // first visit with a non-classic look: upgrade as soon as the JSON arrives
 if (!libertyBase && mapLook[themeMode()] !== "classic") applyLook();
 
-/* the "map look" picker lives in the Options drawer (Sam 2026-07-20: the
-   floating layers button was too hidden). It offers the looks for the
-   CURRENT theme and re-lists itself if the system flips light/dark. */
-const lookSel = document.getElementById("lookSel");
-function renderLookSel(){
-  const mode = themeMode();
-  lookSel.innerHTML = LOOKS[mode].map(k =>
-    `<option value="${k}"${k === mapLook[mode] ? " selected" : ""}>Map: ${
-      LOOK_NAME[k]}${k === "classic" ? " (old)" : ""}</option>`).join("");
-}
-renderLookSel();
-lookSel.onchange = () => { mapLook[themeMode()] = lookSel.value; saveLook(); applyLook(); };
-darkMql.addEventListener("change", renderLookSel);
+/* standalone map-look button, top-right like Apple Maps' map-type control
+   (Sam 2026-07-20: wanted its own button, not buried in Options). Opens a
+   small menu of the current theme's looks. */
+(function(){
+  const btn = document.createElement("button");
+  btn.id = "lookBtn"; btn.title = "Map look";
+  btn.setAttribute("aria-label", "Choose the map's look");
+  btn.innerHTML = icn("layers", 18);
+  const pop = document.createElement("div"); pop.id = "lookPop";
+  document.body.append(btn, pop);
+  function renderPop(){
+    const mode = themeMode();
+    pop.innerHTML = '<div class="lp-h">MAP LOOK</div>' + LOOKS[mode].map(k =>
+      `<button data-look="${k}" class="${k === mapLook[mode] ? "on" : ""}">${
+        LOOK_NAME[k]}${k === "classic" ? " (the old map)" : ""}</button>`).join("");
+  }
+  btn.onclick = e => { e.stopPropagation(); renderPop(); pop.classList.toggle("open"); };
+  pop.onclick = e => {
+    const b = e.target.closest("[data-look]"); if (!b) return;
+    mapLook[themeMode()] = b.dataset.look; saveLook(); applyLook();
+    pop.classList.remove("open");
+  };
+  document.addEventListener("click", e => {
+    if (!pop.contains(e.target) && !btn.contains(e.target))
+      pop.classList.remove("open");
+  });
+})();
 
 /* route layers survive style swaps: whenever the style (re)loads and our
    source is gone, put it back. styledata fires many times; the re-add is
