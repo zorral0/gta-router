@@ -144,6 +144,44 @@
   @keyframes livepulse { 50% { opacity: .35; } }
   .late { color: #ff9f0a; font-weight: 600; }
   .early { color: var(--accent); font-weight: 600; }
+  /* service alerts: amber ⚠ chip on cards, per-leg note in detail, and the
+     collapsible "current disruptions" bar under the wordmark */
+  .alertchip { color: #ff9f0a; font-size: 11px; margin-left: 4px; vertical-align: 1px; }
+  .legalert { margin-top: 6px; background: color-mix(in srgb, #ff9f0a 12%, transparent);
+    border-radius: 8px; padding: 6px 8px; font-size: 12px; }
+  .legalert > summary { display: flex; align-items: flex-start; gap: 5px;
+    cursor: pointer; list-style: none; color: #d98500; font-weight: 600; }
+  .legalert > summary::-webkit-details-marker { display: none; }
+  .legalert .icn { color: #ff9f0a; flex: none; margin-top: 1px; }
+  .legalert .ah { flex: 1; }
+  .legalert .amore { color: var(--muted); font-weight: 500; font-size: 11px; }
+  .legalert[open] .amore { display: none; }
+  .legalert .ad { margin: 5px 0 0 17px; color: var(--text); font-weight: 400;
+    white-space: pre-line; }
+  .legalert .al { display: inline-block; margin: 5px 0 0 17px; color: var(--accent);
+    font-weight: 600; text-decoration: none; }
+  .alertbar { position: relative; margin: -4px 2px 10px;
+    background: color-mix(in srgb, #ff9f0a 13%, transparent);
+    border-radius: 10px; overflow: hidden; }
+  .alertbar .abhead { width: 100%; display: flex; align-items: center; gap: 7px;
+    background: none; border: none; cursor: pointer; text-align: left;
+    padding: 8px 34px 8px 10px; color: #d98500; font-size: 12px; font-weight: 700; }
+  .alertbar .abhead > span:first-of-type { flex: 1; }
+  .alertbar .abhead .icn { flex: none; }
+  .alertbar .abchev { transition: transform .18s ease; }
+  .alertbar:not(.collapsed) .abchev { transform: rotate(180deg); }
+  .alertbar .abx { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px;
+    display: flex; align-items: center; justify-content: center; background: none;
+    border: none; border-radius: 6px; cursor: pointer; color: #d98500; }
+  .alertbar .abx:hover { background: color-mix(in srgb, #ff9f0a 18%, transparent); }
+  .alertbar .ablist { padding: 0 10px 9px; display: flex; flex-direction: column; gap: 8px; }
+  .alertbar.collapsed .ablist { display: none; }
+  .alertbar .abitem { font-size: 12px; }
+  .alertbar .abitem .ah { color: var(--text); font-weight: 600; }
+  .alertbar .abitem .ad { color: var(--muted); font-weight: 400; margin-top: 2px;
+    white-space: pre-line; }
+  .alertbar .abitem .al { display: inline-block; margin-top: 3px; color: var(--accent);
+    font-weight: 600; text-decoration: none; font-size: 11.5px; }
   .legs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
     margin-top: 8px; }
   .rt { color: #fff; font-weight: 700; font-size: 11.5px; padding: 2.5px 8px;
@@ -198,6 +236,25 @@
   @keyframes slidein { from { opacity: 0; transform: translateX(22px); } }
   .ibtn:active, #go:active, .seg button:active, .back:active,
   .morebtn:active { transform: scale(.94); }
+
+  /* map-look switcher (layers button above the zoom controls) */
+  #lookBtn { position: absolute; right: 10px; bottom: 112px; z-index: 30;
+    width: 32px; height: 32px; border: none; border-radius: 10px;
+    background: var(--card-solid); color: var(--text); cursor: pointer;
+    box-shadow: var(--shadow); display: flex; align-items: center;
+    justify-content: center; }
+  #lookBtn:active { transform: scale(.94); }
+  #lookPop { position: absolute; right: 48px; bottom: 112px; z-index: 31;
+    background: var(--card-solid); border-radius: 12px; box-shadow: var(--shadow);
+    padding: 5px; display: none; min-width: 150px; }
+  #lookPop.open { display: block; }
+  #lookPop button { display: flex; align-items: center; width: 100%;
+    border: none; background: none; color: var(--text); font: inherit;
+    font-size: 12.5px; font-weight: 600; padding: 7px 10px;
+    border-radius: 8px; cursor: pointer; text-align: left; }
+  #lookPop button:hover { background: var(--chip); }
+  #lookPop button.on { color: var(--accent); }
+  #lookPop button.on::after { content: "\2713"; margin-left: auto; }
 
   /* map markers - Apple "you are here" halo dots (start green, end red) */
   .mk { cursor: grab; line-height: 0; }
@@ -428,7 +485,9 @@ const ICONS = {
   chev: '<path d="m6 9 6 6 6-6"/>',
   arrow: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
   link: '<path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" x2="16" y1="12" y2="12"/>',
-  check: '<path d="M20 6 9 17l-5-5"/>'
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  warn: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  layers: '<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>'
 };
 function icn(name, size){
   return `<svg class="icn" ${size ? `style="font-size:${size}px"` : ""} viewBox="0 0 24 24">${ICONS[name] || ""}</svg>`;
@@ -597,17 +656,186 @@ function itineraryCostDetail(it){
 }
 function itineraryCost(it){ return itineraryCostDetail(it).total; }
 
-/* ---- map (vector, light/dark follows the system) ---- */
+/* ---- map (vector, light/dark follows the system) ----
+   MAP LOOKS (Sam's picks, 2026-07-19): the map is OpenFreeMap's "liberty"
+   style recolored right here in the browser - no API key, no new host.
+   Defaults: "midnight" (dark) / "daylight" (light); "classic" = the
+   untouched hosted styles (fiord / liberty) from before, kept as options
+   via the little layers button bottom-right. The liberty style JSON
+   (~43 KB) is cached in localStorage so later visits start straight in
+   the chosen look; the first visit (or a cleared cache) briefly shows
+   classic, then swaps once the JSON arrives. Offline = classic. */
 const darkMql = matchMedia("(prefers-color-scheme: dark)");
-const styleURL = () => darkMql.matches
-  ? "https://tiles.openfreemap.org/styles/fiord"   // soft blue-gray dark
-  : "https://tiles.openfreemap.org/styles/liberty";
+const HOSTED = { dark: "https://tiles.openfreemap.org/styles/fiord",
+                 light: "https://tiles.openfreemap.org/styles/liberty" };
+const LOOKS = { dark: ["midnight", "graphite", "classic"],
+                light: ["daylight", "quiet", "classic"] };
+const LOOK_NAME = { midnight: "Midnight", graphite: "Graphite",
+                    daylight: "Daylight", quiet: "Quiet", classic: "Classic" };
+const PALETTES = {
+  midnight: { dark: true, dropPois: true,
+    land: "#1b1b1d", residential: "#1f1f22", civic: "#222226",
+    water: "#12181f", wood: "#1a211c", park: "#1d2620", grass: "#1c221e",
+    sand: "#202020", building: "#242428", aeroway: "#26262a",
+    casing1: "#141416", road1: "#2e2e33", casing15: "#141416", road15: "#38383f",
+    casing2: "#17171a", road2: "#43434b", casing3: "#1a1a1e", road3: "#514d3e",
+    rail: "#2b2b31", path: "#2a2a2e", boundary: "#3d3d47",
+    label: "#a8a8af", strong: "#d8d8dd", roadLabel: "#8e8e96",
+    waterLabel: "#51708a", poiLabel: "#7c7c85", halo: "#161618" },
+  graphite: { dark: true, dropPois: true,
+    land: "#1c1c1e", residential: "#202023", civic: "#232327",
+    water: "#101014", wood: "#202422", park: "#212623", grass: "#1f2321",
+    sand: "#202020", building: "#252529", aeroway: "#27272b",
+    casing1: "#151517", road1: "#303036", casing15: "#151517", road15: "#3a3a41",
+    casing2: "#18181b", road2: "#46464f", casing3: "#1b1b1f", road3: "#5c5c66",
+    rail: "#2c2c32", path: "#2b2b30", boundary: "#40404a",
+    label: "#a2a2aa", strong: "#dcdce0", roadLabel: "#90909a",
+    waterLabel: "#4a5a6a", poiLabel: "#7a7a84", halo: "#141416" },
+  daylight: { dark: false, dropPois: false,
+    land: "#f4f1ea", residential: "#efece4", civic: "#eae6dc",
+    water: "#9ec7e8", wood: "#c9dfc0", park: "#cfe6c2", grass: "#d6e6c8",
+    sand: "#efe8d0", building: "#e6e2d8", aeroway: "#e4e0d6",
+    casing1: "#dedad0", road1: "#ffffff", casing15: "#d8d4ca", road15: "#ffffff",
+    casing2: "#d5d0c5", road2: "#ffffff", casing3: "#e2b458", road3: "#f6cf6e",
+    rail: "#d8d2c8", path: "#e6e0d4", boundary: "#b9b2a6",
+    label: "#4b4b52", strong: "#26262b", roadLabel: "#6f6f76",
+    waterLabel: "#4877a3", poiLabel: "#6f6f66", halo: "#f7f5ef" },
+  quiet: { dark: false, dropPois: false,
+    land: "#f2f2f0", residential: "#ececea", civic: "#e8e8e4",
+    water: "#b8d4e8", wood: "#d2e2ca", park: "#d6e6ce", grass: "#dbe8d2",
+    sand: "#eee9dc", building: "#e4e4e0", aeroway: "#e2e2de",
+    casing1: "#dcdcda", road1: "#ffffff", casing15: "#d6d6d4", road15: "#ffffff",
+    casing2: "#cfcfcd", road2: "#ffffff", casing3: "#c4c4c8", road3: "#fdfdfd",
+    rail: "#d6d2cc", path: "#e4e0d8", boundary: "#b8b8b2",
+    label: "#50505a", strong: "#28282e", roadLabel: "#74747c",
+    waterLabel: "#5a7d9e", poiLabel: "#74746c", halo: "#f4f4f2" }
+};
+
+/* repaint every layer of the liberty style with one palette. Grouping is
+   by source-layer + layer-id substrings, so it survives minor upstream
+   style updates; anything unrecognized keeps its original color. */
+function recolorStyle(base, p){
+  const s = JSON.parse(JSON.stringify(base));
+  s.layers = s.layers.filter(l => {
+    if (l.id === "natural_earth" && p.dark) return false; // photo backdrop
+    if (p.dropPois && /^poi_r/.test(l.id)) return false;  // POI icon clutter
+    return true;
+  });
+  for (const l of s.layers){
+    l.paint = l.paint || {};
+    const id = l.id, sl = l["source-layer"] || "";
+    if (l.type === "background"){ l.paint["background-color"] = p.land; continue; }
+    if (l.type === "fill"){
+      let c = null;
+      if (sl === "water") c = p.water;
+      else if (sl === "landcover")
+        c = /wood|wetland/.test(id) ? p.wood : /sand/.test(id) ? p.sand
+          : /ice/.test(id) ? p.land : p.grass;
+      else if (sl === "park") c = p.park;
+      else if (sl === "landuse")
+        c = /residential/.test(id) ? p.residential
+          : /cemetery|pitch|track/.test(id) ? p.grass : p.civic;
+      else if (sl === "building") c = p.building;
+      else if (sl === "aeroway") c = p.aeroway;
+      else if (sl === "transportation") c = p.road1;
+      if (c){ l.paint["fill-color"] = c; delete l.paint["fill-pattern"];
+              delete l.paint["fill-outline-color"]; }
+      if (id === "building-3d") l.paint["fill-extrusion-color"] = p.building;
+      continue;
+    }
+    if (l.type === "fill-extrusion"){ l.paint["fill-extrusion-color"] = p.building; continue; }
+    if (l.type === "line"){
+      let c = null;
+      if (sl === "waterway") c = p.water;
+      else if (sl === "boundary") c = p.boundary;
+      else if (sl === "park") c = p.park;
+      else if (sl === "aeroway") c = p.road1;
+      else if (sl === "transportation"){
+        const casing = /casing/.test(id);
+        if (/rail|transit/.test(id)) c = p.rail;
+        else if (/motorway/.test(id)) c = casing ? p.casing3 : p.road3;
+        else if (/trunk|primary/.test(id)) c = casing ? p.casing2 : p.road2;
+        else if (/secondary|tertiary/.test(id)) c = casing ? p.casing15 : p.road15;
+        else if (/path|pedestrian|pier|bridleway/.test(id)) c = p.path;
+        else c = casing ? p.casing1 : p.road1;
+      }
+      if (c) l.paint["line-color"] = c;
+      continue;
+    }
+    if (l.type === "symbol"){
+      let c = p.label;
+      if (sl === "place") c = /city|capital|state/.test(id) ? p.strong : p.label;
+      else if (sl === "transportation_name") c = p.roadLabel;
+      else if (sl === "water_name" || sl === "waterway") c = p.waterLabel;
+      else if (sl === "poi" || sl === "aerodrome_label") c = p.poiLabel;
+      l.paint["text-color"] = c;
+      l.paint["text-halo-color"] = p.halo;
+      l.paint["text-halo-width"] = 1.1;
+    }
+  }
+  return s;
+}
+
+const mapLook = Object.assign({ dark: "midnight", light: "daylight" },
+                              loadStored("mapLook", {}));
+function saveLook(){
+  try { localStorage.setItem("mapLook", JSON.stringify(mapLook)); } catch (e){}
+}
+const themeMode = () => darkMql.matches ? "dark" : "light";
+let libertyBase = loadStored("libertyStyle", null);
+async function fetchLibertyBase(){
+  if (libertyBase) return libertyBase;
+  libertyBase = await (await fetch(HOSTED.light)).json();
+  try { localStorage.setItem("libertyStyle", JSON.stringify(libertyBase)); }
+  catch (e){}
+  return libertyBase;
+}
+function initialMapStyle(){
+  const look = mapLook[themeMode()];
+  if (look !== "classic" && libertyBase)
+    return recolorStyle(libertyBase, PALETTES[look]);
+  return HOSTED[themeMode()];
+}
+async function applyLook(){
+  const look = mapLook[themeMode()];
+  if (look === "classic") return map.setStyle(HOSTED[themeMode()]);
+  try { map.setStyle(recolorStyle(await fetchLibertyBase(), PALETTES[look])); }
+  catch (e){ map.setStyle(HOSTED[themeMode()]); }
+}
 const map = new maplibregl.Map({
-  container: "map", style: styleURL(),
+  container: "map", style: initialMapStyle(),
   center: [-79.5, 43.75], zoom: 9.2, attributionControl: { compact: true }
 });
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
-darkMql.addEventListener("change", () => map.setStyle(styleURL()));
+darkMql.addEventListener("change", applyLook);
+// first visit with a non-classic look: upgrade as soon as the JSON arrives
+if (!libertyBase && mapLook[themeMode()] !== "classic") applyLook();
+
+/* the little "map look" switcher, bottom-right above the zoom buttons */
+(function(){
+  const btn = document.createElement("button");
+  btn.id = "lookBtn"; btn.title = "Map look";
+  btn.setAttribute("aria-label", "Choose the map's look");
+  btn.innerHTML = icn("layers", 16);
+  const pop = document.createElement("div"); pop.id = "lookPop";
+  document.body.append(btn, pop);
+  function renderPop(){
+    const mode = themeMode();
+    pop.innerHTML = LOOKS[mode].map(k =>
+      `<button data-look="${k}" class="${k === mapLook[mode] ? "on" : ""}">
+         ${LOOK_NAME[k]}${k === "classic" ? " (the old map)" : ""}</button>`).join("");
+  }
+  btn.onclick = () => { renderPop(); pop.classList.toggle("open"); };
+  pop.onclick = e => {
+    const b = e.target.closest("[data-look]"); if (!b) return;
+    mapLook[themeMode()] = b.dataset.look; saveLook(); applyLook();
+    pop.classList.remove("open");
+  };
+  document.addEventListener("click", e => {
+    if (!pop.contains(e.target) && !btn.contains(e.target))
+      pop.classList.remove("open");
+  });
+})();
 
 /* route layers survive style swaps: whenever the style (re)loads and our
    source is gone, put it back. styledata fires many times; the re-add is
@@ -1057,6 +1285,8 @@ const PC_QUERY = `query PC($origin:PlanLabeledLocationInput!,
             agency{name} route{shortName longName color}
             from{name lat lon stop{gtfsId}} to{name lat lon stop{gtfsId}}
             stopCalls{stopLocation{... on Stop {name}}}
+            alerts{ id alertHeaderText alertDescriptionText alertUrl
+                    alertSeverityLevel effectiveStartDate effectiveEndDate }
             legGeometry{points} } } } } }`;
 
 /* reshape a planConnection itinerary to the leg fields the rest of the
@@ -1065,6 +1295,31 @@ const PC_QUERY = `query PC($origin:PlanLabeledLocationInput!,
    carries estimated.time - prefer it, and keep the delay in seconds
    (computed from the two timestamps, so the Duration scalar format
    never matters). estimated == null means schedule-only. */
+/* GTFS-RT service alerts: keep the currently-in-effect ones, dedupe by id
+   (the same alert rides in on several legs/stops), and hand back a clean,
+   plain-words shape. effective*Date are epoch SECONDS (OTP GTFS API). An
+   alert with no dates is treated as always-active. */
+function cleanAlerts(raw){
+  const now = Date.now();
+  const out = [], seen = new Set();
+  for (const a of (raw || [])){
+    const start = a.effectiveStartDate ? a.effectiveStartDate * 1000 : null;
+    const end = a.effectiveEndDate ? a.effectiveEndDate * 1000 : null;
+    if (start && start > now) continue;        // not started yet
+    if (end && end < now) continue;            // already over
+    const head = (a.alertHeaderText || "").trim();
+    const desc = (a.alertDescriptionText || "").trim();
+    if (!head && !desc) continue;              // nothing to show
+    const key = a.id || (head + "|" + desc);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ id: key, header: head || desc,
+      desc: desc && desc !== head ? desc : "",
+      url: a.alertUrl || "", severity: a.alertSeverityLevel || "",
+      feed: a.feed || "" });   // present on the global query, absent on legs
+  }
+  return out;
+}
 function normalizeItin(n){
   return { duration: n.duration,
     startTime: Date.parse(n.start), endTime: Date.parse(n.end),
@@ -1078,6 +1333,7 @@ function normalizeItin(n){
         endTime: Date.parse(eEst || eSched),
         live: !!(sEst || eEst),
         rtDelaySec: sEst ? Math.round((Date.parse(sEst) - Date.parse(sSched)) / 1000) : null,
+        alerts: cleanAlerts(l.alerts),
         intermediatePlaces: (l.stopCalls || []).slice(1, -1) };
     }) };
 }
@@ -1247,7 +1503,9 @@ function cardHTML(it, cid, fastestIt, cheapestIt){
     <div class="head"><span class="mins">${Math.round(it.duration/60)} min</span>
       <span class="times">${hhmm(it.startTime)} &ndash; ${hhmm(it.endTime)}${
         alts.length ? " &middot; also " + alts.map(hhmm).join(", ") : ""}${
-        it.legs.some(l => l.live) ? '<span class="livechip">live</span>' : ""}</span>
+        it.legs.some(l => l.live) ? '<span class="livechip">live</span>' : ""}${
+        it.legs.some(l => (l.alerts || []).length)
+          ? '<span class="alertchip" title="Service alert on this trip">&#9888;</span>' : ""}</span>
       <span class="cost">$${cost.toFixed(2)}</span></div>
     ${badges ? `<div class="badges">${badges}</div>` : ""}
     ${viaLine(it)}
@@ -1510,6 +1768,15 @@ function renderDetail(cid){
       }
       const bi = boardingInfo(it.legs, li);
       if (bi) extra = trainDiagram(bi, (l.to.name || "").split(" Station")[0]);
+    }
+    // service alerts for this leg's route/stop (the header always shows; the
+    // longer description, when there is one, is revealed by tapping)
+    for (const a of (l.alerts || [])){
+      extra += `<details class="legalert"><summary>${icn("warn", 12)}
+        <span class="ah">${esc(a.header)}</span>${
+        a.desc ? '<span class="amore">more</span>' : ""}</summary>${
+        a.desc ? `<div class="ad">${esc(a.desc)}</div>` : ""}${
+        a.url ? `<a class="al" href="${esc(a.url)}" target="_blank" rel="noopener">Agency page &rarr;</a>` : ""}</details>`;
     }
     steps += `<div class="step ${l.mode === "WALK" ? "walkstep" : ""}" style="--rail:${col}">
       <div class="t">${hhmm(l.startTime)}</div>
@@ -1847,6 +2114,66 @@ function tripFromURL(){
       : `Schedule data runs out in ${Math.max(1, days)} day${days === 1 ? "" : "s"} — re-run setup.sh soon.`;
     document.querySelector(".wordmark").after(div);
   } catch (e){ /* engine down - plan() already explains that */ }
+})();
+
+/* CURRENT DISRUPTIONS BAR - all active service alerts across the loaded
+   feeds (TTC/YRT/MiWay today), so a rider sees "Line 1 no service" BEFORE
+   planning. Collapsed by default (just a count); tap to expand; the x
+   dismisses it for this browser session. Refreshes every 2 min, skipped
+   while the tab is hidden. Fails silent if the engine is down. */
+const ALERTS_QUERY = `{ alerts { id feed alertHeaderText alertDescriptionText
+  alertUrl alertSeverityLevel effectiveStartDate effectiveEndDate } }`;
+const FEED_LABEL = { TTC:"TTC", YRT:"York/Viva", MIWAY:"MiWay",
+  GO:"GO Transit", UP:"UP Express", BRAMPTON:"Brampton", DRT:"Durham" };
+(function(){
+  let bar = null, dismissed = false;
+  try { dismissed = sessionStorage.getItem("alertsDismissed") === "1"; } catch (e){}
+  // isInitial: the first paint must run even in a background tab (rendering
+  // DOM needs no rAF); only the periodic polling is skipped while hidden.
+  async function refresh(isInitial){
+    if (dismissed) return;
+    if (!isInitial && document.hidden) return;
+    let alerts;
+    try {
+      const r = await fetch(OTP, { method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: ALERTS_QUERY }) });
+      const js = await r.json();
+      if (js.errors) return;                 // schema mismatch: stay silent
+      alerts = cleanAlerts((js.data || {}).alerts)
+        .map(a => ({ ...a, feedLabel: FEED_LABEL[a.feed] || "" }));
+    } catch (e){ return; }                    // engine down
+    if (!alerts.length){ if (bar){ bar.remove(); bar = null; } return; }
+    render(alerts);
+  }
+  function render(alerts){
+    if (!bar){
+      bar = document.createElement("div");
+      bar.className = "alertbar collapsed";
+      document.querySelector(".wordmark").after(bar);
+    }
+    const n = alerts.length;
+    const items = alerts.map(a =>
+      `<div class="abitem"><div class="ah">${a.feedLabel
+        ? `<b>${esc(a.feedLabel)}</b> ` : ""}${esc(a.header)}</div>${
+        a.desc ? `<div class="ad">${esc(a.desc)}</div>` : ""}${
+        a.url ? `<a class="al" href="${esc(a.url)}" target="_blank" rel="noopener">Agency page &rarr;</a>` : ""}</div>`
+    ).join("");
+    bar.innerHTML =
+      `<button class="abhead" aria-expanded="${!bar.classList.contains("collapsed")}">
+        ${icn("warn", 13)}<span>${n} current service alert${n === 1 ? "" : "s"}</span>
+        <span class="abchev">${icn("chev", 13)}</span></button>
+       <button class="abx" title="Hide alerts" aria-label="Hide alerts">${icn("x", 12)}</button>
+       <div class="ablist">${items}</div>`;
+    bar.querySelector(".abhead").onclick = () => bar.classList.toggle("collapsed");
+    bar.querySelector(".abx").onclick = () => {
+      dismissed = true;
+      try { sessionStorage.setItem("alertsDismissed", "1"); } catch (e){}
+      bar.remove(); bar = null;
+    };
+  }
+  refresh(true);
+  setInterval(() => refresh(false), 120000);
 })();
 
 /* ===================== REACH MODE =====================
