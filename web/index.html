@@ -8,22 +8,25 @@
 <link href="vendor/maplibre-gl.css" rel="stylesheet">
 <script src="vendor/maplibre-gl.js"></script>
 <style>
+  /* SOLID surfaces (Apple-material pass, 2026-07-19): the old translucent
+     gray-on-gray read muddy - now the sheet, cards and chips are opaque
+     with real contrast (dark mode: black cards on a #1b sheet). */
   :root {
-    --panel: rgba(248,248,250,.85); --card: rgba(255,255,255,.92);
+    --panel: #f4f4f6; --card: #ffffff;
     --card-solid: #ffffff; --text: #1d1d1f; --muted: #6e6e73;
     --accent: #007aff; --good: #248a3d; --bad: #ff3b30;
-    --line: rgba(0,0,0,.08); --chip: rgba(120,120,128,.12);
-    --shadow: 0 0 0 .5px rgba(0,0,0,.06), 0 8px 30px rgba(0,0,0,.14);
+    --line: rgba(0,0,0,.08); --chip: #e7e7ec;
+    --shadow: 0 0 0 .5px rgba(0,0,0,.08), 0 12px 36px rgba(0,0,0,.16);
     --card-shadow: 0 1px 2px rgba(0,0,0,.05);
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --panel: rgba(28,28,30,.82); --card: rgba(44,44,46,.92);
+      --panel: #1b1b1d; --card: #000000;
       --card-solid: #2c2c2e; --text: #f5f5f7; --muted: #98989d;
       --accent: #0a84ff; --good: #30d158; --bad: #ff453a;
-      --line: rgba(255,255,255,.1); --chip: rgba(120,120,128,.24);
-      --shadow: 0 0 0 .5px rgba(255,255,255,.08), 0 8px 30px rgba(0,0,0,.55);
-      --card-shadow: 0 1px 2px rgba(0,0,0,.3);
+      --line: rgba(255,255,255,.09); --chip: #2c2c2e;
+      --shadow: 0 0 0 .5px rgba(255,255,255,.09), 0 12px 36px rgba(0,0,0,.6);
+      --card-shadow: none;
     }
   }
   * { box-sizing: border-box; }
@@ -37,15 +40,14 @@
   #panel { position: absolute; top: 14px; left: 14px;
     width: min(384px, calc(100vw - 28px));
     max-height: calc(100% - 28px); display: flex; flex-direction: column;
-    background: var(--panel); backdrop-filter: blur(24px) saturate(180%);
-    -webkit-backdrop-filter: blur(24px) saturate(180%);
-    border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; }
+    background: var(--panel);
+    border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; }
   #panelScroll { overflow-y: auto; padding: 14px 14px 16px; }
   #panelScroll::-webkit-scrollbar { width: 8px; }
   #panelScroll::-webkit-scrollbar-thumb { background: var(--chip); border-radius: 4px; }
 
-  .wordmark { font-size: 12px; font-weight: 700; letter-spacing: .08em;
-    text-transform: uppercase; color: var(--muted); margin: 2px 2px 10px; }
+  .wordmark { font-size: 17px; font-weight: 800; letter-spacing: -.01em;
+    color: var(--text); margin: 2px 2px 12px; }
 
   /* search fields */
   .search { background: var(--card); border-radius: 12px;
@@ -79,13 +81,13 @@
     margin-bottom: 12px; }
   .ctrls select { appearance: none; -webkit-appearance: none; border: none;
     background: var(--chip); color: var(--text); font: inherit; font-size: 12.5px;
-    font-weight: 590; padding: 7px 24px 7px 12px; border-radius: 999px;
+    font-weight: 590; height: 32px; padding: 0 22px 0 11px; border-radius: 999px;
     cursor: pointer;
     background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='6'%3E%3Cpath d='M1 1l3.5 3.5L8 1' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
     background-repeat: no-repeat; background-position: right 10px center; }
   .seg { display: inline-flex; background: var(--chip); border-radius: 999px;
     padding: 2px; }
-  .seg button { border: none; background: transparent; padding: 5.5px 11px;
+  .seg button { border: none; background: transparent; padding: 5.5px 10px;
     border-radius: 999px; font: inherit; font-size: 12px; font-weight: 600;
     color: var(--muted); cursor: pointer; }
   .seg button.on { background: var(--card-solid); color: var(--text);
@@ -111,31 +113,37 @@
     text-transform: uppercase; color: var(--muted); }
   .sect h2 .icn { font-size: 14px; }
   .card { background: var(--card); border-radius: 14px;
-    box-shadow: 0 0 0 .5px var(--line), 0 1px 1.5px rgba(0,0,0,.04),
-                0 4px 14px rgba(0,0,0,.05);
-    padding: 11px 13px; cursor: pointer; margin-bottom: 7px;
+    box-shadow: 0 0 0 .5px var(--line), var(--card-shadow);
+    padding: 13px 15px; cursor: pointer; margin-bottom: 8px;
     transition: transform .14s ease, box-shadow .14s ease;
     animation: rise .3s cubic-bezier(.2,.7,.3,1) both; }
   .card:hover { transform: translateY(-1px);
-    box-shadow: 0 0 0 .5px var(--line), 0 2px 4px rgba(0,0,0,.06),
-                0 10px 24px rgba(0,0,0,.1); }
+    box-shadow: 0 0 0 .5px var(--line), 0 6px 18px rgba(0,0,0,.10); }
   .card:active { transform: scale(.985); }
-  .card.sel { box-shadow: 0 0 0 2px var(--accent), 0 4px 14px rgba(0,0,0,.08); }
+  /* the picked trip is a full accent card, Apple-style - every inner
+     piece flips to white-on-blue */
+  .card.sel { background: var(--accent); box-shadow: none; }
+  .card.sel, .card.sel .mins, .card.sel .cost { color: #fff; }
+  .card.sel .times, .card.sel .via, .card.sel .badge,
+  .card.sel .livechip, .card.sel .alertchip, .card.sel .sep
+    { color: rgba(255,255,255,.85); }
+  .card.sel .gchip { background: rgba(255,255,255,.22); color: #fff; }
   @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
   .head { display: flex; align-items: baseline; gap: 8px; }
-  .mins { font-size: 19px; font-weight: 700; letter-spacing: -.02em;
+  /* one big number per card; everything else stays small and quiet */
+  .mins { font-size: 24px; font-weight: 700; letter-spacing: -.03em;
     font-variant-numeric: tabular-nums; }
-  .times { color: var(--muted); font-size: 11.5px;
+  .times { color: var(--muted); font-size: 12px;
     font-variant-numeric: tabular-nums; }
-  .cost { margin-left: auto; font-size: 15px; font-weight: 700;
-    color: var(--good); font-variant-numeric: tabular-nums; }
-  .badges { display: flex; gap: 5px; margin-top: 5px; }
-  .badge { font-size: 10px; font-weight: 700; letter-spacing: .05em;
-    text-transform: uppercase; padding: 2px 8px; border-radius: 999px; }
-  .badge.fast { background: color-mix(in srgb, var(--accent) 16%, transparent);
-    color: var(--accent); }
-  .badge.cheap { background: color-mix(in srgb, var(--good) 16%, transparent);
-    color: var(--good); }
+  .cost { margin-left: auto; font-size: 15px; font-weight: 650;
+    color: var(--text); font-variant-numeric: tabular-nums; }
+  /* badges are quiet colored words now, not uppercase pills */
+  .badges { display: flex; gap: 12px; margin-top: 3px; }
+  .badge { font-size: 12.5px; font-weight: 650; padding: 0; }
+  .badge::before { content: "\25CF"; font-size: 8px; vertical-align: 1.5px;
+    margin-right: 5px; }
+  .badge.fast { color: var(--accent); }
+  .badge.cheap { color: var(--good); }
   /* real-time markers: "live" on cards, late/early notes on detail legs */
   .livechip { color: var(--good); font-size: 9.5px; font-weight: 700;
     letter-spacing: .06em; text-transform: uppercase; margin-left: 2px; }
@@ -198,13 +206,15 @@
   .extra.open { display: block; }
 
   /* "what you have" toggles - gate which mode mixes get searched */
-  .have { border: none; cursor: pointer; font: inherit; font-size: 12px;
+  .have { border: none; cursor: pointer; font: inherit; font-size: 12.5px;
     font-weight: 600; display: inline-flex; align-items: center; gap: 5px;
-    padding: 6.5px 12px; border-radius: 999px; background: var(--chip);
-    color: var(--muted); }
-  .have.on { background: color-mix(in srgb, var(--accent) 15%, transparent);
-    color: var(--accent); box-shadow: 0 0 0 1.5px var(--accent) inset; }
+    height: 32px; padding: 0 13px; border-radius: 999px;
+    background: var(--chip); color: var(--muted); }
+  .have.on { background: var(--accent); color: #fff; }
   .have:active { transform: scale(.96); }
+  /* collapsed "Options" drawer - the extra controls live behind one chip */
+  #optWrap { display: none; }
+  #optWrap.open { display: flex; }
   .havelbl { font-size: 11.5px; font-weight: 600; color: var(--muted); }
 
   /* one-line mode summary on mixed-mode cards */
@@ -410,16 +420,22 @@
       <button data-when="depart" class="on" aria-pressed="true">Leave at</button>
       <button data-when="arrive" aria-pressed="false">Arrive by</button>
     </div>
+    <span style="flex-basis:100%"></span>
     <select id="daySel" title="Day"></select>
     <select id="timeSel" title="Time"></select>
+  </div>
+  <div class="ctrls">
+    <button class="have" id="optsBtn" aria-expanded="false"
+      title="Bike, car and Bike Share toggles, fare type, drive limit">Options</button>
     <button class="ibtn" id="swap" title="Swap start and end"
       aria-label="Swap start and end"></button>
     <button class="ibtn" id="share" title="Copy a link to this trip"
       aria-label="Copy a shareable link to this trip"></button>
     <button class="ibtn" id="clear" title="Clear"
       aria-label="Clear start, end and results"></button>
+    <button id="go">Plan trip</button>
   </div>
-  <div class="ctrls">
+  <div class="ctrls" id="optWrap">
     <span class="havelbl">Using:</span>
     <button class="have on" id="haveBike" data-have="bike"
       title="I can bike to a stop and lock my bike there"></button>
@@ -429,8 +445,6 @@
       title="A car for the last leg - a pickup, or your car waiting at the station"></button>
     <button class="have on" id="haveShare" data-have="share"
       title="OK with renting a Bike Share Toronto bike"></button>
-  </div>
-  <div class="ctrls">
     <div class="seg" id="riderSeg" title="Fare type">
       <button data-rider="adult" class="on" aria-pressed="true">Adult</button>
       <button data-rider="youth" aria-pressed="false">Youth 13&ndash;19</button>
@@ -446,7 +460,6 @@
       <option value="balanced">Bike: balanced</option>
       <option value="fastest">Bike: fastest</option>
     </select>
-    <button id="go">Plan trip</button>
   </div>
   <div id="results">
     <div class="hint">Pick a start and an end to compare every mix of
@@ -852,19 +865,26 @@ map.on("style.load", ensureRoute);
 function addRouteLayers(fc){
   if (map.getSource("route")){ map.getSource("route").setData(fc); return; }
   map.addSource("route", { type: "geojson", data: fc });
-  map.addLayer({ id: "route-casing", type: "line", source: "route",
-    layout: { "line-cap": "round", "line-join": "round" },
-    paint: { "line-color": darkMql.matches ? "#1c1c1e" : "#ffffff",
-             "line-width": 8 } });
+  /* Apple-style line (Sam's request 2026-07-19): the outline is a darker
+     shade of the line's own color (not a white sticker edge), and widths
+     grow with zoom so the route feels drawn on the map, not pasted on. */
   const previewOpacity = ["case", ["==", ["get","preview"], 1], 0.55, 1];
+  const zw = (a, b, c) =>
+    ["interpolate", ["linear"], ["zoom"], 10, a, 13, b, 16, c];
+  map.addLayer({ id: "route-casing", type: "line", source: "route",
+    filter: ["!=", ["get","dash"], 1],
+    layout: { "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": ["get","ccolor"], "line-width": zw(5.5, 8, 11.5),
+             "line-opacity": previewOpacity } });
   map.addLayer({ id: "route-solid", type: "line", source: "route",
     filter: ["!=", ["get","dash"], 1],
     layout: { "line-cap": "round", "line-join": "round" },
-    paint: { "line-color": ["get","color"], "line-width": 4.5,
+    paint: { "line-color": ["get","color"], "line-width": zw(3.5, 5.5, 8.5),
              "line-opacity": previewOpacity } });
   map.addLayer({ id: "route-walk", type: "line", source: "route",
     filter: ["==", ["get","dash"], 1],
-    paint: { "line-color": ["get","color"], "line-width": 4.5,
+    layout: { "line-cap": "round" },
+    paint: { "line-color": ["get","color"], "line-width": zw(3, 4.5, 6),
              "line-dasharray": [0.2, 1.6],
              "line-opacity": previewOpacity } });
 }
@@ -1651,13 +1671,25 @@ function modeColor(l){
   if (l.mode === "CAR") return darkMql.matches ? "#aeaeb2" : "#48484a";
   return routeColor(l.route) || agencyColor(agencyOf(l));
 }
+/* a darker shade of the same color - the route line's outline */
+function shade(hex, f){
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
+  if (!m) return "rgba(0,0,0,.35)";
+  const n = parseInt(m[1], 16);
+  const ch = s => Math.round(((n >> s) & 255) * f)
+    .toString(16).padStart(2, "0");
+  return "#" + ch(16) + ch(8) + ch(0);
+}
 function buildFC(it, preview){
-  return { type: "FeatureCollection", features: it.legs.map(l => ({
-    type: "Feature",
-    properties: { color: modeColor(l), dash: l.mode === "WALK" ? 1 : 0,
-                  preview: preview ? 1 : 0 },
-    geometry: { type: "LineString",
-                coordinates: decodePolyline(l.legGeometry.points) } })) };
+  return { type: "FeatureCollection", features: it.legs.map(l => {
+    const color = modeColor(l);
+    return { type: "Feature",
+      properties: { color, ccolor: shade(color, 0.62),
+                    dash: l.mode === "WALK" ? 1 : 0,
+                    preview: preview ? 1 : 0 },
+      geometry: { type: "LineString",
+                  coordinates: decodePolyline(l.legGeometry.points) } };
+  }) };
 }
 /* decoded routes are cached per card - hovering shouldn't re-decode
    every polyline every time the mouse moves */
@@ -1959,6 +1991,24 @@ for (const id of ["haveBike", "haveCarStart", "haveCarEnd", "haveShare"]){
     plan();
   };
 }
+
+/* the Options chip folds the toggle/fare/drive/bike controls away
+   (Apple's "Now / Avoid" trick). Open state sticks across visits. */
+(function(){
+  const btn = document.getElementById("optsBtn"),
+        wrap = document.getElementById("optWrap");
+  btn.innerHTML = "Options " + icn("chev", 12);
+  function setOpen(open){
+    wrap.classList.toggle("open", open);
+    btn.classList.toggle("on", open);
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    try { localStorage.setItem("optsOpen", open ? "1" : ""); } catch (e){}
+  }
+  btn.onclick = () => setOpen(!wrap.classList.contains("open"));
+  let saved = "";
+  try { saved = localStorage.getItem("optsOpen") || ""; } catch (e){}
+  setOpen(saved === "1");
+})();
 
 document.querySelectorAll("#riderSeg button").forEach(b => {
   b.onclick = () => {
