@@ -41,7 +41,19 @@
     width: min(384px, calc(100vw - 28px));
     max-height: calc(100% - 28px); display: flex; flex-direction: column;
     background: var(--panel);
-    border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; }
+    border-radius: 20px; box-shadow: var(--shadow); overflow: hidden;
+    transform-origin: top left;
+    /* no fill-mode: the panel must settle to transform:none, otherwise the
+       retained scale(1) makes #panel a containing block that clips the fixed
+       "More" menu against its own overflow:hidden */
+    animation: panelIn .62s cubic-bezier(.2,.7,.3,1); }
+  /* playful first-impression entrance: drop in, overshoot, unblur into focus.
+     Runs once on load, so a little expressiveness is earned here. */
+  @keyframes panelIn {
+    0%   { opacity: 0; transform: translateY(-14px) scale(.93); filter: blur(7px); }
+    60%  { opacity: 1; transform: translateY(4px)   scale(1.02); filter: blur(0);  }
+    100% { opacity: 1; transform: translateY(0)     scale(1);    filter: blur(0);  }
+  }
   #panelScroll { overflow-y: auto; padding: 14px 14px 16px; }
   #panelScroll::-webkit-scrollbar { width: 8px; }
   #panelScroll::-webkit-scrollbar-thumb { background: var(--chip); border-radius: 4px; }
@@ -52,10 +64,21 @@
   /* search fields */
   .search { background: var(--card); border-radius: 12px;
     box-shadow: 0 0 0 .5px var(--line), var(--card-shadow);
-    padding: 4px 12px; margin-bottom: 10px; }
+    padding: 4px 12px; margin-bottom: 10px;
+    /* stays pinned so you never lose sight of where you're routing while
+       the results scroll underneath it */
+    position: sticky; top: 0; z-index: 4; }
   .srow { display: flex; align-items: center; gap: 10px; position: relative; }
   .srow + .srow { border-top: .5px solid var(--line); }
-  .srow .pt { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .srow .pt { width: 10px; height: 10px; border-radius: 50%; flex: none;
+    cursor: pointer; box-shadow: 0 0 0 0 rgba(0,0,0,0);
+    transition: box-shadow .15s ease, transform .1s ease; }
+  .srow .pt:hover { box-shadow: 0 0 0 3px var(--chip); }
+  /* the "armed" dot: your next map click drops THIS point. Halo in the dot's
+     own colour, separated from the core by a card-coloured gap. */
+  .srow .pt.active { box-shadow: 0 0 0 2px var(--card), 0 0 0 4px currentColor; }
+  .srow .pt.active:hover { box-shadow: 0 0 0 2px var(--card), 0 0 0 4px currentColor; }
+  .srow .pt:active { transform: scale(.85); }
   .srow input { flex: 1; border: none; outline: none; background: transparent;
     color: var(--text); font: inherit; padding: 11px 0; min-width: 0; }
   .srow input::placeholder { color: var(--muted); }
@@ -79,7 +102,7 @@
   /* controls */
   .ctrls { display: flex; gap: 7px; align-items: center; flex-wrap: wrap;
     margin-bottom: 12px; }
-  .ctrls select { appearance: none; -webkit-appearance: none; border: none;
+  .ctrls select, .optrow select { appearance: none; -webkit-appearance: none; border: none;
     background: var(--chip); color: var(--text); font: inherit; font-size: 12.5px;
     font-weight: 590; height: 32px; padding: 0 22px 0 11px; border-radius: 999px;
     cursor: pointer;
@@ -95,8 +118,8 @@
   .ibtn { border: none; background: var(--chip); color: var(--text);
     width: 30px; height: 30px; border-radius: 999px; cursor: pointer;
     display: inline-flex; align-items: center; justify-content: center; }
-  .ibtn:hover, .ctrls select:hover { filter: brightness(.96); }
-  @media (prefers-color-scheme: dark) { .ibtn:hover, .ctrls select:hover { filter: brightness(1.25); } }
+  .ibtn:hover, .ctrls select:hover, .optrow select:hover { filter: brightness(.96); }
+  @media (prefers-color-scheme: dark) { .ibtn:hover, .ctrls select:hover, .optrow select:hover { filter: brightness(1.25); } }
   #go { border: none; background: var(--accent); color: #fff; font: inherit;
     font-size: 13px; font-weight: 650; padding: 7px 16px; border-radius: 999px;
     cursor: pointer; margin-left: auto; }
@@ -132,11 +155,12 @@
   .head { display: flex; align-items: baseline; gap: 8px; }
   /* one big number per card; everything else stays small and quiet */
   .mins { font-size: 24px; font-weight: 700; letter-spacing: -.03em;
-    font-variant-numeric: tabular-nums; }
+    font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }
   .times { color: var(--muted); font-size: 12px;
-    font-variant-numeric: tabular-nums; }
+    font-variant-numeric: tabular-nums; min-width: 0; }
   .cost { margin-left: auto; font-size: 15px; font-weight: 650;
-    color: var(--text); font-variant-numeric: tabular-nums; }
+    color: var(--text); font-variant-numeric: tabular-nums;
+    white-space: nowrap; flex-shrink: 0; padding-left: 6px; }
   /* badges are quiet colored words now, not uppercase pills */
   .badges { display: flex; gap: 12px; margin-top: 3px; }
   .badge { font-size: 12.5px; font-weight: 650; padding: 0; }
@@ -152,8 +176,8 @@
   @keyframes livepulse { 50% { opacity: .35; } }
   .late { color: #ff9f0a; font-weight: 600; }
   .early { color: var(--accent); font-weight: 600; }
-  /* service alerts: amber ⚠ chip on cards, per-leg note in detail, and the
-     collapsible "current disruptions" bar under the wordmark */
+  /* service alerts: amber ⚠ chip on cards, per-leg note in detail; the
+     full list lives in the "More" (⋯) menu, styled under .mm-alerts */
   .alertchip { color: #ff9f0a; font-size: 11px; margin-left: 4px; vertical-align: 1px; }
   .legalert { margin-top: 6px; background: color-mix(in srgb, #ff9f0a 12%, transparent);
     border-radius: 8px; padding: 6px 8px; font-size: 12px; }
@@ -168,28 +192,6 @@
     white-space: pre-line; }
   .legalert .al { display: inline-block; margin: 5px 0 0 17px; color: var(--accent);
     font-weight: 600; text-decoration: none; }
-  .alertbar { position: relative; margin: -4px 2px 10px;
-    background: color-mix(in srgb, #ff9f0a 13%, transparent);
-    border-radius: 10px; overflow: hidden; }
-  .alertbar .abhead { width: 100%; display: flex; align-items: center; gap: 7px;
-    background: none; border: none; cursor: pointer; text-align: left;
-    padding: 8px 34px 8px 10px; color: #d98500; font-size: 12px; font-weight: 700; }
-  .alertbar .abhead > span:first-of-type { flex: 1; }
-  .alertbar .abhead .icn { flex: none; }
-  .alertbar .abchev { transition: transform .18s ease; }
-  .alertbar:not(.collapsed) .abchev { transform: rotate(180deg); }
-  .alertbar .abx { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px;
-    display: flex; align-items: center; justify-content: center; background: none;
-    border: none; border-radius: 6px; cursor: pointer; color: #d98500; }
-  .alertbar .abx:hover { background: color-mix(in srgb, #ff9f0a 18%, transparent); }
-  .alertbar .ablist { padding: 0 10px 9px; display: flex; flex-direction: column; gap: 8px; }
-  .alertbar.collapsed .ablist { display: none; }
-  .alertbar .abitem { font-size: 12px; }
-  .alertbar .abitem .ah { color: var(--text); font-weight: 600; }
-  .alertbar .abitem .ad { color: var(--muted); font-weight: 400; margin-top: 2px;
-    white-space: pre-line; }
-  .alertbar .abitem .al { display: inline-block; margin-top: 3px; color: var(--accent);
-    font-weight: 600; text-decoration: none; font-size: 11.5px; }
   .legs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
     margin-top: 8px; }
   .rt { color: #fff; font-weight: 700; font-size: 11.5px; padding: 2.5px 8px;
@@ -198,6 +200,17 @@
     color: var(--muted); font-size: 11.5px; font-weight: 550;
     background: var(--chip); border-radius: 6px; padding: 2.5px 7px; }
   .sep { color: var(--muted); opacity: .5; font-size: 9px; }
+  /* Apple-style leg row: mode glyphs + colored route badges joined by
+     chevrons. Exact distances now live in the trip detail view. */
+  .legrow { display: flex; flex-wrap: wrap; align-items: center; gap: 7px;
+    margin-top: 9px; color: var(--text); font-size: 17px; }
+  .lg { display: inline-flex; align-items: center; gap: 5px; }
+  .legrow .rt { font-size: 11px; padding: 2px 7px; }
+  .csep { color: var(--muted); opacity: .55; font-size: 13px; display: inline-flex; }
+  .lgwalk { display: inline-flex; align-items: center; gap: 3px;
+    color: var(--muted); font-size: 12px; font-weight: 550; }
+  .card.sel .legrow { color: #fff; }
+  .card.sel .csep, .card.sel .lgwalk { color: rgba(255,255,255,.8); }
   .morebtn { display: block; width: 100%; border: none; background: transparent;
     color: var(--accent); font: inherit; font-size: 12.5px; font-weight: 600;
     padding: 4px; cursor: pointer; border-radius: 8px; }
@@ -214,7 +227,14 @@
   .have:active { transform: scale(.96); }
   /* collapsed "Options" drawer - the extra controls live behind one chip */
   #optWrap { display: none; }
-  #optWrap.open { display: flex; }
+  #optWrap.open { display: block; margin-bottom: 2px; }
+  /* the drawer is grouped under quiet labels so seven controls read as
+     organized, not dumped */
+  .optgrp { margin-top: 11px; }
+  .optgrp:first-child { margin-top: 3px; }
+  .optlbl { font-size: 11px; font-weight: 700; letter-spacing: .02em;
+    text-transform: uppercase; color: var(--muted); margin: 0 2px 6px; }
+  .optrow { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; }
   .havelbl { font-size: 11.5px; font-weight: 600; color: var(--muted); }
 
   /* one-line mode summary on mixed-mode cards */
@@ -242,10 +262,34 @@
   #detail { display: none; }
   body.detail-open #results { display: none; }
   body.detail-open #detail { display: block;
-    animation: slidein .26s cubic-bezier(.2,.7,.3,1); }
-  @keyframes slidein { from { opacity: 0; transform: translateX(22px); } }
+    animation: slidein .32s cubic-bezier(.2,.7,.3,1) both; }
+  /* comes in from the right with a tiny overshoot + materialize */
+  @keyframes slidein {
+    0%   { opacity: 0; transform: translateX(26px) scale(.98); filter: blur(4px); }
+    70%  { opacity: 1; transform: translateX(-3px) scale(1);   filter: blur(0);   }
+    100% { opacity: 1; transform: translateX(0)    scale(1);   filter: blur(0);   }
+  }
+  /* exit is quieter than the entrance (attention is already moving on) */
+  body.detail-closing #results { display: none; }
+  body.detail-closing #detail { display: block;
+    animation: slideout .22s cubic-bezier(.4,0,1,1) both; }
+  @keyframes slideout {
+    to { opacity: 0; transform: translateX(14px) scale(.99); filter: blur(3px); }
+  }
   .ibtn:active, #go:active, .seg button:active, .back:active,
   .morebtn:active { transform: scale(.94); }
+
+  /* Accessibility: honour reduced-motion. Disables the entrances, the detail
+     slide, and the pre-existing looping "live" pulses while preserving final
+     states so nothing breaks. Required for every animation in this file. */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 
   /* zoom controls restyled to match the app (Sam 2026-07-20: the stock
      +/- felt cheap): app card material, rounded, our own +/- glyphs */
@@ -290,7 +334,19 @@
     justify-content: center; }
   #lookBtn:hover { background: var(--chip); }
   #lookBtn:active { transform: scale(.94); }
-  #lookPop { position: absolute; top: 62px; right: 14px; z-index: 7;
+  /* 3D tilt toggle - middle of the right-hand column: layers / 3D / Reach
+     (Sam 2026-07-20 wanted the three top-right controls stacked vertically) */
+  #d3Btn { position: absolute; top: 62px; right: 14px; z-index: 6;
+    width: 40px; height: 40px; border: none; border-radius: 12px;
+    background: var(--card-solid); color: var(--text); cursor: pointer;
+    box-shadow: var(--shadow); font: 600 14px/1 -apple-system, sans-serif;
+    letter-spacing: .2px; display: flex; align-items: center;
+    justify-content: center; }
+  #d3Btn:hover { background: var(--chip); }
+  #d3Btn:active { transform: scale(.94); }
+  #d3Btn.on { background: var(--accent); color: #fff; }
+  /* opens to the LEFT of the layers button so it clears the column below */
+  #lookPop { position: absolute; top: 14px; right: 62px; z-index: 7;
     background: var(--card-solid); border-radius: 12px; box-shadow: var(--shadow);
     padding: 6px; display: none; min-width: 172px; }
   #lookPop.open { display: block; }
@@ -304,6 +360,44 @@
   #lookPop button.on { font-weight: 700; color: var(--accent); }
   #lookPop button.on::after { content: "\2713"; margin-left: auto;
     font-weight: 700; }
+
+  /* "More" actions menu (Share / Clear / Service alerts) - hangs off the
+     ellipsis button in the controls row, keeps those actions off the panel */
+  .morewrap { position: relative; display: inline-flex; }
+  [hidden] { display: none !important; }   /* .ibtn's display was overriding it */
+  /* fixed so the panel's scroll box can't clip it; JS sets top/left on open */
+  #moreMenu { position: fixed; z-index: 60;
+    background: var(--card-solid); border-radius: 12px; box-shadow: var(--shadow);
+    padding: 6px; display: none; width: 236px; }
+  #moreMenu.open { display: block; }
+  .mm-item { display: flex; align-items: center; gap: 8px; width: 100%;
+    border: none; background: none; color: var(--text); font: inherit;
+    font-size: 13px; font-weight: 550; padding: 9px 10px;
+    border-radius: 8px; cursor: pointer; text-align: left; }
+  .mm-item:hover { background: var(--chip); }
+  .mm-sep { height: .5px; background: var(--line); margin: 5px 6px; }
+  .mm-alertstog .mm-lbl { flex: 1; }
+  .mm-count { font-size: 11px; font-weight: 700; color: #ff9f0a;
+    background: color-mix(in srgb, #ff9f0a 16%, transparent);
+    padding: 1px 7px; border-radius: 999px; }
+  .mm-chev { margin-left: 6px; color: var(--muted); transition: transform .18s ease; }
+  .mm-chev::after { content: "\203A"; font-size: 15px; }
+  .mm-alertstog[aria-expanded="true"] .mm-chev { transform: rotate(90deg); }
+  .mm-alerts { display: none; max-height: 240px; overflow-y: auto;
+    padding: 2px 4px 4px; }
+  .mm-alerts.open { display: block; }
+  .mm-alerts .abitem { font-size: 12px; padding: 6px 6px; border-radius: 6px; }
+  .mm-alerts .abitem + .abitem { border-top: .5px solid var(--line); }
+  .mm-alerts .ah { color: var(--text); font-weight: 600; }
+  .mm-alerts .ad { color: var(--muted); font-weight: 400; margin-top: 2px;
+    line-height: 1.35; }
+  .mm-alerts .al { display: inline-block; margin-top: 3px; color: var(--accent);
+    font-size: 11.5px; text-decoration: none; }
+  .mm-noalerts { font-size: 12px; color: var(--muted); padding: 9px 10px; }
+  /* a small amber dot on the ellipsis when alerts are active */
+  #moreBtn.hasalerts { position: relative; }
+  #moreBtn.hasalerts::after { content: ""; position: absolute; top: 5px; right: 5px;
+    width: 6px; height: 6px; border-radius: 50%; background: #ff9f0a; }
 
   /* map markers - Apple "you are here" halo dots (start green, end red) */
   .mk { cursor: grab; line-height: 0; }
@@ -387,7 +481,7 @@
   .fnote { color: var(--muted); font-size: 11px; margin-top: 7px; }
 
   /* ---- Reach mode ---- */
-  #reachCard { position: absolute; top: 62px; right: 14px; z-index: 5;
+  #reachCard { position: absolute; top: 110px; right: 14px; z-index: 5;
     width: 216px; background: var(--panel);
     backdrop-filter: blur(24px) saturate(180%);
     -webkit-backdrop-filter: blur(24px) saturate(180%);
@@ -427,7 +521,7 @@
     cursor: pointer; border-radius: 999px; padding: 0; font-size: 13px;
     display: inline-flex; align-items: center; justify-content: center; }
   #reachClose:hover { background: var(--chip); color: var(--text); }
-  #reachLauncher { position: absolute; top: 62px; right: 14px; z-index: 5;
+  #reachLauncher { position: absolute; top: 110px; right: 14px; z-index: 5;
     width: 40px; height: 40px; border-radius: 999px; border: none;
     background: var(--panel); backdrop-filter: blur(24px) saturate(180%);
     -webkit-backdrop-filter: blur(24px) saturate(180%);
@@ -449,9 +543,15 @@
 <div id="panel"><div id="panelScroll">
   <div class="wordmark">GTA Router</div>
   <div class="search">
-    <div class="srow"><span class="pt" style="background:#34c759"></span>
+    <div class="srow"><span class="pt pick" id="dotFrom" data-field="from"
+      style="background:#34c759;color:#34c759"
+      title="Set the start — click this, then click the map"
+      aria-label="Set the start point, then click the map" role="button" tabindex="0"></span>
       <input id="fromBox" type="text" placeholder="Start — click the map or type a place"></div>
-    <div class="srow"><span class="pt" style="background:#ff453a"></span>
+    <div class="srow"><span class="pt pick" id="dotTo" data-field="to"
+      style="background:#ff453a;color:#ff453a"
+      title="Set the destination — click this, then click the map"
+      aria-label="Set the destination, then click the map" role="button" tabindex="0"></span>
       <input id="toBox" type="text" placeholder="End — e.g. '155 College St' or 'Union Station'"></div>
   </div>
   <div class="ctrls">
@@ -468,37 +568,66 @@
       title="Bike, car and Bike Share toggles, fare type, drive limit">Options</button>
     <button class="ibtn" id="swap" title="Swap start and end"
       aria-label="Swap start and end"></button>
-    <button class="ibtn" id="share" title="Copy a link to this trip"
-      aria-label="Copy a shareable link to this trip"></button>
-    <button class="ibtn" id="clear" title="Clear"
-      aria-label="Clear start, end and results"></button>
+    <span class="morewrap">
+      <button class="ibtn" id="moreBtn" title="More" aria-label="More actions"
+        aria-haspopup="true" aria-expanded="false"></button>
+      <div id="moreMenu" role="menu">
+        <button class="mm-item" id="mmShare" role="menuitem">Share trip</button>
+        <button class="mm-item" id="mmClear" role="menuitem">Clear</button>
+        <div class="mm-sep"></div>
+        <button class="mm-item mm-alertstog" id="mmAlertsToggle" role="menuitem"
+          aria-expanded="false" hidden>
+          <span class="mm-lbl">Service alerts</span>
+          <span class="mm-count" id="mmAlertCount"></span>
+          <span class="mm-chev"></span></button>
+        <div id="moreAlerts" class="mm-alerts"></div>
+        <div class="mm-noalerts" id="mmNoAlerts" hidden>No current service alerts</div>
+      </div>
+    </span>
+    <button class="ibtn" id="share" hidden aria-hidden="true"
+      title="Copy a link to this trip"></button>
+    <button class="ibtn" id="clear" hidden aria-hidden="true" title="Clear"></button>
     <button id="go">Plan trip</button>
   </div>
-  <div class="ctrls" id="optWrap">
-    <span class="havelbl">Using:</span>
-    <button class="have on" id="haveBike" data-have="bike"
-      title="I can bike to a stop and lock my bike there"></button>
-    <button class="have on" id="haveCarStart" data-have="carStart"
-      title="You can drive to a station and park (park and ride)"></button>
-    <button class="have on" id="haveCarEnd" data-have="carEnd"
-      title="A car for the last leg - a pickup, or your car waiting at the station"></button>
-    <button class="have on" id="haveShare" data-have="share"
-      title="OK with renting a Bike Share Toronto bike"></button>
-    <div class="seg" id="riderSeg" title="Fare type">
-      <button data-rider="adult" class="on" aria-pressed="true">Adult</button>
-      <button data-rider="youth" aria-pressed="false">Youth 13&ndash;19</button>
+  <div id="optWrap">
+    <div class="optgrp">
+      <div class="optlbl">What you've got</div>
+      <div class="optrow">
+        <button class="have on" id="haveBike" data-have="bike"
+          title="I can bike to a stop and lock my bike there"></button>
+        <button class="have on" id="haveCarStart" data-have="carStart"
+          title="You can drive to a station and park (park and ride)"></button>
+        <button class="have on" id="haveCarEnd" data-have="carEnd"
+          title="A car for the last leg - a pickup, or your car waiting at the station"></button>
+        <button class="have on" id="haveShare" data-have="share"
+          title="OK with renting a Bike Share Toronto bike"></button>
+      </div>
     </div>
-    <select id="driveSel" title="Hide options with a longer drive (to the station, or at the end)">
-      <option value="8000">Drive &le; 8 km</option>
-      <option value="15000" selected>Drive &le; 15 km</option>
-      <option value="30000">Drive &le; 30 km</option>
-      <option value="9999000">Any drive</option>
-    </select>
-    <select id="bikeSel" title="Safest sticks to bike lanes and quiet streets; fastest allows busier roads when they save time">
-      <option value="safest" selected>Bike: safest</option>
-      <option value="balanced">Bike: balanced</option>
-      <option value="fastest">Bike: fastest</option>
-    </select>
+    <div class="optgrp">
+      <div class="optlbl">Who's riding</div>
+      <div class="optrow">
+        <div class="seg" id="riderSeg" title="Fare type">
+          <button data-rider="adult" class="on" aria-pressed="true">Adult</button>
+          <button data-rider="youth" aria-pressed="false">Youth 13&ndash;19</button>
+        </div>
+      </div>
+    </div>
+    <div class="optgrp">
+      <div class="optlbl">Preferences</div>
+      <div class="optrow">
+        <select id="driveSel" title="Hide options with a longer drive (to the station, or at the end)">
+          <option value="8000">Drive &le; 8 km</option>
+          <option value="15000" selected>Drive &le; 15 km</option>
+          <option value="30000">Drive &le; 30 km</option>
+          <option value="9999000">Any drive</option>
+        </select>
+        <select id="bikeSel" title="Safest sticks to bike lanes and quiet streets; fastest allows busier roads when they save time">
+          <option value="safest" selected>Bike: safest</option>
+          <option value="balanced">Bike: balanced</option>
+          <option value="fastest">Bike: fastest</option>
+        </select>
+      </div>
+    </div>
   </div>
   <div id="results">
     <div class="hint">Pick a start and an end to compare every mix of
@@ -530,11 +659,16 @@ const ICONS = {
   bike: '<circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/>',
   car: '<path d="m21 8-2 2-1.5-3.7A2 2 0 0 0 15.646 5H8.4a2 2 0 0 0-1.903 1.257L5 10 3 8"/><path d="M7 14h.01"/><path d="M17 14h.01"/><rect width="18" height="8" x="3" y="10" rx="2"/><path d="M5 18v2"/><path d="M19 18v2"/>',
   bus: '<path d="M4 6 2 7"/><path d="M10 6h4"/><path d="m22 7-2-1"/><rect width="16" height="16" x="4" y="3" rx="2"/><path d="M4 11h16"/><path d="M8 15h.01"/><path d="M16 15h.01"/><path d="M6 19v2"/><path d="M18 21v-2"/>',
+  // GO / regional rail: tall train-front (Lucide train-front)
   rail: '<path d="M8 3.1V7a4 4 0 0 0 8 0V3.1"/><path d="m9 15-1-1"/><path d="m15 15 1-1"/><path d="M9 19c-2.8 0-5-2.2-5-5v-4a8 8 0 0 1 16 0v4c0 2.8-2.2 5-5 5Z"/><path d="m8 19-2 3"/><path d="m16 19 2 3"/>',
+  // subway / streetcar: boxy windowed car (Lucide tram-front) - deliberately
+  // a different silhouette from the GO train so the two never read alike
+  subway: '<rect width="16" height="16" x="4" y="3" rx="2"/><path d="M4 11h16"/><path d="M12 3v8"/><path d="m8 19-2 3"/><path d="m18 22-2-3"/><path d="M8 15h.01"/><path d="M16 15h.01"/>',
   back: '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
   swap: '<path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/>',
   x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
   chev: '<path d="m6 9 6 6 6-6"/>',
+  more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
   arrow: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
   link: '<path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" x2="16" y1="12" y2="12"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
@@ -545,7 +679,7 @@ function icn(name, size){
   return `<svg class="icn" ${size ? `style="font-size:${size}px"` : ""} viewBox="0 0 24 24">${ICONS[name] || ""}</svg>`;
 }
 const modeIcon = m => ({ WALK:"walk", BICYCLE:"bike", CAR:"car", BUS:"bus",
-  RAIL:"rail", SUBWAY:"rail", TRAM:"bus" }[m] || "bus");
+  RAIL:"rail", SUBWAY:"subway", TRAM:"subway" }[m] || "bus");
 
 /* ---- fare model: keep in sync with costs.py ---- */
 // [name-match, adult fare, youth fare (null = not modelled), verified?]
@@ -891,6 +1025,35 @@ if (!libertyBase && mapLook[themeMode()] !== "classic") applyLook();
   });
 })();
 
+/* 3D button: tilt the camera so the map's building extrusions stand up,
+   like Apple/Google Maps' 3D. Toggles between flat (pitch 0) and tilted.
+   You can also tilt by hand any time - right-drag, or two-finger drag on a
+   trackpad - this button is just the one-tap way. (Sam 2026-07-20 asked
+   how to get 3D.) */
+(function(){
+  const btn = document.createElement("button");
+  btn.id = "d3Btn"; btn.textContent = "3D";
+  btn.title = "Tilt the map into 3D";
+  btn.setAttribute("aria-label", "Tilt the map into 3D");
+  btn.setAttribute("aria-pressed", "false");
+  document.body.append(btn);
+  function sync(){
+    const on = map.getPitch() > 5;
+    btn.classList.toggle("on", on);
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+    btn.textContent = on ? "2D" : "3D";
+  }
+  btn.onclick = () => {
+    const on = map.getPitch() > 5;
+    map.easeTo({ pitch: on ? 0 : 60,
+                 zoom: on ? map.getZoom() : Math.max(map.getZoom(), 15),
+                 duration: 700 });
+  };
+  // keep the label in step if the user tilts by hand
+  map.on("pitchend", sync);
+  map.on("pitch", sync);
+})();
+
 /* route layers survive style swaps: whenever the style (re)loads and our
    source is gone, put it back. styledata fires many times; the re-add is
    idempotent and wrapped so a mid-load call just retries shortly after. */
@@ -928,7 +1091,25 @@ function addRouteLayers(fc){
     paint: { "line-color": ["get","color"], "line-width": zw(3, 4.5, 6),
              "line-dasharray": [0.2, 1.6],
              "line-opacity": previewOpacity } });
+  orderRouteForPitch();
 }
+/* In 3D the flat route line was painting ON TOP of the building extrusions,
+   so it looked like it climbed into the buildings (Sam 2026-07-20). When the
+   map is tilted, slide the route BELOW the 3D buildings so they hide it where
+   it passes behind them - it reads as running under/between the buildings.
+   Flat (2D) keeps the route on top so it's always visible from above. */
+function orderRouteForPitch(){
+  if (!map.getLayer("route-casing")) return;
+  const in3d = map.getPitch() > 5 && map.getLayer("building-3d");
+  const before = in3d ? "building-3d" : undefined;
+  ["route-casing","route-solid","route-walk"].forEach(id => {
+    if (map.getLayer(id)) map.moveLayer(id, before);
+  });
+  // keep the dock dots just beneath the route casing wherever it ends up
+  if (map.getLayer("docks") && map.getLayer("route-casing"))
+    map.moveLayer("docks", "route-casing");
+}
+map.on("pitchend", orderRouteForPitch);
 function drawRoute(fc){
   lastRouteFC = fc;
   if (map.isStyleLoaded()) addRouteLayers(fc);
@@ -970,11 +1151,15 @@ function ensureDocks(){
   try {
     map.addSource("docks", { type: "geojson", data: dockFC });
     // slide under the route lines when they exist; routes added later go on top
-    map.addLayer({ id: "docks", type: "circle", source: "docks", minzoom: 10.5,
-      paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 10.5, 3, 14, 6.5, 16, 8.5],
-               "circle-color": "#34c759",
+    map.addLayer({ id: "docks", type: "circle", source: "docks", minzoom: 11,
+      // muted teal-blue, NOT the start-pin green (Sam 2026-07-20: the green
+      // docks clashed with the green Start dot). Smaller + semi-transparent
+      // so they read as background amenities, not trip points.
+      paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 11, 2, 14, 4, 16, 5.5],
+               "circle-color": "#3a9ec4",
+               "circle-opacity": 0.7,
                "circle-stroke-color": darkMql.matches ? "#1c1c1e" : "#ffffff",
-               "circle-stroke-width": 1.6 } },
+               "circle-stroke-width": 1 } },
       map.getLayer("route-casing") ? "route-casing" : undefined);
     dockRetry = 0;
   } catch (e){ if (dockRetry++ < 40) setTimeout(ensureDocks, 250); }
@@ -1079,6 +1264,23 @@ function animateRoute(fc){
 }
 
 let fromPt = null, toPt = null, fromMarker = null, toMarker = null;
+/* which end the NEXT map click drops. Normally it auto-points at the first
+   empty end (start, then destination); clicking a coloured dot overrides it
+   so you can re-place the start after both are set (Sam 2026-07-20: the old
+   flow forced the second click to always be the destination). */
+let pickOverride = null;
+function currentPick(){
+  if (pickOverride) return pickOverride;
+  if (!fromPt) return "from";
+  if (!toPt) return "to";
+  return "from";
+}
+function refreshPick(){
+  const p = currentPick();
+  const df = document.getElementById("dotFrom"), dt = document.getElementById("dotTo");
+  if (df) df.classList.toggle("active", p === "from");
+  if (dt) dt.classList.toggle("active", p === "to");
+}
 function haloDotSVG(color, id){
   // "you are here" halo dot: soft colored halo, white ring, colored core.
   // Flat fills (no gradient/sheen); a single soft shadow lifts the white
@@ -1114,11 +1316,49 @@ function setPoint(which, lngLat, label){
     if (which === "from") fromPt = p; else toPt = p;
     document.getElementById(which + "Box").value = fmt(p);
     savePts();
+    refreshPick();
+    fillLabel(which, p);   // turn the new spot into a place name
     plan();
   });
   if (which === "from"){ fromMarker = m; fromPt = lngLat; }
   else { toMarker = m; toPt = lngLat; }
   document.getElementById(which + "Box").value = label || fmt(lngLat);
+  savePts();
+  refreshPick();
+  if (!label) fillLabel(which, lngLat);   // clicked a bare spot: name it
+}
+/* reverse-geocode a dropped/dragged pin so the box shows a place name
+   instead of "43.74, -79.35". Photon (same service the search box uses)
+   answers /reverse; we fall back silently to the coordinates on any miss. */
+async function reverseLabel(lngLat){
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const r = await fetch("https://photon.komoot.io/reverse?lang=en&lon="
+      + lngLat.lng + "&lat=" + lngLat.lat, { signal: ctrl.signal });
+    if (!r.ok) return null;
+    const f = ((await r.json()).features || [])[0];
+    if (!f) return null;
+    const p = f.properties || {};
+    const addr = [p.housenumber, p.street].filter(Boolean).join(" ");
+    const name = p.name || addr || p.street || p.city;
+    if (!name) return null;
+    const extra = [];
+    if (p.name && addr) extra.push(addr);
+    if (p.city && p.city !== name) extra.push(p.city);
+    return extra.length ? name + ", " + extra[0] : name;
+  } catch (e) { return null; }
+  finally { clearTimeout(t); }
+}
+async function fillLabel(which, lngLat){
+  const name = await reverseLabel(lngLat);
+  if (!name) return;
+  // only apply if this pin is still exactly where we geocoded (not moved/cleared)
+  const cur = which === "from" ? fromPt : toPt;
+  if (!cur || cur.lng !== lngLat.lng || cur.lat !== lngLat.lat) return;
+  const box = document.getElementById(which + "Box");
+  if (box === document.activeElement) return;   // don't fight the user's typing
+  box.value = name;
   savePts();
 }
 /* remember the trip ends, so tomorrow's commute is one click, not a re-type */
@@ -1135,8 +1375,14 @@ map.on("click", e => {
   // (dock dots are hover-only now - a click on one still drops a pin)
   // Reach mode: a tap paints a travel-time bloom instead of dropping pins
   if (window.__reachMode) { window.__reachTap && window.__reachTap(e.lngLat); return; }
-  if (!fromPt) setPoint("from", e.lngLat);
-  else { setPoint("to", e.lngLat); plan(); }
+  // drop the ARMED end (the highlighted dot). setPoint() calls refreshPick(),
+  // which then auto-advances the highlight to the other empty end - so a fresh
+  // "click start, click end" still just works, but you can re-arm the start by
+  // clicking its green dot even after both points exist.
+  const which = currentPick();
+  pickOverride = null;
+  setPoint(which, e.lngLat);
+  if (fromPt && toPt) plan();
 });
 
 /* ---- search with live suggestions (Photon, kept to the GTA) ---- */
@@ -1455,16 +1701,30 @@ function agencyColor(a){
   if (a.includes("BRAMPTON")) return "#005daa";
   return "#666";
 }
-function legChip(l){
-  if (l.mode === "WALK")
-    return `<span class="gchip">${icn("walk")}${Math.round(l.distance)} m</span>`;
-  if (l.mode === "BICYCLE")
-    return `<span class="gchip">${icn("bike")}${(l.distance/1000).toFixed(1)} km</span>`;
-  if (l.mode === "CAR")
-    return `<span class="gchip">${icn("car")}${(l.distance/1000).toFixed(1)} km</span>`;
-  const r = l.route || {}, name = r.shortName || r.longName || l.mode;
-  const bg = routeColor(r) || agencyColor(agencyOf(l));
-  return `<span class="rt" style="background:${bg}">${esc(name)}</span>`;
+/* the card's mode sequence, Apple-style: a glyph per real leg (transit legs
+   also carry their colored route badge), joined by chevrons, with a trailing
+   "N min walk" if the trip ends on foot. Walks between legs are implied by the
+   chevrons; every exact distance is in the detail view. */
+function legRow(it){
+  const parts = [];
+  for (const l of it.legs){
+    if (l.mode === "WALK") continue;
+    if (l.mode === "CAR")
+      parts.push(`<span class="lg" title="Drive">${icn("car")}</span>`);
+    else if (l.mode === "BICYCLE")
+      parts.push(`<span class="lg" title="${l.rentedBike ? "Bike Share" : "Your bike"}">${icn("bike")}</span>`);
+    else if (TRANSIT.has(l.mode)){
+      const r = l.route || {}, name = r.shortName || r.longName || "";
+      const bg = routeColor(r) || agencyColor(agencyOf(l));
+      parts.push(`<span class="lg" title="${esc(r.longName || name)}">`
+        + `<span class="rt" style="background:${bg}">${esc(name)}</span>`
+        + icn(modeIcon(l.mode)) + `</span>`);
+    }
+  }
+  const last = it.legs[it.legs.length - 1];
+  if (last && last.mode === "WALK" && last.duration >= 60)
+    parts.push(`<span class="lgwalk">${icn("walk")}${Math.round(last.duration / 60)} min</span>`);
+  return `<div class="legrow">${parts.join('<span class="csep">&rsaquo;</span>')}</div>`;
 }
 const esc = s => String(s).replace(/[&<>"']/g, c =>
   ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
@@ -1528,19 +1788,6 @@ async function plan(){
 }
 
 /* one plain-words line for mixed-mode trips: "Drive → transit → Bike Share" */
-function viaLine(it){
-  const toks = [];
-  for (const l of it.legs){
-    let t = null;
-    if (l.mode === "CAR") t = "drive";
-    else if (l.mode === "BICYCLE") t = l.rentedBike ? "Bike Share" : "your bike";
-    else if (TRANSIT.has(l.mode)) t = "transit";
-    if (t && toks[toks.length - 1] !== t) toks.push(t);
-  }
-  if (!toks.some(t => t !== "transit")) return "";
-  return `<div class="via">${toks.map((t, i) =>
-    i === 0 ? t[0].toUpperCase() + t.slice(1) : t).join(" &rarr; ")}</div>`;
-}
 
 function cardHTML(it, cid, fastestIt, cheapestIt){
   const cost = itineraryCost(it);
@@ -1560,9 +1807,7 @@ function cardHTML(it, cid, fastestIt, cheapestIt){
           ? '<span class="alertchip" title="Service alert on this trip">&#9888;</span>' : ""}</span>
       <span class="cost">$${cost.toFixed(2)}</span></div>
     ${badges ? `<div class="badges">${badges}</div>` : ""}
-    ${viaLine(it)}
-    <div class="legs">${it.legs.filter(l => l.mode !== "WALK" || l.distance > 50)
-      .map(legChip).join('<span class="sep">&#9656;</span>')}</div></div>`;
+    ${legRow(it)}</div>`;
 }
 
 function carDistance(it){
@@ -1892,7 +2137,17 @@ function renderDetail(cid){
     </div>`;
 }
 window.closeDetail = function(){
-  document.body.classList.remove("detail-open");
+  const b = document.body;
+  // reduced-motion or already closing: just snap back, no exit animation
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches
+      || b.classList.contains("detail-closing")){
+    b.classList.remove("detail-open", "detail-closing");
+    return;
+  }
+  b.classList.add("detail-closing");            // keeps #detail visible while it slides out
+  document.getElementById("detail").addEventListener("animationend", () => {
+    b.classList.remove("detail-open", "detail-closing");
+  }, { once: true });
 };
 
 /* ---- controls ---- */
@@ -1925,6 +2180,38 @@ document.querySelectorAll("#whenSeg button").forEach(b => {
 document.getElementById("swap").innerHTML = icn("swap", 14);
 document.getElementById("clear").innerHTML = icn("x", 13);
 document.getElementById("share").innerHTML = icn("link", 14);
+
+/* ---- the "More" menu: Share / Clear / Service alerts ---- */
+(function(){
+  const btn = document.getElementById("moreBtn");
+  const menu = document.getElementById("moreMenu");
+  btn.innerHTML = icn("more", 16);
+  const close = () => { menu.classList.remove("open"); btn.setAttribute("aria-expanded", "false"); };
+  const open = () => {
+    const r = btn.getBoundingClientRect();
+    menu.style.top = (r.bottom + 6) + "px";
+    menu.style.left = Math.min(r.left, innerWidth - 236 - 8) + "px";
+    menu.classList.add("open"); btn.setAttribute("aria-expanded", "true");
+  };
+  btn.onclick = e => { e.stopPropagation();
+    menu.classList.contains("open") ? close() : open(); };
+  // click anywhere else closes it
+  document.addEventListener("click", e => {
+    if (menu.classList.contains("open") && !menu.contains(e.target) && e.target !== btn) close();
+  });
+  // Share / Clear just fire the (hidden) originals so their logic stays put
+  document.getElementById("mmShare").onclick = () => {
+    close(); document.getElementById("share").click(); };
+  document.getElementById("mmClear").onclick = () => {
+    close(); document.getElementById("clear").click(); };
+  // alerts sub-list expand/collapse
+  const tog = document.getElementById("mmAlertsToggle");
+  const list = document.getElementById("moreAlerts");
+  tog.onclick = () => {
+    const on = list.classList.toggle("open");
+    tog.setAttribute("aria-expanded", on ? "true" : "false");
+  };
+})();
 
 /* a brief floating message (e.g. "Link copied") - no dependency, self-removes */
 let toastTimer = null;
@@ -2063,17 +2350,29 @@ document.querySelectorAll("#riderSeg button").forEach(b => {
         && selId && itinsById[selId]) renderDetail(selId);
   };
 });
-document.getElementById("swap").onclick = () => {
+function swapEnds(){
   if (!fromPt || !toPt) return;
   const f = { ...fromPt }, t = { ...toPt };
   const fl = document.getElementById("fromBox").value,
         tl = document.getElementById("toBox").value;
   setPoint("from", t, tl); setPoint("to", f, fl);
   plan();
-};
+}
+document.getElementById("swap").onclick = swapEnds;
+// clicking a coloured dot ARMS that end: your next map click drops THAT point.
+// This fixes the old "second click is always the destination" trap - now you
+// can re-place the start any time by arming its green dot first.
+document.querySelectorAll(".pt.pick").forEach(d => {
+  const f = d.dataset.field;
+  const arm = () => { pickOverride = f; refreshPick(); };
+  d.onclick = arm;
+  d.onkeydown = e => { if (e.key === "Enter" || e.key === " "){ e.preventDefault(); arm(); } };
+});
+refreshPick();
 document.getElementById("clear").onclick = () => {
   if (fromMarker) fromMarker.remove(); if (toMarker) toMarker.remove();
   fromPt = toPt = fromMarker = toMarker = null;
+  pickOverride = null; refreshPick();
   lastParts = null; lastRouteFC = null;
   clearTripDocks();
   localStorage.removeItem("pts");
@@ -2208,12 +2507,14 @@ const ALERTS_QUERY = `{ alerts { id feed alertHeaderText alertDescriptionText
 const FEED_LABEL = { TTC:"TTC", YRT:"York/Viva", MIWAY:"MiWay",
   GO:"GO Transit", UP:"UP Express", BRAMPTON:"Brampton", DRT:"Durham" };
 (function(){
-  let bar = null, dismissed = false;
-  try { dismissed = sessionStorage.getItem("alertsDismissed") === "1"; } catch (e){}
-  // isInitial: the first paint must run even in a background tab (rendering
-  // DOM needs no rAF); only the periodic polling is skipped while hidden.
+  const tog = document.getElementById("mmAlertsToggle");
+  const countEl = document.getElementById("mmAlertCount");
+  const listEl = document.getElementById("moreAlerts");
+  const noneEl = document.getElementById("mmNoAlerts");
+  const moreBtn = document.getElementById("moreBtn");
+  // isInitial: the first fetch runs even in a background tab; only the
+  // periodic polling is skipped while hidden.
   async function refresh(isInitial){
-    if (dismissed) return;
     if (!isInitial && document.hidden) return;
     let alerts;
     try {
@@ -2224,35 +2525,26 @@ const FEED_LABEL = { TTC:"TTC", YRT:"York/Viva", MIWAY:"MiWay",
       if (js.errors) return;                 // schema mismatch: stay silent
       alerts = cleanAlerts((js.data || {}).alerts)
         .map(a => ({ ...a, feedLabel: FEED_LABEL[a.feed] || "" }));
-    } catch (e){ return; }                    // engine down
-    if (!alerts.length){ if (bar){ bar.remove(); bar = null; } return; }
+    } catch (e){ return; }                    // engine down: leave menu as-is
     render(alerts);
   }
   function render(alerts){
-    if (!bar){
-      bar = document.createElement("div");
-      bar.className = "alertbar collapsed";
-      document.querySelector(".wordmark").after(bar);
-    }
     const n = alerts.length;
-    const items = alerts.map(a =>
+    if (!n){
+      tog.hidden = true; listEl.classList.remove("open"); listEl.innerHTML = "";
+      countEl.textContent = ""; noneEl.hidden = false;
+      moreBtn.classList.remove("hasalerts");
+      return;
+    }
+    noneEl.hidden = true; tog.hidden = false;
+    countEl.textContent = n;
+    moreBtn.classList.add("hasalerts");   // amber dot on the ellipsis
+    listEl.innerHTML = alerts.map(a =>
       `<div class="abitem"><div class="ah">${a.feedLabel
         ? `<b>${esc(a.feedLabel)}</b> ` : ""}${esc(a.header)}</div>${
         a.desc ? `<div class="ad">${esc(a.desc)}</div>` : ""}${
         a.url ? `<a class="al" href="${esc(a.url)}" target="_blank" rel="noopener">Agency page &rarr;</a>` : ""}</div>`
     ).join("");
-    bar.innerHTML =
-      `<button class="abhead" aria-expanded="${!bar.classList.contains("collapsed")}">
-        ${icn("warn", 13)}<span>${n} current service alert${n === 1 ? "" : "s"}</span>
-        <span class="abchev">${icn("chev", 13)}</span></button>
-       <button class="abx" title="Hide alerts" aria-label="Hide alerts">${icn("x", 12)}</button>
-       <div class="ablist">${items}</div>`;
-    bar.querySelector(".abhead").onclick = () => bar.classList.toggle("collapsed");
-    bar.querySelector(".abx").onclick = () => {
-      dismissed = true;
-      try { sessionStorage.setItem("alertsDismissed", "1"); } catch (e){}
-      bar.remove(); bar = null;
-    };
   }
   refresh(true);
   setInterval(() => refresh(false), 120000);
