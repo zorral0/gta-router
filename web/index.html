@@ -859,23 +859,23 @@ const LOOKS = { dark: ["midnight", "graphite", "classic"],
 const LOOK_NAME = { midnight: "Midnight", graphite: "Graphite",
                     daylight: "Daylight", quiet: "Quiet", classic: "Classic" };
 const PALETTES = {
-  midnight: { dark: true, dropPois: true,
+  midnight: { dark: true, dropPois: false,
     land: "#1b1b1d", residential: "#1f1f22", civic: "#222226",
     water: "#12181f", wood: "#1a211c", park: "#1d2620", grass: "#1c221e",
     sand: "#202020", building: "#242428", aeroway: "#26262a",
     casing1: "#141416", road1: "#2e2e33", casing15: "#141416", road15: "#38383f",
     casing2: "#17171a", road2: "#43434b", casing3: "#1a1a1e", road3: "#514d3e",
     rail: "#2b2b31", path: "#2a2a2e", boundary: "#3d3d47",
-    label: "#a8a8af", strong: "#d8d8dd", roadLabel: "#c6c6cc",
+    label: "#a8a8af", strong: "#d8d8dd", roadLabel: "#8e8e96",
     waterLabel: "#51708a", poiLabel: "#7c7c85", halo: "#111113" },
-  graphite: { dark: true, dropPois: true,
+  graphite: { dark: true, dropPois: false,
     land: "#1c1c1e", residential: "#202023", civic: "#232327",
     water: "#101014", wood: "#202422", park: "#212623", grass: "#1f2321",
     sand: "#202020", building: "#252529", aeroway: "#27272b",
     casing1: "#151517", road1: "#303036", casing15: "#151517", road15: "#3a3a41",
     casing2: "#18181b", road2: "#46464f", casing3: "#1b1b1f", road3: "#5c5c66",
     rail: "#2c2c32", path: "#2b2b30", boundary: "#40404a",
-    label: "#a2a2aa", strong: "#dcdce0", roadLabel: "#c8c8ce",
+    label: "#a2a2aa", strong: "#dcdce0", roadLabel: "#90909a",
     waterLabel: "#4a5a6a", poiLabel: "#7a7a84", halo: "#101012" },
   daylight: { dark: false, dropPois: false,
     land: "#f4f1ea", residential: "#efece4", civic: "#eae6dc",
@@ -907,6 +907,20 @@ function recolorStyle(base, p){
     if (p.dropPois && /^poi_r/.test(l.id)) return false;  // POI icon clutter
     return true;
   });
+  // Curate POIs to a few important landmark classes (Sam 2026-07-23: "just a
+  // few important ones" - drop shops/parking/bins). Applies to every look.
+  const POI_KEEP = ["hospital","university","college","museum","aquarium",
+    "stadium","monument","attraction","theatre","cinema","library","town_hall",
+    "police","fire_station","place_of_worship","park","railway","ferry_terminal"];
+  const poiClassFilter = ["match", ["get","class"], POI_KEEP, true, false];
+  for (const l of s.layers){
+    if (l["source-layer"] === "poi" && /^poi_r/.test(l.id)){
+      l.filter = (Array.isArray(l.filter) && l.filter[0] === "all")
+        ? [...l.filter, poiClassFilter] : ["all", poiClassFilter];
+    } else if (l.id === "poi_transit"){
+      l.filter = ["match", ["get","class"], ["airport","rail"], true, false];
+    }
+  }
   for (const l of s.layers){
     l.paint = l.paint || {};
     const id = l.id, sl = l["source-layer"] || "";
@@ -951,7 +965,7 @@ function recolorStyle(base, p){
     if (l.type === "symbol"){
       let c = p.label, halo = 1.2;
       if (sl === "place") c = /city|capital|state/.test(id) ? p.strong : p.label;
-      else if (sl === "transportation_name"){ c = p.roadLabel; halo = 1.6; }
+      else if (sl === "transportation_name"){ c = p.roadLabel; halo = 1.3; }
       else if (sl === "water_name" || sl === "waterway") c = p.waterLabel;
       else if (sl === "poi" || sl === "aerodrome_label") c = p.poiLabel;
       l.paint["text-color"] = c;
@@ -984,9 +998,14 @@ function initialMapStyle(){
 }
 async function applyLook(){
   const look = mapLook[themeMode()];
-  if (look === "classic") return map.setStyle(HOSTED[themeMode()]);
-  try { map.setStyle(recolorStyle(await fetchLibertyBase(), PALETTES[look])); }
-  catch (e){ map.setStyle(HOSTED[themeMode()]); }
+  if (look === "classic") map.setStyle(HOSTED[themeMode()]);
+  else {
+    try { map.setStyle(recolorStyle(await fetchLibertyBase(), PALETTES[look])); }
+    catch (e){ map.setStyle(HOSTED[themeMode()]); }
+  }
+  // style.load only fires on the FIRST style load in MapLibre 4.x, so re-apply
+  // the crown shields on the next idle after every look/theme swap.
+  map.once("idle", reapplyShields);
 }
 const map = new maplibregl.Map({
   container: "map", style: initialMapStyle(),
@@ -996,6 +1015,63 @@ map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom
 darkMql.addEventListener("change", applyLook);
 // first visit with a non-classic look: upgrade as soon as the JSON arrives
 if (!libertyBase && mapLook[themeMode()] !== "classic") applyLook();
+
+/* Ontario King's Highway crown shields (Sam's request 2026-07-23). The liberty
+   style draws plain sprite boxes for the 400-series; we swap in the real
+   public-domain crown shield artwork (web/highway-shield.svg), recolored per
+   theme, drawn small and low-opacity so it blends into the map. Re-runs on
+   every style load (theme flips reset added images + layer props). */
+const SHIELD_REFS = ["400","401","403","404","407","409","410","412","418","420","427"];
+const SHIELD_LAYERS = ["highway-shield-non-us","highway-shield-us-interstate","road_shield_us"];
+let shieldSvgBase = null;
+async function shieldBase(){
+  if (shieldSvgBase) return shieldSvgBase;
+  const raw = await (await fetch("highway-shield.svg")).text();
+  const open = raw.match(/<svg[^>]*>/)[0];
+  const nOpen = open.replace(/width="[^"]*"/, 'width="46"').replace(/height="[^"]*"/, 'height="73"');
+  shieldSvgBase = raw.replace(open, nOpen);
+  return shieldSvgBase;
+}
+function shieldRecolor(s, accent, body){
+  if (accent) s = s.split("fill:#000000").join("fill:" + accent).split("fill:#231f20").join("fill:" + accent)
+                   .split('fill="#000000"').join('fill="' + accent + '"').split('fill="#231f20"').join('fill="' + accent + '"');
+  if (body) s = s.split("fill:#ffffff").join("fill:" + body).split('fill="#ffffff"').join('fill="' + body + '"');
+  return s;
+}
+async function applyShields(dark){
+  let base;
+  try { base = await shieldBase(); } catch (e){ return; }  // asset missing: keep default boxes
+  const v = dark ? { accent: "#d3a441", body: "#2b2f36", num: "#f4f4f8", op: 0.5 }
+                 : { accent: "#1a1a1a", body: "#ffffff", num: "#1a1a1a", op: 0.72 };
+  for (const num of SHIELD_REFS){
+    const svg = shieldRecolor(base, v.accent, v.body).replace("</svg>",
+      '<text x="113.7" y="250" text-anchor="middle" font-family="Arial,Helvetica,sans-serif"'
+      + ' font-weight="700" font-size="118" fill="' + v.num + '">' + num + "</text></svg>");
+    const img = new Image();
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+    try { await (img.decode ? img.decode() : new Promise((res, rej) => { img.onload = res; img.onerror = rej; })); }
+    catch (e){ continue; }
+    const id = "onsh_" + num;
+    if (map.hasImage(id)) map.removeImage(id);
+    map.addImage(id, img, { pixelRatio: 2 });
+  }
+  const iconExpr = ["coalesce", ["image", ["concat", "onsh_", ["get", "ref"]]],
+                    ["image", ["concat", "road_", ["get", "ref_length"]]]];
+  for (const id of SHIELD_LAYERS){
+    if (!map.getLayer(id)) continue;
+    map.setLayoutProperty(id, "icon-image", iconExpr);
+    map.setLayoutProperty(id, "icon-size", 0.54);
+    map.setLayoutProperty(id, "icon-text-fit", "none");
+    map.setPaintProperty(id, "icon-opacity", v.op);
+    map.setPaintProperty(id, "text-opacity", 0);
+  }
+}
+function reapplyShields(){
+  const look = mapLook[themeMode()];
+  const dark = look === "classic" ? darkMql.matches : (PALETTES[look] || {}).dark;
+  applyShields(!!dark);
+}
+map.on("style.load", reapplyShields);  // first style load
 
 /* standalone map-look button, top-right like Apple Maps' map-type control
    (Sam 2026-07-20: wanted its own button, not buried in Options). Opens a
