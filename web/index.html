@@ -135,6 +135,29 @@
   .sel-tick { margin-left: auto; color: var(--accent); font-size: 12px;
     visibility: hidden; }
   .sel-item.on .sel-tick { visibility: visible; }
+  /* month grid: same popup material, one screen per month. A day is a
+     button only when #daySel has an option for it, so the past and
+     anything past the end of the loaded timetables is dead text. */
+  .selmenu-cal { padding: 10px; overflow: visible; }
+  .cal-head { display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 6px; }
+  .cal-title { font-size: 13px; font-weight: 650; color: var(--text); }
+  .cal-nav { border: none; background: none; color: var(--accent); cursor: pointer;
+    font-size: 19px; line-height: 1; width: 26px; height: 26px; border-radius: 999px; }
+  .cal-nav:hover { background: var(--chip); }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 30px); gap: 2px; }
+  .cal-dow { font-size: 10.5px; font-weight: 700; color: var(--muted);
+    text-align: center; padding-bottom: 2px; }
+  .cal-day { height: 30px; border: none; background: none; color: var(--text);
+    font: inherit; font-size: 12.5px; font-weight: 550; border-radius: 999px;
+    cursor: pointer; padding: 0; }
+  .cal-day:hover, .cal-day.hi { background: var(--chip); }
+  .cal-day.today { font-weight: 800; color: var(--accent); }
+  .cal-day.on { background: var(--accent); color: #fff; font-weight: 700; }
+  .cal-day.off { color: var(--muted); opacity: .3; cursor: default;
+    display: flex; align-items: center; justify-content: center; }
+  .cal-foot { font-size: 11px; font-weight: 550; color: var(--muted);
+    text-align: center; margin-top: 8px; }
   .seg { display: inline-flex; background: var(--chip); border-radius: 999px;
     padding: 2px; }
   .seg button { border: none; background: transparent; padding: 5.5px 10px;
@@ -202,6 +225,13 @@
   .livechip::before { content: "●"; font-size: 7px; vertical-align: 1px;
     margin-right: 3px; animation: livepulse 1.6s ease-in-out infinite; }
   @keyframes livepulse { 50% { opacity: .35; } }
+  /* a drive on the 407: the price on the card does NOT include it, so the
+     marker has to be loud enough to notice (same amber as alerts) */
+  .tollchip { color: #ff9f0a; font-size: 9.5px; font-weight: 700;
+    letter-spacing: .06em; text-transform: uppercase; margin-left: 5px;
+    background: color-mix(in srgb, #ff9f0a 16%, transparent);
+    padding: 1px 5px; border-radius: 5px; }
+  .card.sel .tollchip { color: #fff; background: rgba(255,255,255,.24); }
   .late { color: #ff9f0a; font-weight: 600; }
   .early { color: var(--accent); font-weight: 600; }
   /* service alerts: amber ⚠ chip on cards, per-leg note in detail; the
@@ -697,6 +727,8 @@
           <option value="balanced">Bike: balanced</option>
           <option value="fastest">Bike: fastest</option>
         </select>
+        <button class="have" id="noTolls" aria-pressed="false"
+          title="Hide any option whose drive uses Highway 407">Avoid tolls</button>
       </div>
     </div>
     <div class="optgrp">
@@ -782,6 +814,10 @@ const BIKESHARE_UNLOCK = 1.00, BIKESHARE_PER_MIN = 0.12;
 const TRANSIT = new Set(["BUS","RAIL","SUBWAY","TRAM","FERRY"]);
 let rider = "adult";
 let maxDriveM = 15000;  // hide drive-to-station options with a longer drive
+/* hide options that drive on a toll road. The engine can't route around
+   one (OTP has no toll support at all), so this filters rather than
+   re-routes - see the toll-roads block further down. */
+let avoidTolls = localStorage.getItem("avoidTolls") === "1";
 /* bike routing trade-off: the ENGINE default is safest-streets
    (router-config.json); "balanced"/"fastest" override it per request so
    busier roads are allowed when they save time */
@@ -1962,7 +1998,9 @@ function cardHTML(it, cid, fastestIt, cheapestIt, latestIt){
         alts.length ? " &middot; also " + alts.map(hhmm).join(", ") : ""}${
         it.legs.some(l => l.live) ? '<span class="livechip">live</span>' : ""}${
         it.legs.some(l => (l.alerts || []).length)
-          ? '<span class="alertchip" title="Service alert on this trip">&#9888;</span>' : ""}</span>
+          ? '<span class="alertchip" title="Service alert on this trip">&#9888;</span>' : ""}${
+        isTolled(it) ? `<span class="tollchip" title="${
+          (tollM(it)/1000).toFixed(1)} km of this drive is on Highway 407. The toll is NOT included in the price shown.">toll</span>` : ""}</span>
       <span class="cost">$${cost.toFixed(2)}</span></div>
     ${badges ? `<div class="badges">${badges}</div>` : ""}
     ${legRow(it)}</div>`;
@@ -1972,12 +2010,59 @@ function carDistance(it){
   return it.legs.filter(l => l.mode === "CAR")
                 .reduce((s,l) => s + (l.distance||0), 0);
 }
+
+/* ---- toll roads ----
+   OTP 2.9 has NO toll support (checked its GraphQL schema: no avoidTolls,
+   no toll cost, nothing), so the engine happily sends the "fastest" drive
+   27 km up the 407 ETR and then prices the trip at the transit fare alone.
+   web/toll-roads.json is a ~30 m grid of every toll=yes way in the OSM
+   extract, built by make_toll_cells.py; a car leg whose geometry runs
+   through those cells is on a toll road. We cannot make OTP route AROUND
+   one - all we can do is say so, and hide those options on request. */
+const TOLL_MIN_M = 400;      // ignore a leg that merely clips a toll ramp
+let TOLL = null;
+fetch("toll-roads.json").then(r => r.ok ? r.json() : null).then(j => {
+  if (!j) return;
+  for (const k in j.cells) j.cells[k] = new Set(j.cells[k]);
+  TOLL = j;
+  if (lastParts) renderResults(lastParts, { noFit: true, noSweep: true });
+}).catch(() => {});   // no file, no toll marks - everything else still works
+
+function inToll(lng, lat){
+  const x = Math.floor((lat - TOLL.lat0) / TOLL.dlat),
+        y = Math.floor((lng - TOLL.lon0) / TOLL.dlon);
+  for (let dx = -1; dx <= 1; dx++){
+    const ys = TOLL.cells[x + dx];
+    if (!ys) continue;
+    for (let dy = -1; dy <= 1; dy++) if (ys.has(y + dy)) return true;
+  }
+  return false;
+}
+/* metres of one driving leg that run on a toll road (0 until the grid
+   loads; the fetch above re-renders once it has) */
+function legTollM(l){
+  if (!TOLL || l.mode !== "CAR" || !l.legGeometry) return 0;
+  if (l._tollM != null) return l._tollM;
+  const pts = decodePolyline(l.legGeometry.points);   // [lng, lat]
+  let m = 0;
+  for (let i = 1; i < pts.length; i++){
+    const a = pts[i-1], b = pts[i];
+    if (!inToll(a[0], a[1]) || !inToll(b[0], b[1])) continue;
+    const dy = (b[1] - a[1]) * 111320,
+          dx = (b[0] - a[0]) * 111320 * Math.cos(a[1] * Math.PI / 180);
+    m += Math.hypot(dx, dy);
+  }
+  return (l._tollM = m);
+}
+const tollM = it => it.legs.reduce((s, l) => s + legTollM(l), 0);
+const isTolled = it => tollM(it) >= TOLL_MIN_M;
 /* itineraries a part actually shows, after the "max drive" cap
    (applies to both drive categories - "at the end" should stay short) */
 function visibleIts(p){
   let its = p.its || [];
   if (p.c.drive)
     its = its.filter(it => carDistance(it) <= maxDriveM);
+  if (avoidTolls) its = its.filter(it => !isTolled(it));
   return its;
 }
 
@@ -2251,7 +2336,10 @@ function renderDetail(cid){
       sub = (sawTransit
         ? `${mins} min &middot; to ${esc(l.to.name === "Destination" ? "your destination" : l.to.name)}`
         : `${mins} min &middot; park at ${esc(l.to.name)}`)
-        + " &middot; light traffic assumed";
+        + " &middot; light traffic assumed"
+        + (legTollM(l) >= TOLL_MIN_M
+          ? ` &middot; <span class="late">${(legTollM(l)/1000).toFixed(1)} km on
+              Highway 407, toll not in the price</span>` : "");
     } else {
       sawTransit = true;
       const r = l.route || {};
@@ -2384,6 +2472,25 @@ document.getElementById("go").onclick = plan;
     paint(); rerender();
   };
   hint.addEventListener("click", takeHint);   // a real <button>: Enter/Space free
+})();
+
+/* "Avoid tolls" - pure filtering (see the toll-roads block), so it never
+   needs a re-query, and it persists like the drive limit */
+(function(){
+  const b = document.getElementById("noTolls");
+  const paint = () => {
+    b.classList.toggle("on", avoidTolls);
+    b.setAttribute("aria-pressed", avoidTolls ? "true" : "false");
+  };
+  paint();
+  b.onclick = () => {
+    avoidTolls = !avoidTolls;
+    localStorage.setItem("avoidTolls", avoidTolls ? "1" : "");
+    paint();
+    if (!lastParts) return;
+    const keepSig = selId && itinsById[selId] ? itinSig(itinsById[selId]) : null;
+    renderResults(lastParts, { selectSig: keepSig, noFit: true, noSweep: true });
+  };
 })();
 document.getElementById("daySel").addEventListener("change", plan);
 document.getElementById("timeSel").addEventListener("change", plan);
@@ -2616,19 +2723,35 @@ document.getElementById("clear").onclick = () => {
     map.getSource("route").setData({ type:"FeatureCollection", features: [] });
 };
 
-/* populate the day + time pickers (default: today, next quarter hour) */
-(function(){
-  const daySel = document.getElementById("daySel"),
-        timeSel = document.getElementById("timeSel");
-  const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-  const pad = n => String(n).padStart(2,"0");
-  for (let i = 0; i < 7; i++){
-    const d = new Date(Date.now() + i*86400000);
-    const val = d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
-    const label = i === 0 ? "Today" : i === 1 ? "Tomorrow"
-      : days[d.getDay()] + " " + d.getDate();
-    daySel.add(new Option(label, val));
+/* populate the day + time pickers (default: today, next quarter hour).
+   #daySel is still the source of truth for the date - it just wears a
+   calendar instead of a list (see skinSelect/buildCalendar). Its option
+   set IS the set of bookable days, so the calendar greys out anything the
+   loaded schedules can't answer for; addDayOptions extends it once the
+   engine reports how far the timetables run. */
+let scheduleEnd = 0;   // ms; last day the loaded timetables can answer for
+const DOW = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const pad2 = n => String(n).padStart(2,"0");
+const isoDay = d => d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate());
+/* grow #daySel to `days` days from today (idempotent - safe to call again
+   with a bigger number once serviceTimeRange comes back) */
+function addDayOptions(days){
+  const daySel = document.getElementById("daySel");
+  const have = new Set([...daySel.options].map(o => o.value));
+  const today = new Date(); today.setHours(12, 0, 0, 0);   // noon: DST-proof
+  for (let i = 0; i < days; i++){
+    const d = new Date(today.getTime() + i*86400000);
+    const val = isoDay(d);
+    if (have.has(val)) continue;
+    daySel.add(new Option(i === 0 ? "Today" : i === 1 ? "Tomorrow"
+      : `${DOW[d.getDay()].slice(0,3)}, ${MON[d.getMonth()]} ${d.getDate()}`, val));
   }
+}
+(function(){
+  const timeSel = document.getElementById("timeSel");
+  const pad = pad2;
+  addDayOptions(14);   // enough to use immediately; extended once we know
   for (let h = 0; h < 24; h++) for (const m of [0,15,30,45]){
     const ampm = h < 12 ? "AM" : "PM";
     const h12 = h % 12 === 0 ? 12 : h % 12;
@@ -2637,9 +2760,10 @@ document.getElementById("clear").onclick = () => {
   // rolling to the next quarter hour can cross midnight - let Date carry
   // the day over, then move the day picker with it (else the default was
   // "today at 12:00 AM", i.e. almost a full day in the PAST)
+  const daySel = document.getElementById("daySel");
   const now = new Date(Date.now() + 5*60000);
   now.setMinutes(Math.ceil(now.getMinutes()/15)*15, 0, 0);
-  const dval = now.getFullYear()+"-"+pad(now.getMonth()+1)+"-"+pad(now.getDate());
+  const dval = isoDay(now);
   if ([...daySel.options].some(o => o.value === dval)) daySel.value = dval;
   timeSel.value = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
 })();
@@ -2652,7 +2776,8 @@ document.getElementById("clear").onclick = () => {
    options, .value and change events; it just goes invisible behind a
    .selbtn, and .selmenu draws the list the same way the "More" menu
    does. Must run AFTER the day/time options are populated. */
-function skinSelect(sel){
+function skinSelect(sel, opts){
+  opts = opts || {};
   const wrap = document.createElement("span");
   wrap.className = "selwrap";
   sel.parentNode.insertBefore(wrap, sel);
@@ -2668,8 +2793,8 @@ function skinSelect(sel){
   wrap.appendChild(btn);
 
   const menu = document.createElement("div");
-  menu.className = "selmenu";
-  menu.setAttribute("role", "listbox");
+  menu.className = "selmenu" + (opts.calendar ? " selmenu-cal" : "");
+  menu.setAttribute("role", opts.calendar ? "dialog" : "listbox");
   document.body.appendChild(menu);
 
   const sync = () => {
@@ -2689,7 +2814,7 @@ function skinSelect(sel){
   sync();
 
   let hi = -1;
-  const items = () => [...menu.querySelectorAll(".sel-item")];
+  const items = () => [...menu.querySelectorAll("[data-oi]")];
   const setHi = i => {
     const list = items();
     if (!list.length) return;
@@ -2697,37 +2822,102 @@ function skinSelect(sel){
     list.forEach((el, n) => el.classList.toggle("hi", n === hi));
     list[hi].scrollIntoView({ block: "nearest" });
   };
+  // where the CURRENT value sits among the rendered items (the calendar
+  // only renders one month, so it is often not there at all)
+  const hiOfSelected = () => Math.max(0,
+    items().findIndex(el => +el.dataset.oi === sel.selectedIndex));
+  let posRAF = 0;
   const close = () => {
+    cancelAnimationFrame(posRAF);
     menu.classList.remove("open");
     btn.setAttribute("aria-expanded", "false");
   };
-  const choose = i => {
-    const o = sel.options[i];
+  const choose = el => {
+    const o = sel.options[+el.dataset.oi];
     if (!o) return;
     close();
     if (o.value === sel.value) return;       // no phantom change events
     sel.value = o.value;                     // (setter above re-syncs the label)
     sel.dispatchEvent(new Event("change", { bubbles: true }));
   };
-  const open = () => {
-    // nothing to anchor to if the button isn't laid out (drawer closed)
-    if (!btn.getBoundingClientRect().width) return;
-    // rebuilt every time: day/time options are generated at runtime
-    menu.innerHTML = "";
+  const mkItem = (o, i) => {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.dataset.oi = i;
+    item.setAttribute("role", "option");
+    item.setAttribute("aria-selected", o.selected ? "true" : "false");
+    item.onclick = e => { e.stopPropagation(); choose(item); };
+    return item;
+  };
+  const buildList = () => {
     [...sel.options].forEach((o, i) => {
-      const item = document.createElement("button");
-      item.type = "button";
+      const item = mkItem(o, i);
       item.className = "sel-item" + (o.selected ? " on" : "");
-      item.setAttribute("role", "option");
-      item.setAttribute("aria-selected", o.selected ? "true" : "false");
       item.innerHTML = `<span></span><span class="sel-tick">&#10003;</span>`;
       item.firstChild.textContent = o.textContent;
-      item.onclick = e => { e.stopPropagation(); choose(i); };
       menu.appendChild(item);
     });
+  };
+  /* month grid. The <select>'s option set IS the bookable range, so a day
+     with no option is simply not a button - past dates and anything past
+     the end of the loaded timetables grey out for free. */
+  let calMonth = null;   // Date pinned to the 1st of the shown month
+  const buildCalendar = () => {
+    const byDay = new Map();
+    [...sel.options].forEach((o, i) => byDay.set(o.value, i));
+    const sel1 = sel.value ? new Date(sel.value + "T12:00:00") : new Date();
+    if (!calMonth) calMonth = new Date(sel1.getFullYear(), sel1.getMonth(), 1);
+    const today = isoDay(new Date());
+    const head = document.createElement("div");
+    head.className = "cal-head";
+    head.innerHTML = `<button type="button" class="cal-nav" data-d="-1"
+        aria-label="Previous month">&lsaquo;</button>
+      <span class="cal-title"></span>
+      <button type="button" class="cal-nav" data-d="1"
+        aria-label="Next month">&rsaquo;</button>`;
+    head.querySelector(".cal-title").textContent =
+      `${MON[calMonth.getMonth()]} ${calMonth.getFullYear()}`;
+    head.querySelectorAll(".cal-nav").forEach(b => b.onclick = e => {
+      e.stopPropagation();
+      calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + +b.dataset.d, 1);
+      menu.innerHTML = ""; buildCalendar(); setHi(0);
+    });
+    menu.appendChild(head);
+    const grid = document.createElement("div");
+    grid.className = "cal-grid";
+    for (const d of ["S","M","T","W","T","F","S"]){
+      const s = document.createElement("span");
+      s.className = "cal-dow"; s.textContent = d; grid.appendChild(s);
+    }
+    const first = new Date(calMonth.getFullYear(), calMonth.getMonth(), 1);
+    const lastDate = new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 0).getDate();
+    for (let i = 0; i < first.getDay(); i++)
+      grid.appendChild(document.createElement("span"));
+    for (let day = 1; day <= lastDate; day++){
+      const val = isoDay(new Date(calMonth.getFullYear(), calMonth.getMonth(), day));
+      const oi = byDay.get(val);
+      if (oi === undefined){                       // outside the bookable range
+        const s = document.createElement("span");
+        s.className = "cal-day off"; s.textContent = day; grid.appendChild(s);
+        continue;
+      }
+      const item = mkItem(sel.options[oi], oi);
+      item.className = "cal-day" + (sel.options[oi].selected ? " on" : "")
+        + (val === today ? " today" : "");
+      item.textContent = day;
+      grid.appendChild(item);
+    }
+    menu.appendChild(grid);
+    if (scheduleEnd){
+      const f = document.createElement("div");
+      f.className = "cal-foot";
+      const e = new Date(scheduleEnd);
+      f.textContent = `Schedules loaded through ${MON[e.getMonth()]} ${e.getDate()}`;
+      menu.appendChild(f);
+    }
+  };
+  const place = () => {
     const r = btn.getBoundingClientRect();
-    menu.style.visibility = "hidden";
-    menu.classList.add("open");
     menu.style.minWidth = r.width + "px";
     // flip above the button when there isn't room below (time picker near
     // the bottom of a short window)
@@ -2737,9 +2927,30 @@ function skinSelect(sel){
                                                  : r.bottom + 6) + "px";
     menu.style.left = Math.max(8,
       Math.min(r.left, innerWidth - menu.offsetWidth - 8)) + "px";
+  };
+  // re-place every frame while open. Positioning once was wrong whenever
+  // anything above the button changed height afterwards - the disruptions
+  // bar loads a second or two in and pushed the anchor 30 px down, leaving
+  // the popup sitting ON TOP of its own button.
+  const track = () => {
+    if (!isOpen()) return;
+    place();
+    posRAF = requestAnimationFrame(track);
+  };
+  const open = () => {
+    // nothing to anchor to if the button isn't laid out (drawer closed)
+    if (!btn.getBoundingClientRect().width) return;
+    // rebuilt every time: day/time options are generated at runtime
+    menu.innerHTML = "";
+    calMonth = null;
+    opts.calendar ? buildCalendar() : buildList();
+    menu.style.visibility = "hidden";
+    menu.classList.add("open");
+    place();
     menu.style.visibility = "";
     btn.setAttribute("aria-expanded", "true");
-    setHi(Math.max(0, sel.selectedIndex));
+    setHi(hiOfSelected());
+    track();
   };
   const isOpen = () => menu.classList.contains("open");
 
@@ -2754,10 +2965,20 @@ function skinSelect(sel){
   });
   document.addEventListener("keydown", e => {
     if (!isOpen()) return;
+    // in the month grid up/down is a WEEK, left/right a day; in a list
+    // up/down is the only axis
+    const week = opts.calendar ? 7 : 1;
     if (e.key === "Escape"){ close(); btn.focus(); }
-    else if (e.key === "ArrowDown"){ e.preventDefault(); setHi(hi + 1); }
-    else if (e.key === "ArrowUp"){ e.preventDefault(); setHi(hi - 1); }
-    else if (e.key === "Enter"){ e.preventDefault(); choose(hi); btn.focus(); }
+    else if (e.key === "ArrowDown"){ e.preventDefault(); setHi(hi + week); }
+    else if (e.key === "ArrowUp"){ e.preventDefault(); setHi(hi - week); }
+    else if (opts.calendar && e.key === "ArrowRight"){ e.preventDefault(); setHi(hi + 1); }
+    else if (opts.calendar && e.key === "ArrowLeft"){ e.preventDefault(); setHi(hi - 1); }
+    else if (e.key === "Enter"){
+      e.preventDefault();
+      const el = items()[hi];
+      if (el) choose(el);
+      btn.focus();
+    }
   });
   document.addEventListener("click", e => {
     if (isOpen() && !menu.contains(e.target) && e.target !== btn) close();
@@ -2771,7 +2992,8 @@ function skinSelect(sel){
   }, true);
   addEventListener("resize", () => { if (isOpen()) close(); });
 }
-["daySel", "timeSel", "bikeSel"].forEach(id => {
+skinSelect(document.getElementById("daySel"), { calendar: true });
+["timeSel", "bikeSel"].forEach(id => {
   const el = document.getElementById(id);
   if (el) skinSelect(el);
 });
@@ -2850,6 +3072,10 @@ function tripFromURL(){
     const end = typeof raw === "string" ? Date.parse(raw) : (raw || 0) * 1000;
     if (!end) return;
     const days = Math.round((end - Date.now()) / 86400000);
+    // the calendar can offer exactly as far as the timetables reach, no
+    // further: a date past the end plans a confidently empty trip
+    scheduleEnd = end;
+    addDayOptions(Math.min(Math.max(days + 1, 1), 400));
     if (days > 14) return;
     const div = document.createElement("div");
     div.className = "warnbar";
