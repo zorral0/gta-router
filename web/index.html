@@ -263,7 +263,14 @@
   .optlbl { font-size: 11px; font-weight: 700; letter-spacing: .02em;
     text-transform: uppercase; color: var(--muted); margin: 0 2px 6px; }
   .optrow { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; }
-  .havelbl { font-size: 11.5px; font-weight: 600; color: var(--muted); }
+  /* four loose pills wrapped 3+1 and read as a pile. Grouped instead by
+     the thing you own - Bike / Car, two choices each - so the toggles
+     land in two aligned columns. */
+  .haverow { flex-wrap: nowrap; }
+  .haverow + .haverow { margin-top: 6px; }
+  .havelbl { font-size: 11.5px; font-weight: 600; color: var(--muted);
+    width: 34px; flex: none; }
+  .haverow .have { flex: 1; min-width: 0; justify-content: center; }
   /* drive-distance slider (replaced a 4-step dropdown: 8/15/30/Any hid
      everything in between, and 15 km is exactly where the useful
      park-and-ride stations start) */
@@ -658,15 +665,19 @@
   <div id="optWrap">
     <div class="optgrp">
       <div class="optlbl">What you've got</div>
-      <div class="optrow">
+      <div class="optrow haverow">
+        <span class="havelbl">Bike</span>
         <button class="have on" id="haveBike" data-have="bike"
           title="I can bike to a stop and lock my bike there"></button>
+        <button class="have on" id="haveShare" data-have="share"
+          title="OK with renting a Bike Share Toronto bike"></button>
+      </div>
+      <div class="optrow haverow">
+        <span class="havelbl">Car</span>
         <button class="have on" id="haveCarStart" data-have="carStart"
           title="You can drive to a station and park (park and ride)"></button>
         <button class="have on" id="haveCarEnd" data-have="carEnd"
           title="A car for the last leg - a pickup, or your car waiting at the station"></button>
-        <button class="have on" id="haveShare" data-have="share"
-          title="OK with renting a Bike Share Toronto bike"></button>
       </div>
     </div>
     <div class="optgrp">
@@ -2512,12 +2523,14 @@ function countTo(el, to){
 
 /* the "Using:" toggles - flip one and the trip is re-planned with the
    matching mode mixes included/excluded */
-const HAVE_LABEL = { bike:"My bike", carStart:"Car at start", carEnd:"Car at end", share:"Bike Share" };
-const HAVE_ICON  = { bike:"bike", carStart:"car", carEnd:"car", share:"bike" };
+// the Bike / Car row label carries the mode now, so the pills say only
+// which one - no icon, no repeating the word in every button
+const HAVE_LABEL = { bike:"My bike", carStart:"At the start", carEnd:"At the end",
+  share:"Bike Share" };
 for (const id of ["haveBike", "haveCarStart", "haveCarEnd", "haveShare"]){
   const b = document.getElementById(id);
   const k = b.dataset.have;
-  b.innerHTML = icn(HAVE_ICON[k], 13) + HAVE_LABEL[k];
+  b.textContent = HAVE_LABEL[k];
   b.classList.toggle("on", !!have[k]);
   b.setAttribute("aria-pressed", have[k] ? "true" : "false");
   b.onclick = () => {
@@ -2750,8 +2763,12 @@ function skinSelect(sel){
     if (isOpen() && !menu.contains(e.target) && e.target !== btn) close();
   });
   // a fixed menu would hang in mid-air once the panel scrolls under it
-  // (capture: scroll doesn't bubble out of #panelScroll)
-  document.addEventListener("scroll", () => { if (isOpen()) close(); }, true);
+  // (capture: scroll doesn't bubble out of #panelScroll). Scrolling INSIDE
+  // the menu is not that - the time picker has 96 options and used to
+  // close itself the moment you scrolled the list.
+  document.addEventListener("scroll", e => {
+    if (isOpen() && !menu.contains(e.target)) close();
+  }, true);
   addEventListener("resize", () => { if (isOpen()) close(); });
 }
 ["daySel", "timeSel", "bikeSel"].forEach(id => {
