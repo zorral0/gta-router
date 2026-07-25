@@ -102,12 +102,39 @@
   /* controls */
   .ctrls { display: flex; gap: 7px; align-items: center; flex-wrap: wrap;
     margin-bottom: 12px; }
-  .ctrls select, .optrow select { appearance: none; -webkit-appearance: none; border: none;
+  .ctrls select, .optrow select, .selbtn { appearance: none; -webkit-appearance: none; border: none;
     background: var(--chip); color: var(--text); font: inherit; font-size: 12.5px;
     font-weight: 590; height: 32px; padding: 0 22px 0 11px; border-radius: 999px;
     cursor: pointer;
     background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='6'%3E%3Cpath d='M1 1l3.5 3.5L8 1' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
     background-repeat: no-repeat; background-position: right 10px center; }
+  /* Themed dropdowns. A native <select>'s option popup is drawn by the OS
+     and cannot be styled, so it always looked like a system menu bolted
+     onto the app. The real <select> stays in the DOM as the source of
+     truth (its options, .value and change events - nothing else had to
+     change), but goes invisible; .selbtn shows the current label and
+     .selmenu draws the list in the same material as the "More" menu. */
+  .selwrap { position: relative; display: inline-flex; }
+  .selwrap select { position: absolute; inset: 0; width: 100%; height: 100%;
+    opacity: 0; pointer-events: none; }
+  .selbtn { display: inline-flex; align-items: center; white-space: nowrap; }
+  .selbtn[aria-expanded="true"] { background: var(--accent); color: #fff;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='6'%3E%3Cpath d='M1 1l3.5 3.5L8 1' stroke='%23fff' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center; }
+  /* fixed, like #moreMenu: the panel's scroll box must not clip it */
+  .selmenu { position: fixed; z-index: 60; display: none; padding: 6px;
+    background: var(--card-solid); border-radius: 12px; box-shadow: var(--shadow);
+    max-height: min(320px, 60vh); overflow-y: auto; min-width: 132px; }
+  .selmenu.open { display: block; }
+  .sel-item { display: flex; align-items: center; gap: 10px; width: 100%;
+    border: none; background: none; color: var(--text); font: inherit;
+    font-size: 13px; font-weight: 550; padding: 8px 10px; border-radius: 8px;
+    cursor: pointer; text-align: left; white-space: nowrap; }
+  .sel-item:hover, .sel-item.hi { background: var(--chip); }
+  .sel-item.on { font-weight: 650; }
+  .sel-tick { margin-left: auto; color: var(--accent); font-size: 12px;
+    visibility: hidden; }
+  .sel-item.on .sel-tick { visibility: visible; }
   .seg { display: inline-flex; background: var(--chip); border-radius: 999px;
     padding: 2px; }
   .seg button { border: none; background: transparent; padding: 5.5px 10px;
@@ -118,8 +145,8 @@
   .ibtn { border: none; background: var(--chip); color: var(--text);
     width: 30px; height: 30px; border-radius: 999px; cursor: pointer;
     display: inline-flex; align-items: center; justify-content: center; }
-  .ibtn:hover, .ctrls select:hover, .optrow select:hover { filter: brightness(.96); }
-  @media (prefers-color-scheme: dark) { .ibtn:hover, .ctrls select:hover, .optrow select:hover { filter: brightness(1.25); } }
+  .ibtn:hover, .ctrls select:hover, .optrow select:hover, .selbtn:hover { filter: brightness(.96); }
+  @media (prefers-color-scheme: dark) { .ibtn:hover, .ctrls select:hover, .optrow select:hover, .selbtn:hover { filter: brightness(1.25); } }
   #go { border: none; background: var(--accent); color: #fff; font: inherit;
     font-size: 13px; font-weight: 650; padding: 7px 16px; border-radius: 999px;
     cursor: pointer; margin-left: auto; }
@@ -237,6 +264,34 @@
     text-transform: uppercase; color: var(--muted); margin: 0 2px 6px; }
   .optrow { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; }
   .havelbl { font-size: 11.5px; font-weight: 600; color: var(--muted); }
+  /* drive-distance slider (replaced a 4-step dropdown: 8/15/30/Any hid
+     everything in between, and 15 km is exactly where the useful
+     park-and-ride stations start) */
+  .optrow.sliderrow { display: block; padding: 0 2px; }
+  .slbl { display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 12px; font-weight: 590; color: var(--muted); margin-bottom: 2px; }
+  .slbl b { color: var(--text); font-weight: 650; font-size: 12.5px; }
+  .slider { -webkit-appearance: none; appearance: none; width: 100%; height: 20px;
+    background: transparent; cursor: pointer; margin: 0; display: block; }
+  .slider:focus { outline: none; }
+  .slider:focus-visible::-webkit-slider-thumb { box-shadow: 0 1px 3px rgba(0,0,0,.3),
+    0 0 0 3px color-mix(in srgb, var(--accent) 45%, transparent); }
+  .slider::-webkit-slider-runnable-track { height: 4px; border-radius: 999px;
+    background: linear-gradient(to right, var(--accent) var(--pct, 0%),
+      var(--chip) var(--pct, 0%)); }
+  .slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none;
+    width: 18px; height: 18px; border-radius: 50%; background: #fff; margin-top: -7px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.3), 0 0 0 .5px rgba(0,0,0,.08); }
+  .slider:active::-webkit-slider-thumb { transform: scale(1.12); }
+  .slider::-moz-range-track { height: 4px; border-radius: 999px; background: var(--chip); }
+  .slider::-moz-range-progress { height: 4px; border-radius: 999px; background: var(--accent); }
+  .slider::-moz-range-thumb { width: 18px; height: 18px; border: none; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+  /* the filter is allowed to hide fast options - say so instead of
+     silently dropping them (this is what hid the Fairview trips) */
+  .slhint { font-size: 11.5px; font-weight: 550; color: var(--accent);
+    margin-top: 3px; cursor: pointer; }
+  .slhint[hidden] { display: none; }
 
   /* one-line mode summary on mixed-mode cards */
   .via { font-size: 11px; font-weight: 600; color: var(--muted); margin-top: 4px; }
@@ -616,17 +671,18 @@
     <div class="optgrp">
       <div class="optlbl">Preferences</div>
       <div class="optrow">
-        <select id="driveSel" title="Hide options with a longer drive (to the station, or at the end)">
-          <option value="8000">Drive &le; 8 km</option>
-          <option value="15000" selected>Drive &le; 15 km</option>
-          <option value="30000">Drive &le; 30 km</option>
-          <option value="9999000">Any drive</option>
-        </select>
         <select id="bikeSel" title="Safest sticks to bike lanes and quiet streets; fastest allows busier roads when they save time">
           <option value="safest" selected>Bike: safest</option>
           <option value="balanced">Bike: balanced</option>
           <option value="fastest">Bike: fastest</option>
         </select>
+      </div>
+      <div class="optrow sliderrow">
+        <label class="slbl" for="driveRange">
+          <span>Longest drive</span><b id="driveVal">15 km</b></label>
+        <input type="range" class="slider" id="driveRange" min="5" max="60" step="5"
+          value="15" aria-label="Longest drive (to the station, or at the end)">
+        <div class="slhint" id="driveHint" hidden role="button" tabindex="0"></div>
       </div>
     </div>
   </div>
@@ -1901,6 +1957,27 @@ function visibleIts(p){
   return its;
 }
 
+/* the drive cap is allowed to hide options, but never silently: if
+   something it dropped is FASTER than everything still on screen, say so
+   under the slider and offer the exact limit that would bring it back.
+   (This filter, at its old 15 km default, is what hid the 88 min
+   drive-to-Fairview trips behind a 113 min headline.) */
+function driveHint(pool, raw){
+  const hint = document.getElementById("driveHint");
+  if (!hint) return;
+  const best = pool.length ? pool[0].it.duration : Infinity;
+  const hidden = dedupeAlts(raw.filter(it =>
+    carDistance(it) > maxDriveM && it.duration < best));
+  if (!hidden.length){ hint.hidden = true; delete hint.dataset.km; return; }
+  const km = Math.ceil(Math.min(...hidden.map(carDistance)) / 1000);
+  const mins = Math.round(Math.min(...hidden.map(it => it.duration)) / 60);
+  hint.textContent = `${hidden.length} faster option${hidden.length > 1 ? "s" : ""}`
+    + ` need${hidden.length > 1 ? "" : "s"} a longer drive`
+    + ` — ${mins} min at ${km} km. Tap to allow it.`;
+  hint.dataset.km = km;
+  hint.hidden = false;
+}
+
 /* ---- results: ONE ranked list, every allowed mode mix pooled together.
    Sam's rule (2026-07-10): an option that is slower AND not cheaper than
    another visible option must never headline - it stays reachable under
@@ -1937,10 +2014,11 @@ function renderResults(parts, opts){
   // dominance dimension and keeps its own badge - it just doesn't set the
   // order any more.
   const metric = it => it.duration;
-  const all = [];
-  for (const p of parts) all.push(...visibleIts(p));
+  const all = [], raw = [];
+  for (const p of parts){ all.push(...visibleIts(p)); raw.push(...(p.its || [])); }
   const pool = dedupeAlts(all).map(it => ({ it, cost: itineraryCost(it) }));
   pool.sort((a,b) => metric(a.it) - metric(b.it));
+  driveHint(pool, raw);
 
   // keep only options nothing else beats outright: at least as fast AND at
   // least as cheap (and, with a deadline, leaving at least as late)
@@ -2245,10 +2323,47 @@ window.closeDetail = function(){
 
 /* ---- controls ---- */
 document.getElementById("go").onclick = plan;
-document.getElementById("driveSel").addEventListener("change", e => {
-  maxDriveM = +e.target.value;
-  if (lastParts) renderResults(lastParts);   // re-filter, no re-query
-});
+/* ---- drive-distance slider ----
+   Was a 4-step dropdown (8 / 15 / 30 km / Any) that reset to 15 km on
+   every reload. 15 km is exactly where the useful park-and-ride stations
+   start, so the default silently hid them - see HANDOFF, "Fastest-first
+   ranking". Now: a continuous slider, remembered between visits, with a
+   line underneath when the cap is hiding something faster. */
+(function(){
+  const rng = document.getElementById("driveRange"),
+        out = document.getElementById("driveVal"),
+        hint = document.getElementById("driveHint");
+  const STEP = +rng.step, MIN = +rng.min, ANY = +rng.max;  // top of track = no limit
+  const stored = parseInt(localStorage.getItem("driveKm"), 10);
+  if (stored >= MIN && stored <= ANY) rng.value = stored;
+  const paint = () => {
+    const km = +rng.value, any = km >= ANY;
+    maxDriveM = any ? 9999000 : km * 1000;
+    out.textContent = any ? "Any" : km + " km";
+    rng.style.setProperty("--pct", ((km - MIN) / (ANY - MIN) * 100) + "%");
+  };
+  paint();
+  const rerender = () => {
+    if (!lastParts) return;
+    const keepSig = selId && itinsById[selId] ? itinSig(itinsById[selId]) : null;
+    // no re-query: the cap only filters what the engine already returned
+    renderResults(lastParts, { selectSig: keepSig, noFit: true, noSweep: true });
+  };
+  rng.addEventListener("input", () => { paint(); rerender(); });
+  rng.addEventListener("change", () => localStorage.setItem("driveKm", rng.value));
+  // one tap on the hint raises the cap exactly far enough to reveal them
+  const takeHint = () => {
+    const km = +hint.dataset.km;
+    if (!km) return;
+    rng.value = Math.min(ANY, Math.ceil(km / STEP) * STEP);
+    localStorage.setItem("driveKm", rng.value);
+    paint(); rerender();
+  };
+  hint.addEventListener("click", takeHint);
+  hint.addEventListener("keydown", e => {
+    if (e.key === "Enter" || e.key === " "){ e.preventDefault(); takeHint(); }
+  });
+})();
 document.getElementById("daySel").addEventListener("change", plan);
 document.getElementById("timeSel").addEventListener("change", plan);
 const bikeSel = document.getElementById("bikeSel");
@@ -2505,6 +2620,134 @@ document.getElementById("clear").onclick = () => {
   if ([...daySel.options].some(o => o.value === dval)) daySel.value = dval;
   timeSel.value = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
 })();
+
+/* ---- themed dropdowns ----
+   A native <select>'s option list is drawn by the OS: it can't take the
+   app's card material, radius or accent, so every picker opened into a
+   grey system menu. This skins them WITHOUT touching any of the code
+   that uses them - the real <select> stays put and keeps owning its
+   options, .value and change events; it just goes invisible behind a
+   .selbtn, and .selmenu draws the list the same way the "More" menu
+   does. Must run AFTER the day/time options are populated. */
+function skinSelect(sel){
+  const wrap = document.createElement("span");
+  wrap.className = "selwrap";
+  sel.parentNode.insertBefore(wrap, sel);
+  wrap.appendChild(sel);
+
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "selbtn";
+  btn.setAttribute("aria-haspopup", "listbox");
+  btn.setAttribute("aria-expanded", "false");
+  if (sel.title) btn.title = sel.title;
+  if (sel.getAttribute("aria-label")) btn.setAttribute("aria-label", sel.getAttribute("aria-label"));
+  wrap.appendChild(btn);
+
+  const menu = document.createElement("div");
+  menu.className = "selmenu";
+  menu.setAttribute("role", "listbox");
+  document.body.appendChild(menu);
+
+  const sync = () => {
+    const o = sel.selectedOptions[0];
+    btn.textContent = o ? o.textContent : "";
+  };
+  // .value is assigned programmatically all over (day/time defaults, shared
+  // links, restore) and that fires no event - intercept the setter so the
+  // button label can never drift from the real select
+  const desc = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value");
+  Object.defineProperty(sel, "value", {
+    configurable: true,
+    get(){ return desc.get.call(this); },
+    set(v){ desc.set.call(this, v); sync(); }
+  });
+  sel.addEventListener("change", sync);
+  sync();
+
+  let hi = -1;
+  const items = () => [...menu.querySelectorAll(".sel-item")];
+  const setHi = i => {
+    const list = items();
+    if (!list.length) return;
+    hi = (i + list.length) % list.length;
+    list.forEach((el, n) => el.classList.toggle("hi", n === hi));
+    list[hi].scrollIntoView({ block: "nearest" });
+  };
+  const close = () => {
+    menu.classList.remove("open");
+    btn.setAttribute("aria-expanded", "false");
+  };
+  const choose = i => {
+    const o = sel.options[i];
+    if (!o) return;
+    close();
+    if (o.value === sel.value) return;       // no phantom change events
+    sel.value = o.value;                     // (setter above re-syncs the label)
+    sel.dispatchEvent(new Event("change", { bubbles: true }));
+  };
+  const open = () => {
+    // nothing to anchor to if the button isn't laid out (drawer closed)
+    if (!btn.getBoundingClientRect().width) return;
+    // rebuilt every time: day/time options are generated at runtime
+    menu.innerHTML = "";
+    [...sel.options].forEach((o, i) => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "sel-item" + (o.selected ? " on" : "");
+      item.setAttribute("role", "option");
+      item.setAttribute("aria-selected", o.selected ? "true" : "false");
+      item.innerHTML = `<span></span><span class="sel-tick">&#10003;</span>`;
+      item.firstChild.textContent = o.textContent;
+      item.onclick = e => { e.stopPropagation(); choose(i); };
+      menu.appendChild(item);
+    });
+    const r = btn.getBoundingClientRect();
+    menu.style.visibility = "hidden";
+    menu.classList.add("open");
+    menu.style.minWidth = r.width + "px";
+    // flip above the button when there isn't room below (time picker near
+    // the bottom of a short window)
+    const h = menu.offsetHeight;
+    const below = innerHeight - r.bottom - 8;
+    menu.style.top = (h > below && r.top > below ? Math.max(8, r.top - h - 6)
+                                                 : r.bottom + 6) + "px";
+    menu.style.left = Math.max(8,
+      Math.min(r.left, innerWidth - menu.offsetWidth - 8)) + "px";
+    menu.style.visibility = "";
+    btn.setAttribute("aria-expanded", "true");
+    setHi(Math.max(0, sel.selectedIndex));
+  };
+  const isOpen = () => menu.classList.contains("open");
+
+  btn.onclick = e => { e.stopPropagation(); isOpen() ? close() : open(); };
+  btn.addEventListener("keydown", e => {
+    if (isOpen()) return;      // the document handler below drives an open menu
+    if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter" || e.key === " "){
+      // stop here: the document handler would otherwise see the SAME
+      // keystroke against the now-open menu and skip the first item
+      e.preventDefault(); e.stopPropagation(); open();
+    }
+  });
+  document.addEventListener("keydown", e => {
+    if (!isOpen()) return;
+    if (e.key === "Escape"){ close(); btn.focus(); }
+    else if (e.key === "ArrowDown"){ e.preventDefault(); setHi(hi + 1); }
+    else if (e.key === "ArrowUp"){ e.preventDefault(); setHi(hi - 1); }
+    else if (e.key === "Enter"){ e.preventDefault(); choose(hi); btn.focus(); }
+  });
+  document.addEventListener("click", e => {
+    if (isOpen() && !menu.contains(e.target) && e.target !== btn) close();
+  });
+  // a fixed menu would hang in mid-air once the panel scrolls under it
+  // (capture: scroll doesn't bubble out of #panelScroll)
+  document.addEventListener("scroll", () => { if (isOpen()) close(); }, true);
+  addEventListener("resize", () => { if (isOpen()) close(); });
+}
+["daySel", "timeSel", "bikeSel"].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) skinSelect(el);
+});
 
 /* Open a trip from a shared ?f=..&t=.. link. This WINS over the saved pins
    below: someone sent this exact trip, so show it and plan it right away.
