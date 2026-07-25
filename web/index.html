@@ -168,6 +168,7 @@
     margin-right: 5px; }
   .badge.fast { color: var(--accent); }
   .badge.cheap { color: var(--good); }
+  .badge.late { color: var(--muted); }
   /* real-time markers: "live" on cards, late/early notes on detail legs */
   .livechip { color: var(--good); font-size: 9.5px; font-weight: 700;
     letter-spacing: .06em; text-transform: uppercase; margin-left: 2px; }
@@ -1865,12 +1866,13 @@ async function plan(){
 
 /* one plain-words line for mixed-mode trips: "Drive → transit → Bike Share" */
 
-function cardHTML(it, cid, fastestIt, cheapestIt){
+function cardHTML(it, cid, fastestIt, cheapestIt, latestIt){
   const cost = itineraryCost(it);
   // badge the single winning card (ties go to the first), not every tie
   const badges =
-    (it === fastestIt ? `<span class="badge fast">${
-      arriveBy ? "Latest leave" : "Fastest"}</span>` : "") +
+    (it === fastestIt ? '<span class="badge fast">Fastest</span>' : "") +
+    (it === latestIt && it !== fastestIt
+      ? '<span class="badge late">Latest leave</span>' : "") +
     (it === cheapestIt ? '<span class="badge cheap">Cheapest</span>' : "");
   const alts = (it.altTimes || []).slice().sort((a,b) => a-b).slice(0, 2);
   return `<div class="card" id="${cid}" onclick="openIt('${cid}')"
@@ -1926,25 +1928,39 @@ function renderResults(parts, opts){
   itinsById = {}; selId = null; fcCache = {};
 
   // one pool, drive cap applied, deduped (departure alts collected).
-  // Ranking metric matches the question being asked: "Leave at" ranks by
-  // trip duration; "Arrive by" ranks by how LATE you can leave (a longer
-  // trip that departs later is the better answer to "arrive by 9").
-  const metric = it => arriveBy ? -it.startTime : it.duration;
+  // Ranking is FASTEST FIRST in both modes (Sam, 2026-07-25). "Arrive by"
+  // used to rank by how LATE you could leave, which buried genuinely fast
+  // trips: one suburban trip showed a 113 min trip on top while an
+  // 88 min drive-to-Fairview one sat under "more options" purely because it
+  // left 35 min earlier. Leaving late is still worth something when you're
+  // pinned to a deadline, so in Arrive-by mode departure time stays a
+  // dominance dimension and keeps its own badge - it just doesn't set the
+  // order any more.
+  const metric = it => it.duration;
   const all = [];
   for (const p of parts) all.push(...visibleIts(p));
   const pool = dedupeAlts(all).map(it => ({ it, cost: itineraryCost(it) }));
   pool.sort((a,b) => metric(a.it) - metric(b.it));
 
-  // keep only options nothing else beats on the metric AND price at once
-  const lead = pool.filter(x => !pool.some(y => y !== x
-    && metric(y.it) <= metric(x.it) && y.cost <= x.cost
-    && (metric(y.it) < metric(x.it) || y.cost < x.cost)));
+  // keep only options nothing else beats outright: at least as fast AND at
+  // least as cheap (and, with a deadline, leaving at least as late)
+  const beats = (y, x) =>
+    metric(y.it) <= metric(x.it) && y.cost <= x.cost
+    && (!arriveBy || y.it.startTime >= x.it.startTime)
+    && (metric(y.it) < metric(x.it) || y.cost < x.cost
+        || (arriveBy && y.it.startTime > x.it.startTime));
+  const lead = pool.filter(x => !pool.some(y => y !== x && beats(y, x)));
   let main = lead.slice(0, 5);
-  let cheapest = null;
-  for (const x of pool) if (!cheapest || x.cost < cheapest.cost) cheapest = x;
-  // the cheapest option must never hide inside collapsed "more options"
-  if (cheapest && !main.includes(cheapest) && lead.includes(cheapest))
-    main = lead.slice(0, 4).concat([cheapest]);
+  let cheapest = null, latest = null;
+  for (const x of pool){
+    if (!cheapest || x.cost < cheapest.cost) cheapest = x;
+    if (arriveBy && (!latest || x.it.startTime > latest.it.startTime)) latest = x;
+  }
+  // the cheapest option - and, with a deadline, the one you can leave
+  // latest for - must never hide inside collapsed "more options"
+  const pins = [cheapest, latest].filter((x, i, a) =>
+    x && lead.includes(x) && !main.includes(x) && a.indexOf(x) === i);
+  if (pins.length) main = lead.slice(0, 5 - pins.length).concat(pins);
   const rest = pool.filter(x => !main.includes(x));
 
   // on metric ties, the badge goes to a card that actually headlines
@@ -1952,12 +1968,13 @@ function renderResults(parts, opts){
     ? (lead.find(x => metric(x.it) === metric(pool[0].it)) || pool[0]).it
     : null;
   const cheapestIt = cheapest ? cheapest.it : null;
+  const latestIt = latest ? latest.it : null;
 
   const errs = [...new Set(parts.filter(p => p.err).map(p => p.err))];
   let html = errs.map(e => `<div class="err">${esc(e)}</div>`).join(""), id = 0;
   const card = it => {
     const cid = "it" + (id++); itinsById[cid] = it;
-    return cardHTML(it, cid, fastestIt, cheapestIt);
+    return cardHTML(it, cid, fastestIt, cheapestIt, latestIt);
   };
 
   if (!pool.length){
