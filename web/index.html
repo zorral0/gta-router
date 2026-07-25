@@ -268,9 +268,12 @@
      everything in between, and 15 km is exactly where the useful
      park-and-ride stations start) */
   .optrow.sliderrow { display: block; padding: 0 2px; }
-  .slbl { display: flex; justify-content: space-between; align-items: baseline;
-    font-size: 12px; font-weight: 590; color: var(--muted); margin-bottom: 2px; }
-  .slbl b { color: var(--text); font-weight: 650; font-size: 12.5px; }
+  /* the slider's label IS a group header (.optlbl) so it sits at the same
+     size and weight as "Preferences" / "Who's riding", with the live value
+     right-aligned on the same line */
+  .optlbl.slbl { display: flex; justify-content: space-between; align-items: baseline; }
+  .slbl b { color: var(--text); font-weight: 700; font-size: 12px;
+    text-transform: none; letter-spacing: 0; }
   .slider { -webkit-appearance: none; appearance: none; width: 100%; height: 20px;
     background: transparent; cursor: pointer; margin: 0; display: block; }
   .slider:focus { outline: none; }
@@ -288,9 +291,16 @@
   .slider::-moz-range-thumb { width: 18px; height: 18px; border: none; border-radius: 50%;
     background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
   /* the filter is allowed to hide fast options - say so instead of
-     silently dropping them (this is what hid the Fairview trips) */
-  .slhint { font-size: 11.5px; font-weight: 550; color: var(--accent);
-    margin-top: 3px; cursor: pointer; }
+     silently dropping them (this is what hid the Fairview trips). One
+     quiet chip row, not a paragraph of blue text. */
+  .slhint { display: flex; align-items: center; gap: 8px; width: 100%;
+    border: none; background: var(--chip); color: var(--muted); font: inherit;
+    font-size: 11.5px; font-weight: 550; text-align: left; cursor: pointer;
+    padding: 7px 10px; border-radius: 10px; margin-top: 6px; }
+  .slhint:hover { filter: brightness(.96); }
+  @media (prefers-color-scheme: dark) { .slhint:hover { filter: brightness(1.25); } }
+  .slhint .sh-txt { flex: 1; min-width: 0; }
+  .slhint .sh-act { color: var(--accent); font-weight: 650; flex: none; }
   .slhint[hidden] { display: none; }
 
   /* one-line mode summary on mixed-mode cards */
@@ -677,12 +687,15 @@
           <option value="fastest">Bike: fastest</option>
         </select>
       </div>
+    </div>
+    <div class="optgrp">
+      <label class="optlbl slbl" for="driveRange">
+        <span>Longest drive</span><b id="driveVal">15 km</b></label>
       <div class="optrow sliderrow">
-        <label class="slbl" for="driveRange">
-          <span>Longest drive</span><b id="driveVal">15 km</b></label>
         <input type="range" class="slider" id="driveRange" min="5" max="60" step="5"
           value="15" aria-label="Longest drive (to the station, or at the end)">
-        <div class="slhint" id="driveHint" hidden role="button" tabindex="0"></div>
+        <button type="button" class="slhint" id="driveHint" hidden>
+          <span class="sh-txt"></span><span class="sh-act">Show</span></button>
       </div>
     </div>
   </div>
@@ -1971,9 +1984,9 @@ function driveHint(pool, raw){
   if (!hidden.length){ hint.hidden = true; delete hint.dataset.km; return; }
   const km = Math.ceil(Math.min(...hidden.map(carDistance)) / 1000);
   const mins = Math.round(Math.min(...hidden.map(it => it.duration)) / 60);
-  hint.textContent = `${hidden.length} faster option${hidden.length > 1 ? "s" : ""}`
-    + ` need${hidden.length > 1 ? "" : "s"} a longer drive`
-    + ` — ${mins} min at ${km} km. Tap to allow it.`;
+  hint.querySelector(".sh-txt").textContent = hidden.length > 1
+    ? `Hiding ${hidden.length} faster options, best ${mins} min at ${km} km`
+    : `Hiding a ${mins} min option, ${km} km drive`;
   hint.dataset.km = km;
   hint.hidden = false;
 }
@@ -2359,10 +2372,7 @@ document.getElementById("go").onclick = plan;
     localStorage.setItem("driveKm", rng.value);
     paint(); rerender();
   };
-  hint.addEventListener("click", takeHint);
-  hint.addEventListener("keydown", e => {
-    if (e.key === "Enter" || e.key === " "){ e.preventDefault(); takeHint(); }
-  });
+  hint.addEventListener("click", takeHint);   // a real <button>: Enter/Space free
 })();
 document.getElementById("daySel").addEventListener("change", plan);
 document.getElementById("timeSel").addEventListener("change", plan);
