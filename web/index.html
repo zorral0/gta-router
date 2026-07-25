@@ -1113,16 +1113,29 @@ function initialMapStyle(){
     return recolorStyle(libertyBase, PALETTES[look]);
   return HOSTED[themeMode()];
 }
+// which shield artwork is installed right now (declared up here because
+// applyLook can run during module init, before the shield block below)
+let shieldFor = null;
 async function applyLook(){
   const look = mapLook[themeMode()];
+  // Shields FIRST. Images added with addImage survive setStyle's diff, so
+  // the previous look's shields stayed painted on the new map until the
+  // swap finished - Sam: "the old highway logo shows up briefly when
+  // switching the map theme". Decoding them before the style changes (and
+  // installing them into the outgoing style, which is about to be replaced
+  // anyway) means the new map's first painted frame already has the right
+  // artwork. Cached after the first time, so a repeat switch is instant.
+  shieldFor = null;
+  await prepareShields(shieldKey());
+  ensureShields();          // latched; installs into the outgoing style
   if (look === "classic") map.setStyle(HOSTED[themeMode()]);
   else {
     try { map.setStyle(recolorStyle(await fetchLibertyBase(), PALETTES[look])); }
     catch (e){ map.setStyle(HOSTED[themeMode()]); }
   }
-  // style.load only fires on the FIRST style load in MapLibre 4.x, so re-apply
-  // the crown shields on the next idle after every look/theme swap.
-  map.once("idle", reapplyShields);
+  // "styledata" (not "idle") re-points the layers: it fires as soon as the
+  // new layers exist, before the default sprite boxes can show through.
+  ensureShields();
 }
 const map = new maplibregl.Map({
   container: "map", style: initialMapStyle(),
@@ -1155,11 +1168,21 @@ function shieldRecolor(s, accent, body){
   if (body) s = s.split("fill:#ffffff").join("fill:" + body).split('fill="#ffffff"').join('fill="' + body + '"');
   return s;
 }
-async function applyShields(dark){
+const SHIELD_VARIANT = {
+  dark:  { accent: "#d3a441", body: "#2b2f36", num: "#f4f4f8", op: 0.5 },
+  light: { accent: "#1a1a1a", body: "#ffffff", num: "#1a1a1a", op: 0.72 }
+};
+/* decoded <img>s per theme, built once and kept. They must exist BEFORE a
+   style swap (see applyLook) and the install has to be one synchronous
+   pass - awaiting decode() inside the install loop used to leave the map
+   with half its shields missing for a frame. */
+const shieldCache = {};
+async function prepareShields(key){
+  if (shieldCache[key]) return shieldCache[key];
   let base;
-  try { base = await shieldBase(); } catch (e){ return; }  // asset missing: keep default boxes
-  const v = dark ? { accent: "#d3a441", body: "#2b2f36", num: "#f4f4f8", op: 0.5 }
-                 : { accent: "#1a1a1a", body: "#ffffff", num: "#1a1a1a", op: 0.72 };
+  try { base = await shieldBase(); } catch (e){ return null; }  // asset missing: keep default boxes
+  const v = SHIELD_VARIANT[key];
+  const imgs = [];
   for (const num of SHIELD_REFS){
     const svg = shieldRecolor(base, v.accent, v.body).replace("</svg>",
       '<text x="113.7" y="250" text-anchor="middle" font-family="Arial,Helvetica,sans-serif"'
@@ -1168,10 +1191,18 @@ async function applyShields(dark){
     img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
     try { await (img.decode ? img.decode() : new Promise((res, rej) => { img.onload = res; img.onerror = rej; })); }
     catch (e){ continue; }
-    const id = "onsh_" + num;
+    imgs.push(["onsh_" + num, img]);
+  }
+  return imgs.length ? (shieldCache[key] = imgs) : null;
+}
+function installShields(key){
+  const imgs = shieldCache[key];
+  if (!imgs) return false;
+  for (const [id, img] of imgs){
     if (map.hasImage(id)) map.removeImage(id);
     map.addImage(id, img, { pixelRatio: 2 });
   }
+  const v = SHIELD_VARIANT[key];
   const iconExpr = ["coalesce", ["image", ["concat", "onsh_", ["get", "ref"]]],
                     ["image", ["concat", "road_", ["get", "ref_length"]]]];
   for (const id of SHIELD_LAYERS){
@@ -1182,13 +1213,42 @@ async function applyShields(dark){
     map.setPaintProperty(id, "icon-opacity", v.op);
     map.setPaintProperty(id, "text-opacity", 0);
   }
+  return true;
 }
-function reapplyShields(){
+// function declarations, not const arrows: applyLook calls these during
+// module init, above this block
+function shieldKey(){
   const look = mapLook[themeMode()];
   const dark = look === "classic" ? darkMql.matches : (PALETTES[look] || {}).dark;
-  applyShields(!!dark);
+  return dark ? "dark" : "light";
 }
-map.on("style.load", reapplyShields);  // first style load
+/* a full style reload (as opposed to a diff) drops both the added images
+   and our layer overrides - check for both rather than trusting a flag */
+function shieldsLive(key){
+  return shieldFor === key
+    && map.hasImage("onsh_" + SHIELD_REFS[0])
+    && SHIELD_LAYERS.some(id => map.getLayer(id)
+         && map.getLayoutProperty(id, "icon-size") === 0.54);
+}
+// addImage and setLayoutProperty each fire "styledata" SYNCHRONOUSLY, so
+// without this latch the listener below re-enters installShields from
+// inside itself and blows the stack on the first shield it installs
+let shieldBusy = false;
+function ensureShields(){
+  if (shieldBusy) return;
+  const key = shieldKey();
+  if (shieldsLive(key)) return;
+  if (!shieldCache[key]){
+    prepareShields(key).then(ok => { if (ok) ensureShields(); });
+    return;
+  }
+  shieldBusy = true;
+  try { if (installShields(key)) shieldFor = key; }
+  finally { shieldBusy = false; }
+}
+// styledata fires as soon as the new style's layers exist - far earlier than
+// idle, where the plain sprite boxes used to show through first
+map.on("styledata", ensureShields);
 
 /* standalone map-look button, top-right like Apple Maps' map-type control
    (Sam 2026-07-20: wanted its own button, not buried in Options). Opens a
