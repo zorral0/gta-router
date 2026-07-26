@@ -8,7 +8,9 @@ the client decodes a car leg's geometry and measures how much of it lands in
 one, so "did this drive use the toll road" is a lookup, not a geometry
 library.
 
-Run after any fresh OSM download (setup.sh territory):
+setup.sh now runs this automatically after it crops and patches the OSM
+extract (see its "Rebuilding the toll-road grid" step), so a fresh download
+can't leave a stale grid behind. To do it by hand:
     osmium tags-filter gta.osm.pbf w/toll=yes -o toll.osm.pbf --overwrite
     osmium export toll.osm.pbf -f geojson -o toll.geojson --overwrite
     python3 make_toll_cells.py toll.geojson web/toll-roads.json
@@ -42,11 +44,17 @@ def main(src, dst):
         if g.get("type") != "LineString":
             continue
         # keep drivable ways only: toll=yes also lands on gantries, barriers
-        # and the odd footway crossing the highway
+        # and the odd footway crossing the highway.
+        # highway=service is EXCLUDED on purpose: in this extract the only
+        # tolled service ways are the aisles of one paid parking garage at
+        # Yonge/Sheppard (18 of them, tagged toll=yes for the parking fee).
+        # They are not a toll road, and once the app started putting a DOLLAR
+        # figure on toll metres, counting a garage as Highway 407 would have
+        # invented money. Real toll roads here are motorways and their ramps.
         hw = (f.get("properties") or {}).get("highway")
         if hw not in ("motorway", "motorway_link", "trunk", "trunk_link",
                       "primary", "primary_link", "secondary", "tertiary",
-                      "unclassified", "residential", "service"):
+                      "unclassified", "residential"):
             continue
         ways += 1
         pts = g["coordinates"]
