@@ -73,6 +73,33 @@ osmium extract --bbox -80.30,43.20,-78.40,44.35 ontario-latest.osm.pbf -o gta.os
 osmium apply-changes gta.osm.pbf parking-patch.osc -o gta-parkfix.osm.pbf --overwrite
 mv gta-parkfix.osm.pbf gta.osm.pbf
 
+echo ""
+echo "=== Rebuilding the toll-road grid (web/toll-roads.json) ==="
+# The router engine has NO toll support, so the app measures for itself how
+# much of a drive runs on Highway 407 and prices it - from this grid, built
+# out of the OSM data we just downloaded. Stale grid = wrong toll marks and
+# wrong toll dollars, so it is rebuilt here, from the SAME gta.osm.pbf the
+# graph will be built from. See make_toll_cells.py and HANDOFF.md.
+# Deliberately non-fatal: a missing grid only costs the toll marks (the app
+# checks and carries on), which is not worth failing a 2 GB setup over.
+toll_grid () {
+  local tmp
+  tmp="$(mktemp -d)" || return 1
+  osmium tags-filter gta.osm.pbf w/toll=yes -o "$tmp/toll.osm.pbf" --overwrite \
+    && osmium export "$tmp/toll.osm.pbf" -f geojson -o "$tmp/toll.geojson" --overwrite \
+    && python3 make_toll_cells.py "$tmp/toll.geojson" web/toll-roads.json
+  local rc=$?
+  rm -rf "$tmp"
+  return $rc
+}
+if toll_grid; then
+  echo "OK: web/toll-roads.json rebuilt from this OSM extract"
+else
+  echo "WARNING: could not rebuild web/toll-roads.json. Everything still"
+  echo "works, but the app will not mark or price Highway 407 tolls until"
+  echo "this succeeds. Re-run:  bash setup.sh  (or see make_toll_cells.py)"
+fi
+
 # Basic sanity checks on the downloads
 echo ""
 echo "=== Verifying downloads ==="

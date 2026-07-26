@@ -225,12 +225,14 @@
   .livechip::before { content: "●"; font-size: 7px; vertical-align: 1px;
     margin-right: 3px; animation: livepulse 1.6s ease-in-out infinite; }
   @keyframes livepulse { 50% { opacity: .35; } }
-  /* a drive on the 407: the price on the card does NOT include it, so the
-     marker has to be loud enough to notice (same amber as alerts) */
+  /* a drive on the 407, with what it costs. Amber like the alert chip so it
+     reads as "watch out, there is money here that isn't a fare".
+     nowrap: the chip carries a dollar figure now, and letting it break
+     between "toll" and the amount left the price stranded on its own line. */
   .tollchip { color: #ff9f0a; font-size: 9.5px; font-weight: 700;
     letter-spacing: .06em; text-transform: uppercase; margin-left: 5px;
     background: color-mix(in srgb, #ff9f0a 16%, transparent);
-    padding: 1px 5px; border-radius: 5px; }
+    padding: 1px 5px; border-radius: 5px; white-space: nowrap; }
   .card.sel .tollchip { color: #fff; background: rgba(255,255,255,.24); }
   .late { color: #ff9f0a; font-weight: 600; }
   .early { color: var(--accent); font-weight: 600; }
@@ -283,6 +285,34 @@
     background: var(--chip); color: var(--muted); }
   .have.on { background: var(--accent); color: #fff; }
   .have:active { transform: scale(.96); }
+  /* The drawer's front door. This was a small grey "Options" chip parked
+     between two icon buttons: easy to miss, and the word alone never said
+     what was inside (Sam 2026-07-26: "should be more prominent and clear
+     as to what purpose it serves"). Now it's a full-width row that names
+     its own contents, and its second line does double duty - it lists
+     what's inside while everything is default, and switches to what you
+     have CHANGED as soon as anything is off-default, so a filter can
+     never sit there hidden and quietly drop trips. */
+  .optsrow { display: flex; align-items: center; gap: 11px; width: 100%;
+    border: none; cursor: pointer; font: inherit; text-align: left;
+    color: var(--text); background: var(--card); border-radius: 13px;
+    padding: 10px 12px; margin-bottom: 12px; box-shadow: var(--card-shadow); }
+  .optsrow:hover { filter: brightness(.98); }
+  @media (prefers-color-scheme: dark) { .optsrow:hover { filter: brightness(1.35); } }
+  .optsrow:active { transform: scale(.995); }
+  .optsrow .oi { color: var(--accent); font-size: 17px; flex: none; display: flex; }
+  .optsrow .otx { min-width: 0; flex: 1; }
+  .optsrow .ott { display: block; font-size: 13.5px; font-weight: 620;
+    letter-spacing: -.01em; }
+  .optsrow .osub { display: block; font-size: 11.5px; color: var(--muted);
+    margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* off-default reads as a live setting, not as helper text */
+  .optsrow.set .osub { color: var(--accent); font-weight: 600; }
+  /* inline-flex, not inline: a bare inline span ignores transform, so the
+     chevron silently never rotated */
+  .optsrow .ochev { color: var(--muted); flex: none; font-size: 13px;
+    display: inline-flex; transition: transform .2s ease; }
+  .optsrow.on .ochev { transform: rotate(180deg); }
   /* collapsed "Options" drawer - the extra controls live behind one chip */
   #optWrap { display: none; }
   #optWrap.open { display: block; margin-bottom: 2px; }
@@ -430,16 +460,19 @@
     { border-bottom-color: var(--card-solid) !important; }
 
   /* map-look button - standalone, top-right, Apple-style (Sam 2026-07-20) */
-  #lookBtn { position: absolute; top: 14px; right: 14px; z-index: 6;
+  #lookBtn { position: absolute; top: 62px; right: 14px; z-index: 6;
     width: 40px; height: 40px; border: none; border-radius: 12px;
     background: var(--card-solid); color: var(--text); cursor: pointer;
     box-shadow: var(--shadow); display: flex; align-items: center;
     justify-content: center; }
   #lookBtn:hover { background: var(--chip); }
   #lookBtn:active { transform: scale(.94); }
-  /* 3D tilt toggle - middle of the right-hand column: layers / 3D / Reach
-     (Sam 2026-07-20 wanted the three top-right controls stacked vertically) */
-  #d3Btn { position: absolute; top: 62px; right: 14px; z-index: 6;
+  /* 3D tilt toggle - bottom of the right-hand column: Reach / layers / 3D
+     (Sam 2026-07-20 wanted the three top-right controls stacked vertically;
+     2026-07-25 he wanted Reach first, so all three are now equal-sized
+     icons and the reach panel opens to the LEFT instead of sitting in the
+     column - a card in the column would cover whatever came after it) */
+  #d3Btn { position: absolute; top: 110px; right: 14px; z-index: 6;
     width: 40px; height: 40px; border: none; border-radius: 12px;
     background: var(--card-solid); color: var(--text); cursor: pointer;
     box-shadow: var(--shadow); font: 600 14px/1 -apple-system, sans-serif;
@@ -449,7 +482,7 @@
   #d3Btn:active { transform: scale(.94); }
   #d3Btn.on { background: var(--accent); color: #fff; }
   /* opens to the LEFT of the layers button so it clears the column below */
-  #lookPop { position: absolute; top: 14px; right: 62px; z-index: 7;
+  #lookPop { position: absolute; top: 62px; right: 62px; z-index: 7;
     background: var(--card-solid); border-radius: 12px; box-shadow: var(--shadow);
     padding: 6px; display: none; min-width: 172px; }
   #lookPop.open { display: block; }
@@ -584,7 +617,9 @@
   .fnote { color: var(--muted); font-size: 11px; margin-top: 7px; }
 
   /* ---- Reach mode ---- */
-  #reachCard { position: absolute; top: 110px; right: 14px; z-index: 5;
+  /* the panel hangs to the LEFT of the reach icon (same trick as #lookPop)
+     so the layers/3D icons below it stay clickable */
+  #reachCard { position: absolute; top: 14px; right: 62px; z-index: 7;
     width: 216px; background: var(--panel);
     backdrop-filter: blur(24px) saturate(180%);
     -webkit-backdrop-filter: blur(24px) saturate(180%);
@@ -624,14 +659,16 @@
     cursor: pointer; border-radius: 999px; padding: 0; font-size: 13px;
     display: inline-flex; align-items: center; justify-content: center; }
   #reachClose:hover { background: var(--chip); color: var(--text); }
-  #reachLauncher { position: absolute; top: 110px; right: 14px; z-index: 5;
-    width: 40px; height: 40px; border-radius: 999px; border: none;
-    background: var(--panel); backdrop-filter: blur(24px) saturate(180%);
-    -webkit-backdrop-filter: blur(24px) saturate(180%);
-    box-shadow: var(--shadow); color: var(--text); cursor: pointer;
-    display: none; align-items: center; justify-content: center; font-size: 20px; }
-  #reachLauncher.show { display: inline-flex; }
+  /* top of the right-hand column, and shaped like its two neighbours so the
+     three read as one stack rather than a pill sitting on two squares */
+  #reachLauncher { position: absolute; top: 14px; right: 14px; z-index: 6;
+    width: 40px; height: 40px; border-radius: 12px; border: none;
+    background: var(--card-solid); box-shadow: var(--shadow);
+    color: var(--text); cursor: pointer;
+    display: flex; align-items: center; justify-content: center; }
+  #reachLauncher:hover { background: var(--chip); }
   #reachLauncher:active { transform: scale(.94); }
+  #reachLauncher.on { background: var(--accent); color: #fff; }
   #toast { position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 12px);
     background: var(--card-solid); color: var(--text); font-size: 13px; font-weight: 600;
     padding: 9px 15px; border-radius: 999px; box-shadow: 0 6px 22px rgba(0,0,0,.22);
@@ -648,14 +685,14 @@
   <div class="search">
     <div class="srow"><span class="pt pick" id="dotFrom" data-field="from"
       style="background:#34c759;color:#34c759"
-      title="Set the start — click this, then click the map"
+      title="Set the start: click this, then click the map"
       aria-label="Set the start point, then click the map" role="button" tabindex="0"></span>
-      <input id="fromBox" type="text" placeholder="Start — click the map or type a place"></div>
+      <input id="fromBox" type="text" placeholder="Start: click the map or type a place"></div>
     <div class="srow"><span class="pt pick" id="dotTo" data-field="to"
       style="background:#ff453a;color:#ff453a"
-      title="Set the destination — click this, then click the map"
+      title="Set the destination: click this, then click the map"
       aria-label="Set the destination, then click the map" role="button" tabindex="0"></span>
-      <input id="toBox" type="text" placeholder="End — e.g. '155 College St' or 'Union Station'"></div>
+      <input id="toBox" type="text" placeholder="End: e.g. '155 College St' or 'Union Station'"></div>
   </div>
   <div class="ctrls">
     <div class="seg" id="whenSeg" title="Plan by when you leave, or when you need to be there">
@@ -667,8 +704,6 @@
     <select id="timeSel" title="Time"></select>
   </div>
   <div class="ctrls">
-    <button class="have" id="optsBtn" aria-expanded="false"
-      title="Bike, car and Bike Share toggles, fare type, drive limit">Options</button>
     <button class="ibtn" id="swap" title="Swap start and end"
       aria-label="Swap start and end"></button>
     <span class="morewrap">
@@ -692,6 +727,8 @@
     <button class="ibtn" id="clear" hidden aria-hidden="true" title="Clear"></button>
     <button id="go">Plan trip</button>
   </div>
+  <button class="optsrow" id="optsBtn" aria-expanded="false"
+    aria-controls="optWrap"></button>
   <div id="optWrap">
     <div class="optgrp">
       <div class="optlbl">What you've got</div>
@@ -744,7 +781,7 @@
   </div>
   <div id="results">
     <div class="hint">Pick a start and an end to compare every mix of
-      transit, driving, your bike and Bike Share &mdash; with real fares.</div>
+      transit, driving, your bike and Bike Share, with real fares.</div>
   </div>
   <div id="detail"></div>
 </div></div>
@@ -753,7 +790,7 @@
 "use strict";
 /* if the vendored map library is missing, say so instead of a blank page */
 if (typeof maplibregl === "undefined"){
-  document.body.innerHTML = '<div style="display:flex;height:100%;align-items:center;justify-content:center;font:15px/1.5 -apple-system,sans-serif;color:#6e6e73;text-align:center;padding:30px">The map library didn&#39;t load &mdash; the web/vendor/ files are missing or unreadable.<br>Restore them, then reload this page.</div>';
+  document.body.innerHTML = '<div style="display:flex;height:100%;align-items:center;justify-content:center;font:15px/1.5 -apple-system,sans-serif;color:#6e6e73;text-align:center;padding:30px">The map library didn&#39;t load. The web/vendor/ files are missing or unreadable.<br>Restore them, then reload this page.</div>';
   throw new Error("maplibre-gl missing");
 }
 const OTP = "http://localhost:8080/otp/gtfs/v1";
@@ -766,7 +803,7 @@ function loadStored(key, fallback){
   catch (e){ return fallback; }
 }
 
-/* ---- inline icons (Lucide, ISC license — lucide.dev) ---- */
+/* ---- inline icons (Lucide, ISC license, lucide.dev) ---- */
 const ICONS = {
   walk: '<circle cx="12" cy="5" r="1"/><path d="m9 20 3-6 3 6"/><path d="m6 8 6 2 6-2"/><path d="M12 10v4"/>',
   bike: '<circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/>',
@@ -783,6 +820,8 @@ const ICONS = {
   chev: '<path d="m6 9 6 6 6-6"/>',
   more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
   arrow: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+  // Lucide sliders-horizontal - the drawer's front door
+  sliders: '<line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/>',
   link: '<path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" x2="16" y1="12" y2="12"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
   warn: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
@@ -872,7 +911,7 @@ function trainDiagram(p, stationName){
   const ord = ["", "1st", "2nd", "3rd"][p.car] || p.car + "th";
   return `<div class="btrain">${cars}<span class="bdir">${icn("arrow", 11)}</span></div>
     <div class="bnote">Get on the <b>${ord} car from the front</b> (of ${p.of})
-      &mdash; at ${esc(stationName)} it lines up with ${esc(p.why)}.</div>`;
+      so at ${esc(stationName)} it lines up with ${esc(p.why)}.</div>`;
 }
 
 function stopIdOf(place){
@@ -914,11 +953,11 @@ function itineraryCostDetail(it){
       f = GO_BASE + GO_PER_KM * goKm;
       label = "GO Transit (estimated)";
     }
-    if (rider === "youth"){ f *= GO_YOUTH_FACTOR; label += " — youth 40% off"; }
+    if (rider === "youth"){ f *= GO_YOUTH_FACTOR; label += ", youth 40% off"; }
     items.push({ label, amount: f });
   }
   if (tlegs.some(l => agencyOf(l).includes("UP")))
-    items.push({ label: "UP Express" + (rider === "youth" ? " — youth" : ""),
+    items.push({ label: "UP Express" + (rider === "youth" ? ", youth" : ""),
                  amount: rider === "youth" ? UP_YOUTH : UP_FARE });
   const ridden = [];
   for (const l of tlegs){
@@ -931,8 +970,8 @@ function itineraryCostDetail(it){
   ridden.forEach((r, i) => {
     const free = ONE_FARE && (usedGo || i > 0);
     items.push({ label: prettyAgency(r.a)
-      + (free ? " — free (One Fare transfer)"
-              : (r.ver ? "" : " — fare unverified")), amount: free ? 0 : r.fare });
+      + (free ? ", free (One Fare transfer)"
+              : (r.ver ? "" : ", fare unverified")), amount: free ? 0 : r.fare });
   });
   legs.forEach((l,i) => {
     if (l.mode === "BICYCLE" && l.rentedBike){
@@ -946,6 +985,15 @@ function itineraryCostDetail(it){
       const km = (l.distance||0)/1000;
       items.push({ label: `Driving (${km.toFixed(1)} km, gas + wear)`,
                    amount: km * (GAS_PER_KM + WEAR_PER_KM) });
+      // Highway 407 is billed by the kilometre and the engine knows nothing
+      // about it, so the app measures the tolled metres off the route
+      // geometry and prices them itself - see the toll blocks below.
+      // (Not in costs.py: that one prices from distances alone and has no
+      // route geometry to measure, so it cannot compute this.)
+      const toll = legTollCost(l);
+      if (toll > 0)
+        items.push({ label: `Highway 407 toll (estimated, `
+          + `${(legTollM(l)/1000).toFixed(1)} km)`, amount: toll });
       if (later){ if (GO_PARKING > 0) items.push({ label: "Station parking", amount: GO_PARKING }); }
       // car AFTER transit = a pickup or your car already waiting - no
       // parking fee; only a start-of-trip drive to the destination pays it.
@@ -1266,7 +1314,13 @@ map.on("styledata", ensureShields);
       `<button data-look="${k}" class="${k === mapLook[mode] ? "on" : ""}">${
         LOOK_NAME[k]}${k === "classic" ? " (the old map)" : ""}</button>`).join("");
   }
-  btn.onclick = e => { e.stopPropagation(); renderPop(); pop.classList.toggle("open"); };
+  window.__closeLookPop = () => pop.classList.remove("open");
+  btn.onclick = e => {
+    e.stopPropagation(); renderPop();
+    // the reach panel hangs at the same spot, so only one can be open
+    window.__closeReachCard && window.__closeReachCard();
+    pop.classList.toggle("open");
+  };
   pop.onclick = e => {
     const b = e.target.closest("[data-look]"); if (!b) return;
     mapLook[themeMode()] = b.dataset.look; saveLook(); applyLook();
@@ -1709,13 +1763,13 @@ function attachSuggest(which){
         const js = await r.json();
         items = normalizeSuggestions(js.features || []);
         // silence was the old behavior - say WHY nothing showed up
-        note = items.length ? null : "No matches near Toronto — try a street address.";
+        note = items.length ? null : "No matches near Toronto. Try a street address.";
         hi = items.length ? 0 : -1;
         render();
       } catch (e){
         if (e.name === "AbortError") return;  // superseded by a newer keystroke
         items = []; hi = -1;
-        note = "Search is offline — check your internet, then try again.";
+        note = "Search is offline. Check your internet, then try again.";
         render();
       }
     }, 350);
@@ -1787,7 +1841,41 @@ const COMBOS = [
   { key: "Bike + drive at the end",
     access: ["BICYCLE_PARKING"], egress: ["WALK", "CAR_PICKUP"],
     need: ["bike", "carEnd"], drive: true, needsLeg: "BICYCLE", carAfter: true },
+  // PURE MODES - no transit at all (Sam 2026-07-25: "what if biking the
+  // entire way is just faster"). Until now fetchCombo dropped every
+  // itinerary without a transit leg, so a straight ride could never surface
+  // however fast it was. `directOnly` is what stops the engine padding the
+  // answer with the walk+transit trips it otherwise prefers - ask for
+  // direct:[BICYCLE] alone and you get transit itineraries back instead.
+  //
+  // maxMin keeps these honest rather than noisy. A pure ride is free, and
+  // renderResults deliberately never hides the cheapest option, so an
+  // uncapped 3-hour walk would pin itself to the top of every long trip.
+  // Past these limits nobody is choosing to walk or ride anyway. Raise them
+  // if Sam says otherwise; they are the only tuning here.
+  { key: "Bike the whole way", pure: "BICYCLE", need: ["bike"], maxMin: 60 },
+  { key: "Walk the whole way", pure: "WALK",    need: [],       maxMin: 45 },
 ];
+
+/* How reluctant to drive, once per query, for every combo with drive:true.
+   Reluctance is the ONLY knob that changes which lot the engine picks (OTP
+   2.9 has no "max drive distance" and no way to name a station: the request
+   preferences are car.reluctance, car.boardCost and parking filters, nothing
+   else - introspected 2026-07-25), and each value returns the ONE lot that
+   is optimal at it. That is why a pair of values bracketed the middle out.
+   MEASURED against the live engine (a suburban origin 2 km from its GO station ->
+   U of T, both time modes), distinct lots returned per value:
+     30 and up  2.3 / 2.4 km  (the walk-to-your-own-station tier)
+     4 to 12    2.5 km only
+     2 to 3     2.5 km + 24.8 km
+     1 to 1.5   2.5 + 24.8 + 33.5 + 38.6 km   <- the only wide answer
+   So 1.0 is what actually surfaces a middle-distance station (Fairview at
+   24.6 km was Sam's report on 2026-07-25); 30 is kept because at 1.0 the
+   very-near lots drop out, and 2.0 because the near/middle split is
+   origin-dependent and one more query is cheap (they all run in parallel).
+   Sub-1.0 values were not added: they only buy longer drives, and the drive
+   cap plus driveHint already handle those. */
+const DRIVE_RELUCTANCE = [30.0, 2.0, 1.0];
 
 /* which mode mixes the user has switched on (persisted; loadStored so a
    corrupt value can't brick the whole script) */
@@ -1904,13 +1992,17 @@ async function fetchCombo(combo, date, time, carReluctance, signal){
         ? { latestArrival: new Date(date + "T" + time).toISOString() }
         : { earliestDeparture: new Date(date + "T" + time).toISOString() },
       first: 8,
-      modes: { transit: { access: combo.access, egress: combo.egress } },
+      modes: combo.pure
+        ? { directOnly: true, direct: [combo.pure] }
+        : { transit: { access: combo.access, egress: combo.egress } },
       prefs: (() => {
         // per-request bike optimization only matters when this mode mix
-        // actually rides a bike (own bike to a station, or Bike Share)
-        const usesBike = combo.access.includes("BICYCLE_PARKING")
-          || combo.access.includes("BICYCLE_RENTAL")
-          || combo.egress.includes("BICYCLE_RENTAL");
+        // actually rides a bike (own bike to a station, Bike Share, or the
+        // whole way)
+        const usesBike = combo.pure === "BICYCLE"
+          || (combo.access || []).includes("BICYCLE_PARKING")
+          || (combo.access || []).includes("BICYCLE_RENTAL")
+          || (combo.egress || []).includes("BICYCLE_RENTAL");
         const bikeOpt = usesBike && BIKE_OPT[bikePref]
           ? { bicycle: { optimization: { type: BIKE_OPT[bikePref] } } } : {};
         const street = Object.assign({},
@@ -1923,6 +2015,13 @@ async function fetchCombo(combo, date, time, carReluctance, signal){
   if (js.errors) throw new Error(js.errors.map(e => e.message).join("; "));
   let its = (((js.data || {}).planConnection || {}).edges || [])
     .map(e => normalizeItin(e.node));
+  // a pure ride is a single mode end to end and has no departure choices to
+  // spread, so keep just the best one - and only if it's inside the effort
+  // cap. Everything below this point is transit-combo bookkeeping.
+  if (combo.pure)
+    return its.filter(it => it.legs.length
+      && it.legs.every(l => l.mode === combo.pure)
+      && it.duration <= combo.maxMin * 60).slice(0, 1);
   // results must actually contain transit and the advertised access leg -
   // OTP pads with plain walk+transit trips that belong to Transit only
   its = its.filter(it => it.legs.some(l => TRANSIT.has(l.mode)));
@@ -1935,7 +2034,10 @@ async function fetchCombo(combo, date, time, carReluctance, signal){
     its = its.filter(it => endLegOnly(it, l => l.mode === "BICYCLE" && l.rentedBike));
   if (combo.rentStart)
     its = its.filter(it => startLegOnly(it, l => l.mode === "BICYCLE" && l.rentedBike));
-  return dedupeAlts(its).slice(0, 4);
+  // drive queries keep more: at reluctance 1.0 the engine returns six real
+  // park-and-ride answers spread from 2 km to 39 km, and a keep of 4 cut
+  // exactly the middle ones this combo was already bad at finding
+  return dedupeAlts(its).slice(0, combo.drive ? 8 : 4);
 }
 
 /* GTFS colors come straight from the feeds - only trust clean 6-digit hex,
@@ -1988,7 +2090,7 @@ let itinsById = {}, selId = null, lastParts = null, fcCache = {};
 /* one plain-words line for whatever went wrong, instead of raw fetch noise */
 function friendlyErr(e){
   if (e && (e.name === "AbortError" || e.name === "TimeoutError"))
-    return "The trip engine took too long to answer — try again in a moment.";
+    return "The trip engine took too long to answer. Try again in a moment.";
   if (e instanceof TypeError)
     return "Can't reach the trip engine. Is the app running? (bash run.sh)";
   return e.message || String(e);
@@ -2018,18 +2120,12 @@ async function plan(){
   const parts = await Promise.all(active.map(async c => {
     try {
       if (!c.drive) return { c, its: await fetchCombo(c, date, time, null, ctrl.signal) };
-      // Drive-to-station twice: biased to short drives (nearby station,
-      // survives a tight "Drive <= N km" filter) and to long ones (drive
-      // to the best station outright). Merged, the drive filter always
-      // has both kinds to choose from without re-querying.
-      // (30 = "hate driving": mild values still let fast 40 km drives
-      // crowd short ones out of the result set entirely)
-      const [near, far] = await Promise.all([
-        fetchCombo(c, date, time, 30.0, ctrl.signal),
-        fetchCombo(c, date, time, 2.0, ctrl.signal)]);
-      const merged = dedupeAlts(near.concat(far));
-      merged.sort((a, b) => a.duration - b.duration);
-      return { c, its: merged.slice(0, 6) };
+      // Drive queries run once per DRIVE_RELUCTANCE and are merged, so the
+      // drive slider always has near, middle and far lots to choose from
+      // without re-querying.
+      const tries = await Promise.all(DRIVE_RELUCTANCE.map(r =>
+        fetchCombo(c, date, time, r, ctrl.signal)));
+      return { c, its: spreadByDrive(dedupeAlts([].concat(...tries))) };
     }
     catch (e){ return { c, err: friendlyErr(e) }; }
     finally { tick(); }
@@ -2060,7 +2156,11 @@ function cardHTML(it, cid, fastestIt, cheapestIt, latestIt){
         it.legs.some(l => (l.alerts || []).length)
           ? '<span class="alertchip" title="Service alert on this trip">&#9888;</span>' : ""}${
         isTolled(it) ? `<span class="tollchip" title="${
-          (tollM(it)/1000).toFixed(1)} km of this drive is on Highway 407. The toll is NOT included in the price shown.">toll</span>` : ""}</span>
+          (tollM(it)/1000).toFixed(1)} km of this drive is on Highway 407${
+          tollCost(it) > 0
+            ? `, about $${tollCost(it).toFixed(2)} in tolls at the 2026 rates for the time you set. That is an estimate, and it IS included in the price shown.`
+            : `. The toll is NOT included in the price shown.`}">toll${
+          tollCost(it) > 0 ? " $" + tollCost(it).toFixed(2) : ""}</span>` : ""}</span>
       <span class="cost">$${cost.toFixed(2)}</span></div>
     ${badges ? `<div class="badges">${badges}</div>` : ""}
     ${legRow(it)}</div>`;
@@ -2069,6 +2169,28 @@ function cardHTML(it, cid, fastestIt, cheapestIt, latestIt){
 function carDistance(it){
   return it.legs.filter(l => l.mode === "CAR")
                 .reduce((s,l) => s + (l.distance||0), 0);
+}
+
+/* Merge the drive queries keeping the pool WIDE IN DRIVE DISTANCE, not just
+   fast. This used to be sort-by-duration + slice(0, 6), which quietly threw
+   away every short-drive option the moment six longer-drive ones were faster
+   - so the drive slider, set low, had nothing left to show. Now: the fastest
+   two in each 10 km band of driving, plus the fastest few overall, capped.
+   Everything kept is still ranked normally afterwards (and anything over the
+   cap stays hidden by the slider, which driveHint reports). */
+const DRIVE_BAND_M = 10000, DRIVE_PER_BAND = 2, DRIVE_KEEP = 10;
+function spreadByDrive(its){
+  const byDur = its.slice().sort((a, b) => a.duration - b.duration);
+  const kept = new Set(byDur.slice(0, 4));          // the outright fastest
+  const bands = new Map();
+  for (const it of byDur){                          // already fastest-first
+    const b = Math.floor(carDistance(it) / DRIVE_BAND_M);
+    const n = (bands.get(b) || 0);
+    if (n >= DRIVE_PER_BAND) continue;
+    bands.set(b, n + 1);
+    kept.add(it);
+  }
+  return byDur.filter(it => kept.has(it)).slice(0, DRIVE_KEEP);
 }
 
 /* ---- toll roads ----
@@ -2098,24 +2220,127 @@ function inToll(lng, lat){
   }
   return false;
 }
-/* metres of one driving leg that run on a toll road (0 until the grid
-   loads; the fetch above re-renders once it has) */
-function legTollM(l){
-  if (!TOLL || l.mode !== "CAR" || !l.legGeometry) return 0;
-  if (l._tollM != null) return l._tollM;
+/* Everything the geometry can tell us about one driving leg's toll section:
+   how many metres of it are tolled, how those metres split across 407 ETR's
+   twelve rate zones, which way it was going and when it got on. Cached on
+   the leg (the grid has to be loaded first, so nothing is cached before
+   that - the fetch above re-renders once it arrives). */
+function legTollGeom(l){
+  if (!TOLL || l.mode !== "CAR" || !l.legGeometry) return null;
+  if (l._tollGeom !== undefined) return l._tollGeom;
   const pts = decodePolyline(l.legGeometry.points);   // [lng, lat]
-  let m = 0;
+  const byZone = {};
+  let m = 0, run = 0, enteredAt = null, kmFirst = null, kmLast = null;
   for (let i = 1; i < pts.length; i++){
     const a = pts[i-1], b = pts[i];
-    if (!inToll(a[0], a[1]) || !inToll(b[0], b[1])) continue;
     const dy = (b[1] - a[1]) * 111320,
           dx = (b[0] - a[0]) * 111320 * Math.cos(a[1] * Math.PI / 180);
-    m += Math.hypot(dx, dy);
+    const d = Math.hypot(dx, dy);
+    run += d;
+    if (!inToll(a[0], a[1]) || !inToll(b[0], b[1])) continue;
+    if (enteredAt === null) enteredAt = run - d;      // metres driven first
+    m += d;
+    const km = tollKmAlong((a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+    if (km != null){
+      if (kmFirst === null) kmFirst = km;
+      kmLast = km;
+      const z = tollZoneAt(km);
+      byZone[z] = (byZone[z] || 0) + d;
+    }
   }
-  return (l._tollM = m);
+  const g = m ? { m, byZone, legM: run, enteredAt,
+                  // 407 rates differ by direction; east = further along the
+                  // centreline, which runs QEW -> Brock Rd
+                  dir: (kmLast > kmFirst) ? "eastbound" : "westbound" } : null;
+  // The zone split needs the RATES file (that is where the centreline lives),
+  // and the two files land independently. If the grid got here first, hand
+  // back what we have but do NOT cache it - a leg measured in that window
+  // would otherwise keep an empty zone split for good and later price at
+  // nothing but the flat per-trip charge.
+  if (!TOLLRATE) return g;
+  return (l._tollGeom = g);
 }
+function legTollM(l){ const g = legTollGeom(l); return g ? g.m : 0; }
 const tollM = it => it.legs.reduce((s, l) => s + legTollM(l), 0);
 const isTolled = it => tollM(it) >= TOLL_MIN_M;
+
+/* ---- what the toll costs ----
+   OTP prices nothing about the 407, so before this the app could headline a
+   27 km run up it at the transit fare alone - and a tolled trip could take
+   the "Cheapest" badge off a genuinely cheaper one. 407 ETR bills per
+   kilometre at a rate that depends on which of its 12 zones you are in,
+   which direction you are going, and which time band you ENTERED in, plus a
+   flat charge per trip. web/toll-rates.json carries their published
+   light-vehicle chart and the zone geometry (see make_toll_rates.py); this
+   turns a leg's tolled metres into dollars.
+   It is an ESTIMATE and labelled as one wherever it is shown: the metres
+   come from the engine's idea of the route, statutory holidays (billed at
+   weekend rates) are not modelled, and it assumes a transponder - without
+   one 407 ETR adds a camera charge per trip, which the detail view says. */
+let TOLLRATE = null;
+fetch("toll-rates.json").then(r => r.ok ? r.json() : null).then(j => {
+  if (!j) return;
+  TOLLRATE = j;
+  if (lastParts) renderResults(lastParts, { noFit: true, noSweep: true });
+}).catch(() => {});   // no file, no dollar figure - the km still show
+
+/* how far along the 407 a point is, in km from the QEW end (null if the
+   rates file hasn't loaded). The centreline is ~50 points, so this is a
+   short scan, and it only ever runs on points already known to be tolled. */
+function tollKmAlong(lng, lat){
+  if (!TOLLRATE) return null;
+  const line = TOLLRATE.centreline, cum = TOLLRATE.centreline_km;
+  const K = 111320 * Math.cos(lat * Math.PI / 180);
+  const px = lng * K, py = lat * 111320;
+  let best = Infinity, bestKm = 0;
+  for (let i = 1; i < line.length; i++){
+    const ax = line[i-1][0] * K, ay = line[i-1][1] * 111320,
+          bx = line[i][0] * K, by = line[i][1] * 111320;
+    const dx = bx - ax, dy = by - ay, L2 = dx*dx + dy*dy;
+    const t = L2 ? Math.max(0, Math.min(1, ((px-ax)*dx + (py-ay)*dy) / L2)) : 0;
+    const qx = ax + t*dx, qy = ay + t*dy;
+    const d = Math.hypot(px - qx, py - qy);
+    if (d < best){
+      best = d;
+      bestKm = cum[i-1] + t * (cum[i] - cum[i-1]);
+    }
+  }
+  return bestKm;
+}
+/* which zone (1-12) a kilometre mark falls in */
+function tollZoneAt(km){
+  const zs = TOLLRATE.zones;
+  for (let i = zs.length - 1; i >= 0; i--) if (km >= zs[i].km) return zs[i].n;
+  return 1;
+}
+/* the rate band a trip entering at `when` is billed in. The last band of the
+   day wraps past midnight, so anything before the first one bills at it. */
+function tollBandAt(when){
+  const weekend = when.getDay() === 0 || when.getDay() === 6;
+  const kind = weekend ? "weekend" : "weekday";
+  const bands = TOLLRATE.bands[kind];
+  const hm = String(when.getHours()).padStart(2, "0") + ":"
+           + String(when.getMinutes()).padStart(2, "0");
+  let idx = -1;
+  for (let i = 0; i < bands.length; i++) if (hm >= bands[i]) idx = i;
+  return { kind, idx: idx < 0 ? bands.length - 1 : idx };
+}
+/* dollars for one leg's toll section: per-zone kilometres at that zone's
+   rate, plus the flat per-trip charge. 0 when there is no toll, no rates
+   file, or the leg merely clips a ramp. */
+function legTollCost(l){
+  const g = legTollGeom(l);
+  if (!g || !TOLLRATE || g.m < TOLL_MIN_M) return 0;
+  // billed on the time you got ON, not when the drive started
+  const enter = new Date(l.startTime + (g.legM
+    ? (g.enteredAt / g.legM) * (l.duration * 1000) : 0));
+  const band = tollBandAt(enter);
+  const rates = TOLLRATE.rates[g.dir][band.kind][band.idx];
+  let total = 0;
+  for (const z in g.byZone) total += (g.byZone[z] / 1000) * rates[z - 1] / 100;
+  return total + TOLLRATE.fees.trip_charge;
+}
+const tollCost = it => it.legs.reduce((s, l) => s + legTollCost(l), 0);
 /* itineraries a part actually shows, after the "max drive" cap
    (applies to both drive categories - "at the end" should stay short) */
 function visibleIts(p){
@@ -2227,9 +2452,9 @@ function renderResults(parts, opts){
   if (!pool.length){
     // a dead engine is not the user's fault - don't blame their toggles
     html += errs.length
-      ? `<div class="none">Couldn't check your routes &mdash; see the
+      ? `<div class="none">Couldn't check your routes. See the
           message above.</div>`
-      : `<div class="none">No sensible route found &mdash; try switching
+      : `<div class="none">No sensible route found. Try switching
       on more of the "Using" toggles or raising the drive limit.</div>`;
   } else {
     html += main.map(x => card(x.it)).join("");
@@ -2399,7 +2624,11 @@ function renderDetail(cid){
         + " &middot; light traffic assumed"
         + (legTollM(l) >= TOLL_MIN_M
           ? ` &middot; <span class="late">${(legTollM(l)/1000).toFixed(1)} km on
-              Highway 407, toll not in the price</span>` : "");
+              Highway 407${legTollCost(l) > 0
+                ? `, about $${legTollCost(l).toFixed(2)} in tolls (estimated,
+                   assumes a transponder - without one add
+                   $${TOLLRATE.fees.camera_charge.toFixed(2)})`
+                : ", toll not in the price"}</span>` : "");
     } else {
       sawTransit = true;
       const r = l.route || {};
@@ -2475,7 +2704,7 @@ function renderDetail(cid){
       <div class="fitem total"><span>Total</span><span>$${total.toFixed(2)}</span></div>
       <div class="fnote">PRESTO-level fares, verified July 2026. One Fare makes local
         transit free when a GO trip is part of the journey. Youth rates applied
-        for every system. Driving times assume light traffic &mdash; rush hour
+        for every system. Driving times assume light traffic, so rush hour
         will be slower.</div>
     </div>`;
 }
@@ -2513,6 +2742,7 @@ document.getElementById("go").onclick = plan;
     maxDriveM = any ? 9999000 : km * 1000;
     out.textContent = any ? "Any" : km + " km";
     rng.style.setProperty("--pct", ((km - MIN) / (ANY - MIN) * 100) + "%");
+    paintOptsRow();
   };
   paint();
   const rerender = () => {
@@ -2541,6 +2771,7 @@ document.getElementById("go").onclick = plan;
   const paint = () => {
     b.classList.toggle("on", avoidTolls);
     b.setAttribute("aria-pressed", avoidTolls ? "true" : "false");
+    paintOptsRow();
   };
   paint();
   b.onclick = () => {
@@ -2559,6 +2790,7 @@ bikeSel.value = bikePref;
 bikeSel.addEventListener("change", e => {
   bikePref = e.target.value;
   localStorage.setItem("bikePref", bikePref);
+  paintOptsRow();
   plan();   // routing changes, not just filtering - re-query
 });
 document.querySelectorAll("#whenSeg button").forEach(b => {
@@ -2705,16 +2937,70 @@ for (const id of ["haveBike", "haveCarStart", "haveCarEnd", "haveShare"]){
     localStorage.setItem("have", JSON.stringify(have));
     b.classList.toggle("on", have[k]);
     b.setAttribute("aria-pressed", have[k] ? "true" : "false");
+    paintOptsRow();
     plan();
   };
 }
 
-/* the Options chip folds the toggle/fare/drive/bike controls away
+/* The drawer's front door. Two jobs, and the second line does both:
+   while everything is default it LISTS what's inside (so the row explains
+   its own purpose instead of just saying "Options"), and the moment
+   anything is off-default it switches to naming what you changed, in
+   accent colour. That way a filter can never sit collapsed and quietly
+   drop trips - the thing you set is on screen even when the drawer is
+   shut. Hoisted on purpose: the slider/tolls/bike blocks above all paint
+   themselves at startup and call this before this line is reached. */
+function optsSummary(){
+  const bits = [];
+  if (!have.bike && !have.share) bits.push("no bike");
+  else if (!have.bike) bits.push("no bike of your own");
+  else if (!have.share) bits.push("no Bike Share");
+  if (!have.carStart && !have.carEnd) bits.push("no car");
+  else if (!have.carStart) bits.push("no driving to a station");
+  else if (!have.carEnd) bits.push("no ride at the end");
+  if (rider !== "adult") bits.push("Youth fare");
+  if (have.bike || have.share){
+    if (bikePref !== "safest") bits.push("bike: " + bikePref);
+  }
+  // tolls and the drive cap only bite on trips that drive, so listing them
+  // next to "no car" reads as a contradiction. Still SET, just not said.
+  if (have.carStart || have.carEnd){
+    if (avoidTolls) bits.push("avoiding tolls");
+    // the slider is the source of truth for its own value (maxDriveM is
+    // 9999000 at the top of the track, which would read as nonsense here)
+    const rng = document.getElementById("driveRange");
+    const km = rng ? +rng.value : 15;
+    if (rng && km >= +rng.max) bits.push("any drive");
+    else if (km !== 15) bits.push("drive up to " + km + " km");
+  }
+  return bits;
+}
+function paintOptsRow(){
+  // kept INSIDE the function on purpose: this is called during startup by
+  // the slider/tolls blocks above, and a top-level const declared down
+  // here would still be in its dead zone at that point - referencing it
+  // threw and killed the rest of the script
+  const BLURB = "Bike, car, fares and how far you'll drive";
+  const btn = document.getElementById("optsBtn");
+  if (!btn) return;
+  if (!btn.firstChild)
+    btn.innerHTML = '<span class="oi">' + icn("sliders") + '</span>'
+      + '<span class="otx"><span class="ott">Trip options</span>'
+      + '<span class="osub"></span></span>'
+      + '<span class="ochev">' + icn("chev") + '</span>';
+  const bits = optsSummary(), on = bits.length > 0;
+  const txt = on ? bits.join(", ").replace(/^./, c => c.toUpperCase()) : BLURB;
+  btn.querySelector(".osub").textContent = txt;
+  btn.classList.toggle("set", on);
+  btn.title = on ? "You've changed: " + txt : BLURB;
+}
+
+/* the Options row folds the toggle/fare/drive/bike controls away
    (Apple's "Now / Avoid" trick). Open state sticks across visits. */
 (function(){
   const btn = document.getElementById("optsBtn"),
         wrap = document.getElementById("optWrap");
-  btn.innerHTML = "Options " + icn("chev", 12);
+  paintOptsRow();
   function setOpen(open){
     wrap.classList.toggle("open", open);
     btn.classList.toggle("on", open);
@@ -2740,6 +3026,7 @@ document.querySelectorAll("#riderSeg button").forEach(b => {
       x.classList.toggle("on", x === b);
       x.setAttribute("aria-pressed", x === b ? "true" : "false");
     });
+    paintOptsRow();
     // full re-rank, not repricing in place: youth prices can change which
     // options win, and the Cheapest badge must never point at a hidden card
     if (lastParts) renderResults(lastParts,
@@ -2778,7 +3065,7 @@ document.getElementById("clear").onclick = () => {
   document.getElementById("fromBox").value = "";
   document.getElementById("toBox").value = "";
   document.getElementById("results").innerHTML =
-    '<div class="hint">Pick a start and an end to compare every mix of transit, driving, your bike and Bike Share &mdash; with real fares.</div>';
+    '<div class="hint">Pick a start and an end to compare every mix of transit, driving, your bike and Bike Share, with real fares.</div>';
   if (map.getSource("route"))
     map.getSource("route").setData({ type:"FeatureCollection", features: [] });
 };
@@ -3121,27 +3408,114 @@ function tripFromURL(){
 })();
 
 /* warn when the loaded schedules are close to running out - GTFS data rots
-   and the app must not keep answering confidently from expired timetables */
+   and the app must not keep answering confidently from expired timetables.
+
+   serviceTimeRange covers ALL feeds at once, so it reports whichever agency
+   expires LAST. On 2026-07-25 that read "156 days left" (GO runs to
+   December) while TTC had hours left, so nothing warned before the app
+   started planning TTC trips that did not exist. Ask each feed for its OWN
+   last service day instead and warn on the EARLIEST, by name.
+
+   The probe: routes(feeds:[F], serviceDates:{start:D, end:LAST}) comes back
+   empty exactly when feed F has nothing left on or after D. That's
+   monotonic in D, so a binary search pins each feed's last day in ~11 tiny
+   queries, and every feed's step rides in one batched request. The answer
+   only changes when the graph is rebuilt, so it's cached against the global
+   range and normally costs one query. */
+const FEED_END_CACHE = "feedEnds";
 (async function(){
-  try {
+  const DAY = 86400000;
+  const iso = ms => new Date(ms).toISOString().slice(0, 10);
+  const ask = async q => {
     const r = await fetch(OTP, { method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: "{serviceTimeRange{end}}" }) });
+      body: JSON.stringify({ query: q }) });
     const js = await r.json();
-    const raw = ((js.data || {}).serviceTimeRange || {}).end;
-    const end = typeof raw === "string" ? Date.parse(raw) : (raw || 0) * 1000;
+    if (js.errors) throw new Error(js.errors[0].message);
+    return js.data || {};
+  };
+  const asMs = v => typeof v === "string" ? Date.parse(v) : (v || 0) * 1000;
+
+  try {
+    const base = await ask("{ serviceTimeRange{start end} feeds{feedId} }");
+    const end = asMs((base.serviceTimeRange || {}).end);
+    const start = asMs((base.serviceTimeRange || {}).start);
     if (!end) return;
-    const days = Math.round((end - Date.now()) / 86400000);
     // the calendar can offer exactly as far as the timetables reach, no
-    // further: a date past the end plans a confidently empty trip
+    // further: a date past the end plans a confidently empty trip. This
+    // still uses the GLOBAL end - a GO-only trip stays plannable after TTC
+    // stops; the warning below is what tells you TTC is gone.
     scheduleEnd = end;
-    addDayOptions(Math.min(Math.max(days + 1, 1), 400));
-    if (days > 14) return;
+    addDayOptions(Math.min(Math.max(Math.round((end - Date.now()) / DAY) + 1, 1), 400));
+
+    const feeds = (base.feeds || []).map(f => f.feedId)
+      .filter(f => f && /^[A-Za-z0-9_-]+$/.test(f));   // these get inlined below
+    if (!feeds.length) return;
+
+    // serviceDates is a HALF-OPEN range - {start:D, end:D} matches nothing,
+    // and end is never included. serviceTimeRange.end happens to be
+    // one-past-the-last-day too, but don't lean on two bounds agreeing:
+    // push the window out a day so it covers the real last day either way.
+    const LAST = iso(end + DAY);
+    const key = FEED_END_CACHE + ":" + LAST + ":" + feeds.join(",");
+    let ends = loadStored(key, null);
+
+    if (!ends){
+      // one request per binary-search step, every still-searching feed
+      // batched in by alias
+      const probe = async jobs => {
+        const d = await ask("{" + jobs.map((j, i) =>
+          `f${i}: routes(feeds:["${j.feed}"], ` +
+          `serviceDates:{start:"${iso(j.ms)}", end:"${LAST}"}){ gtfsId }`
+        ).join(" ") + "}");
+        return jobs.map((j, i) => ((d["f" + i] || []).length > 0));
+      };
+      const day0 = start ? new Date(start).setHours(0, 0, 0, 0)
+                         : new Date().setHours(0, 0, 0, 0);
+      const span = Math.max(1, Math.round((end - day0) / DAY));
+      const lo = {}, hi = {};
+      ends = {};
+      // a feed with nothing even at the global start has no service at all
+      const anyAtAll = await probe(feeds.map(f => ({ feed: f, ms: day0 })));
+      let live = [];
+      feeds.forEach((f, i) => {
+        if (!anyAtAll[i]) ends[f] = null;
+        else { lo[f] = 0; hi[f] = span + 1; live.push(f); }
+      });
+      let guard = 0;
+      while (live.length && guard++ < 24){
+        const jobs = live.map(f =>
+          ({ feed: f, ms: day0 + Math.floor((lo[f] + hi[f]) / 2) * DAY }));
+        const res = await probe(jobs);
+        live.forEach((f, i) => {
+          const mid = Math.floor((lo[f] + hi[f]) / 2);
+          if (res[i]) lo[f] = mid; else hi[f] = mid;
+        });
+        live = live.filter(f => hi[f] - lo[f] > 1);
+      }
+      for (const f of feeds)
+        if (ends[f] === undefined) ends[f] = iso(day0 + lo[f] * DAY);
+      try { localStorage.setItem(key, JSON.stringify(ends)); } catch (e){}
+    }
+
+    // FEED_LABEL is declared further down, but this function has already
+    // awaited a fetch by now, so the rest of the script has finished running
+    const label = f => (typeof FEED_LABEL === "object" && FEED_LABEL[f]) || f;
+    const midnight = new Date().setHours(0, 0, 0, 0);
+    const worst = Object.keys(ends)
+      .map(f => ({ f, days: ends[f] === null
+        ? -1 : Math.round((Date.parse(ends[f] + "T00:00:00") - midnight) / DAY) }))
+      .sort((a, b) => a.days - b.days)[0];
+    if (!worst || worst.days > 14) return;
+
+    const who = label(worst.f);
     const div = document.createElement("div");
     div.className = "warnbar";
-    div.textContent = days <= 0
-      ? "The schedule data has expired — answers may be wrong. Re-run setup.sh."
-      : `Schedule data runs out in ${Math.max(1, days)} day${days === 1 ? "" : "s"} — re-run setup.sh soon.`;
+    div.textContent = worst.days < 0
+      ? `${who} schedules have expired. Its trips may be wrong, so re-run refresh.sh.`
+      : worst.days === 0
+        ? `${who} schedules run out today. Re-run refresh.sh.`
+        : `${who} schedules run out in ${worst.days} day${worst.days === 1 ? "" : "s"}. Re-run refresh.sh soon.`;
     document.querySelector(".wordmark").after(div);
   } catch (e){ /* engine down - plan() already explains that */ }
 })();
@@ -3307,11 +3681,11 @@ const FEED_LABEL = { TTC:"TTC", YRT:"York/Viva", MIWAY:"MiWay",
       hidePulse();
       // tell the truth about WHAT failed - a bad tap spot is not a dead engine
       if (String(err.message).startsWith("http"))
-        setStatus("Couldn't map that spot — try tapping near a street.");
+        setStatus("Couldn't map that spot. Try tapping near a street.");
       else if (err.name === "TimeoutError" || err.name === "AbortError")
-        setStatus("That took too long — try again in a moment.");
+        setStatus("That took too long. Try again in a moment.");
       else
-        setStatus("Reach engine isn't running yet — restart the app (Ctrl+C, then bash run.sh).");
+        setStatus("Reach engine isn't running yet. Restart the app (Ctrl+C, then bash run.sh).");
     } finally { busy = false; }
   };
 
@@ -3375,21 +3749,28 @@ const FEED_LABEL = { TTC:"TTC", YRT:"York/Viva", MIWAY:"MiWay",
   }
   toggle.onclick = () => setMode(!window.__reachMode);
 
-  // ---- hide / show the whole reach map (persisted) ----
+  // ---- hide / show the reach panel (persisted) ----
+  // The icon now lives in the column permanently and works as the toggle;
+  // the panel hangs to its left. Hiding still stops tap-to-bloom and clears
+  // the bloom, so a closed panel can't leave colours stranded on the map.
   function showReach(persist){
+    window.__closeLookPop && window.__closeLookPop();  // both hang at right:62
     card.style.display = "";
-    launcher.classList.remove("show");
+    launcher.classList.add("on");
     if (persist) localStorage.setItem("reachHidden", "0");
   }
   function hideReach(persist){
     setMode(false);                 // stop tap-to-bloom + clear any bloom
     card.style.display = "none";
-    launcher.classList.add("show");
+    launcher.classList.remove("on");
     if (persist) localStorage.setItem("reachHidden", "1");
   }
+  window.__closeReachCard = () => hideReach(false);
   card.querySelector("#reachClose").onclick = () => hideReach(true);
-  launcher.onclick = () => showReach(true);
+  launcher.onclick = () =>
+    (card.style.display === "none" ? showReach : hideReach)(true);
   if (localStorage.getItem("reachHidden") === "1") hideReach(false);
+  else launcher.classList.add("on");
 
   paintSchemes(); paintLegend();
 })();

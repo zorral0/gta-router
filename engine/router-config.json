@@ -102,7 +102,18 @@
     // TRIP_NOT_FOUND until the TTC feed is re-downloaded and the graph
     // rebuilt (and its feed's "NEW" trips crash OTP outright without
     // ttc-rt-filter.py). See HANDOFF.md before wiring TTC.
-    // GO/UP waits on Sam's Metrolinx API key.
+    // GO added 2026-07-25 with Sam's free Metrolinx Open Data key (does not
+    // expire). Probed live: 74 of 76 trip ids in TripUpdates matched
+    // go-gtfs.zip trips.txt. Note the GO static feed carries UP Express as its
+    // own route 35 ("Union Pearson Express"), so some UP trains arrive through
+    // this GO updater. There IS also a SEPARATE UP feed at
+    // .../api/V1/UP/Gtfs/Feed/TripUpdates for the up-gtfs.zip feed id - it
+    // returned an EMPTY entity list every time it was probed on 2026-07-25,
+    // so it is not wired yet. Re-probe it during UP service hours; if it has
+    // entities whose trip ids match up-gtfs.zip, add the same two lines with
+    // feedId "UP". See HANDOFF.md "What else the Metrolinx API gives us".
+    { "type": "stop-time-updater", "frequency": "1m", "feedId": "GO",
+      "url": "https://api.openmetrolinx.com/OpenDataAPI/api/V1/Gtfs.proto/Feed/TripUpdates?key=${METROLINX_KEY}" },
     { "type": "stop-time-updater", "frequency": "1m", "feedId": "YRT",
       "url": "http://rtu.york.ca/gtfsrealtime/TripUpdates" },
     { "type": "stop-time-updater", "frequency": "1m", "feedId": "MIWAY",
@@ -123,7 +134,10 @@
     // (Verified on a throwaway engine before shipping - TTC alerts ingested
     // without aborting the batch.)
     // DRT alerts: no public endpoint found (every path 403s) - omitted.
-    // GO/UP alerts wait on Sam's Metrolinx Open Data API key (one line each).
+    // GO alerts added 2026-07-25, same Metrolinx key and same one-feed-covers-
+    // both caveat as the TripUpdates line above (40KB of live alerts probed).
+    { "type": "real-time-alerts", "frequency": "1m", "feedId": "GO",
+      "url": "https://api.openmetrolinx.com/OpenDataAPI/api/V1/Gtfs.proto/Feed/Alerts?key=${METROLINX_KEY}" },
     { "type": "real-time-alerts", "frequency": "1m", "feedId": "TTC",
       "url": "https://bustime.ttc.ca/gtfsrt/alerts" },
     { "type": "real-time-alerts", "frequency": "1m", "feedId": "YRT",
