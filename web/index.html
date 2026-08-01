@@ -481,6 +481,20 @@
   #d3Btn:hover { background: var(--chip); }
   #d3Btn:active { transform: scale(.94); }
   #d3Btn.on { background: var(--accent); color: #fff; }
+  /* compass - only shows once the map is tilted or turned off north, so the
+     column stays three icons tall in plain 2D (Sam 2026-08-01 wanted to be
+     able to spin the map in 3D). Drag it to turn, tap it to face north. */
+  #compassBtn { position: absolute; top: 158px; right: 14px; z-index: 6;
+    width: 40px; height: 40px; border: none; border-radius: 12px;
+    background: var(--card-solid); color: var(--text); cursor: grab;
+    box-shadow: var(--shadow); display: flex; align-items: center;
+    justify-content: center; padding: 0; touch-action: none;
+    opacity: 0; transform: scale(.8); pointer-events: none;
+    transition: opacity .18s ease, transform .18s ease; }
+  #compassBtn.show { opacity: 1; transform: none; pointer-events: auto; }
+  #compassBtn:hover { background: var(--chip); }
+  #compassBtn.turning { cursor: grabbing; background: var(--chip); }
+  #compassBtn svg { display: block; }
   /* opens to the LEFT of the layers button so it clears the column below */
   #lookPop { position: absolute; top: 62px; right: 62px; z-index: 7;
     background: var(--card-solid); border-radius: 12px; box-shadow: var(--shadow);
@@ -496,6 +510,7 @@
   #lookPop button.on { font-weight: 700; color: var(--accent); }
   #lookPop button.on::after { content: "\2713"; margin-left: auto;
     font-weight: 700; }
+  .lp-sep { height: .5px; background: var(--line); margin: 5px 6px; }
 
   /* "More" actions menu (Share / Clear / Service alerts) - hangs off the
      ellipsis button in the controls row, keeps those actions off the panel */
@@ -1019,11 +1034,39 @@ function itineraryCost(it){ return itineraryCostDetail(it).total; }
 const darkMql = matchMedia("(prefers-color-scheme: dark)");
 const HOSTED = { dark: "https://tiles.openfreemap.org/styles/fiord",
                  light: "https://tiles.openfreemap.org/styles/liberty" };
-const LOOKS = { dark: ["midnight", "graphite", "classic"],
-                light: ["daylight", "quiet", "classic"] };
-const LOOK_NAME = { midnight: "Midnight", graphite: "Graphite",
+const LOOKS = { dark: ["applenight", "midnight", "graphite", "classic"],
+                light: ["appleday", "daylight", "quiet", "classic"] };
+// two keys, one name: the picker shows "Apple" in either theme and lands on
+// whichever of the pair matches the mode you are in
+const LOOK_NAME = { appleday: "Apple", applenight: "Apple",
+                    midnight: "Midnight", graphite: "Graphite",
                     daylight: "Daylight", quiet: "Quiet", classic: "Classic" };
 const PALETTES = {
+  /* "Apple" (Sam 2026-08-01, after asking whether we could just use the real
+     Apple map - we cannot without a paid Apple Developer account, so these two
+     palettes chase the look instead). The colours were matched against Apple
+     Maps on the web over downtown Toronto, by laying candidate swatches over
+     the live map and picking the ones with no visible seam; see HANDOFF. The
+     tells are the water (much bluer than our other looks, near-navy at night)
+     and roads that are plain white with a warm grey casing, no gold. */
+  appleday: { dark: false, dropPois: false,
+    land: "#f5f3ee", residential: "#f0ede6", civic: "#ece9e1",
+    water: "#8fcfee", wood: "#bcdfa9", park: "#c6e2b4", grass: "#cfe7be",
+    sand: "#f0e8d4", building: "#e7e3da", aeroway: "#e9e6df",
+    casing1: "#e2ded4", road1: "#ffffff", casing15: "#dcd7cc", road15: "#ffffff",
+    casing2: "#d6d0c4", road2: "#ffffff", casing3: "#d9d2c2", road3: "#fdfbf4",
+    rail: "#dad5cb", path: "#e8e2d6", boundary: "#c3bcae",
+    label: "#46464b", strong: "#1f1f24", roadLabel: "#6c6c73",
+    waterLabel: "#5b9dc4", poiLabel: "#6a6a70", halo: "#f7f5f0" },
+  applenight: { dark: true, dropPois: false,
+    land: "#2c2c30", residential: "#303034", civic: "#333338",
+    water: "#2c3d78", wood: "#24382a", park: "#2a4531", grass: "#28402e",
+    sand: "#38352c", building: "#35353a", aeroway: "#313136",
+    casing1: "#232327", road1: "#3d3d43", casing15: "#232327", road15: "#47474e",
+    casing2: "#26262b", road2: "#52525a", casing3: "#2a2a30", road3: "#5f5f68",
+    rail: "#3a3a41", path: "#35353b", boundary: "#4a4a55",
+    label: "#b6b6bd", strong: "#e4e4e8", roadLabel: "#9a9aa2",
+    waterLabel: "#7f93c8", poiLabel: "#8c8c94", halo: "#1c1c1f" },
   midnight: { dark: true, dropPois: false,
     land: "#1b1b1d", residential: "#1f1f22", civic: "#222226",
     water: "#12181f", wood: "#1a211c", park: "#1d2620", grass: "#1c221e",
@@ -1061,6 +1104,39 @@ const PALETTES = {
     label: "#50505a", strong: "#28282e", roadLabel: "#74747c",
     waterLabel: "#5a7d9e", poiLabel: "#74746c", halo: "#f4f4f2" }
 };
+
+/* Nudge a hex toward white on a dark map, toward black on a light one, so a
+   "stronger" building colour always means more contrast against the land. */
+function shadeHex(hex, amt, dark){
+  const n = parseInt(hex.slice(1), 16);
+  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v =>
+    Math.max(0, Math.min(255, Math.round(dark ? v + (255 - v) * amt : v * (1 - amt)))));
+  return "#" + ch.map(v => v.toString(16).padStart(2, "0")).join("");
+}
+/* Downtown in 3D was an unreadable grey mass (Sam 2026-08-01: "the buildings
+   blend together"). Three causes, all fixed here:
+   1. the base style ships fill-extrusion-opacity 0.8, and ~2000 translucent
+      boxes in view show THROUGH each other and smear into one lump. Opaque
+      is the single biggest win.
+   2. every building was one flat colour, a 125 m tower painted the same as a
+      3 m shed. The tiles carry render_height, so grade the colour by it and
+      the towers separate themselves from the low-rise.
+   3. no vertical gradient, so walls and roofs read as one surface. */
+function buildingPaint(p){
+  /* Kept gentle on purpose. Flat at pitch 0 you are looking straight down at
+     ROOFS, so the whole footprint takes the graded colour and a strong ramp
+     turns downtown into dark patches on a light map. The tilted view gets
+     most of its separation from the directional light anyway, so the grade
+     only has to do the rest. */
+  const tall = shadeHex(p.building, 0.13, p.dark);
+  const mid  = shadeHex(p.building, 0.05, p.dark);
+  return {
+    "fill-extrusion-color": ["interpolate", ["linear"], ["get", "render_height"],
+                             0, p.building, 25, p.building, 60, mid, 150, tall],
+    "fill-extrusion-opacity": 1,
+    "fill-extrusion-vertical-gradient": true,
+  };
+}
 
 /* repaint every layer of the liberty style with one palette. Grouping is
    by source-layer + layer-id substrings, so it survives minor upstream
@@ -1105,10 +1181,10 @@ function recolorStyle(base, p){
       else if (sl === "transportation") c = p.road1;
       if (c){ l.paint["fill-color"] = c; delete l.paint["fill-pattern"];
               delete l.paint["fill-outline-color"]; }
-      if (id === "building-3d") l.paint["fill-extrusion-color"] = p.building;
+      if (id === "building-3d") Object.assign(l.paint, buildingPaint(p));
       continue;
     }
-    if (l.type === "fill-extrusion"){ l.paint["fill-extrusion-color"] = p.building; continue; }
+    if (l.type === "fill-extrusion"){ Object.assign(l.paint, buildingPaint(p)); continue; }
     if (l.type === "line"){
       let c = null;
       if (sl === "waterway") c = p.water;
@@ -1141,11 +1217,28 @@ function recolorStyle(base, p){
   return s;
 }
 
-const mapLook = Object.assign({ dark: "midnight", light: "daylight" },
+// Apple is the new out-of-the-box look (Sam 2026-08-01).
+const mapLook = Object.assign({ dark: "applenight", light: "appleday" },
                               loadStored("mapLook", {}));
 function saveLook(){
   try { localStorage.setItem("mapLook", JSON.stringify(mapLook)); } catch (e){}
 }
+/* One-time move across to the new look. A saved choice normally wins over the
+   default, which meant a browser that had been here before kept showing the
+   old map and it looked like nothing had changed at all (Sam, straight away).
+   So: if the saved look is still one of the OLD defaults, treat that as "never
+   really chose" and move it to Apple once. A look Sam actually went and picked
+   (Graphite, Quiet, Classic) is left alone, and the flag means we only ever do
+   this once - pick Midnight after this and Midnight is what you keep. */
+(function(){
+  try {
+    if (localStorage.getItem("sawAppleLook")) return;
+    if (mapLook.dark === "midnight") mapLook.dark = "applenight";
+    if (mapLook.light === "daylight") mapLook.light = "appleday";
+    localStorage.setItem("sawAppleLook", "1");
+    saveLook();
+  } catch (e){}   // private browsing / storage off: just use the defaults
+})();
 const themeMode = () => darkMql.matches ? "dark" : "light";
 let libertyBase = loadStored("libertyStyle", null);
 async function fetchLibertyBase(){
@@ -1190,6 +1283,16 @@ const map = new maplibregl.Map({
   center: [-79.5, 43.75], zoom: 9.2, attributionControl: { compact: true }
 });
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
+/* Directional light on the extrusions. Without this the style's default sits
+   the sun almost overhead, every wall gets the same tone, and neighbouring
+   towers merge into one grey lump. Anchored to the VIEWPORT rather than the
+   map so the shading holds still while you spin the compass, instead of the
+   sun swinging around the city as you turn. */
+function applyBuildingLight(){
+  try { map.setLight({ anchor: "viewport", position: [1.5, 205, 24],
+                       color: "#ffffff", intensity: 0.32 }); } catch (e){}
+}
+map.on("style.load", applyBuildingLight);
 darkMql.addEventListener("change", applyLook);
 // first visit with a non-classic look: upgrade as soon as the JSON arrives
 if (!libertyBase && mapLook[themeMode()] !== "classic") applyLook();
@@ -1298,6 +1401,137 @@ function ensureShields(){
 // idle, where the plain sprite boxes used to show through first
 map.on("styledata", ensureShields);
 
+/* POI badges (Sam 2026-08-01: the stock icons "theyre not the same as apple
+   maps logos/illustrations at all", asking whether to bin them or replicate).
+   We cannot copy Apple's icons, that artwork is theirs. But their visual
+   LANGUAGE is simple and reproducible: a small rounded badge in a
+   category colour with a white glyph. So the generic OSM sprite icons are
+   replaced with our own badges, drawn from the same Lucide-style glyph set
+   the rest of the app already uses (ISC licensed), grouped into Apple-ish
+   categories with Apple-ish category colours.
+
+   Same install machinery as the shields above, including the same trap:
+   addImage and setLayoutProperty both fire "styledata" SYNCHRONOUSLY, so
+   without the latch this re-enters itself and blows the stack. */
+/* Every glyph is a SOLID filled shape, never a stroke (Sam 2026-08-01: Apple's
+   "theyre more natural looking"). That is most of the difference: a thin
+   2px stroke reads as wiry and technical at 20px, a filled silhouette reads
+   as drawn. Cut-outs use fill-rule="evenodd" rather than a second colour, so
+   the badge colour shows through the holes. */
+const POI_BADGE = {
+  medical:   { color: "#e8544f",
+    glyph: '<path d="M9.9 4.6h4.2v5.3h5.3v4.2h-5.3v5.3H9.9v-5.3H4.6V9.9h5.3z"/>' },
+  transit:   { color: "#4a8fd4",
+    glyph: '<path fill-rule="evenodd" d="M7.5 2.8h9a3.2 3.2 0 0 1 3.2 3.2v8.6a3.2 3.2 0 0 1-3.2 3.2h-9a3.2 3.2 0 0 1-3.2-3.2V6a3.2 3.2 0 0 1 3.2-3.2zm-.7 3.1v3.6h10.4V5.9zm1.1 6.4a1.35 1.35 0 1 0 0 2.7 1.35 1.35 0 0 0 0-2.7zm8.2 0a1.35 1.35 0 1 0 0 2.7 1.35 1.35 0 0 0 0-2.7z"/><path d="M7.4 18.4h2.2l-2 3.1H5.1zm9.2 0h-2.2l2 3.1h2.5z"/>' },
+  air:       { color: "#4a8fd4",
+    glyph: '<path d="M12 2.2c.95 0 1.45.95 1.45 2.3v4.2l7.35 4.25v2.2l-7.35-2.1v4l2.4 1.85v1.65L12 19.2l-3.85 1.35v-1.65l2.4-1.85v-4l-7.35 2.1v-2.2l7.35-4.25V4.5c0-1.35.5-2.3 1.45-2.3z"/>' },
+  education: { color: "#b08a63",
+    glyph: '<path d="M12 3.4 1.4 8.6 12 13.8l10.6-5.2z"/><path d="M6.1 12.1V16c0 1.8 2.6 3.2 5.9 3.2s5.9-1.4 5.9-3.2v-3.9l-5.9 2.9z"/>' },
+  culture:   { color: "#9b6fc4",
+    glyph: '<path d="M12 2.9 2.2 8.1v1.6h19.6V8.1z"/><path d="M4.6 11.2h2.5v6.9H4.6zm6.2 0h2.5v6.9h-2.5zm6.2 0h2.5v6.9h-2.5z"/><path d="M2 19.6h20v1.6H2z"/>' },
+  // theatre + cinema get their own pin: Apple gives the arts a pink of their
+  // own and it is the single most recognisable POI glyph on the map
+  arts:      { color: "#d4569e",
+    glyph: '<path fill-rule="evenodd" d="M3.8 4.2h16.4v6.6c0 4.7-3.7 8.7-8.2 8.7s-8.2-4-8.2-8.7zM9 9.3a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4zm6 0a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4zm-6.6 4.9c1 1.5 2.4 2.3 3.6 2.3s2.6-.8 3.6-2.3c-1.1.6-2.3.9-3.6.9s-2.5-.3-3.6-.9z"/>' },
+  sport:     { color: "#4f9e6a",
+    glyph: '<path fill-rule="evenodd" d="M12 5.2c5.3 0 9.6 3.1 9.6 6.8s-4.3 6.8-9.6 6.8-9.6-3.1-9.6-6.8S6.7 5.2 12 5.2zm0 3.4c-2.8 0-5 1.5-5 3.4s2.2 3.4 5 3.4 5-1.5 5-3.4-2.2-3.4-5-3.4z"/>' },
+  park:      { color: "#4d9d5a",
+    glyph: '<path d="M12 2.6 7.2 10h9.6z"/><path d="M12 7.6 4.9 17.4h14.2z"/><path d="M10.7 16.8h2.6v4.6h-2.6z"/>' },
+  civic:     { color: "#78889a",
+    glyph: '<path d="M12 2.6 4.4 5.7v5.6c0 4.7 3.2 8.2 7.6 10 4.4-1.8 7.6-5.3 7.6-10V5.7z"/>' },
+};
+// OSM class -> badge. "rail" and "railway" both appear depending on the layer.
+const POI_CLASS_BADGE = {
+  hospital: "medical",
+  university: "education", college: "education", library: "education",
+  museum: "culture", aquarium: "culture", monument: "culture",
+  attraction: "culture",
+  theatre: "arts", cinema: "arts",
+  stadium: "sport",
+  town_hall: "civic", police: "civic", fire_station: "civic",
+  place_of_worship: "civic",
+  park: "park",
+  rail: "transit", railway: "transit", ferry_terminal: "transit",
+  airport: "air",
+};
+const POI_LAYERS = ["poi_r1", "poi_r7", "poi_r20", "poi_transit"];
+/* A CIRCLE, not a rounded square (Sam's Apple screenshot: their POI pins are
+   round). The 1px white ring is not decoration either, it is what keeps a
+   dark-purple or slate badge from disappearing into the dark map, and it is
+   what Apple's have. Drawn on a 24 box with 2px of padding so the ring is
+   never clipped. */
+function badgeSvg(b){
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"'
+       + ' viewBox="0 0 24 24">'
+       + '<circle cx="12" cy="12" r="10.4" fill="#ffffff" opacity=".92"/>'
+       + '<circle cx="12" cy="12" r="9.4" fill="' + b.color + '"/>'
+       // glyphs are authored on a 24 box; 0.62 sits them inside the disc
+       + '<g transform="translate(4.56,4.56) scale(.62)" fill="#fff">'
+       + b.glyph + "</g></svg>";
+}
+let badgeCache = null;
+async function prepareBadges(){
+  if (badgeCache) return badgeCache;
+  const out = [];
+  for (const [name, b] of Object.entries(POI_BADGE)){
+    const img = new Image();
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(badgeSvg(b));
+    try { await (img.decode ? img.decode()
+                : new Promise((res, rej) => { img.onload = res; img.onerror = rej; })); }
+    catch (e){ continue; }
+    out.push(["poib_" + name, img]);
+  }
+  return out.length ? (badgeCache = out) : null;
+}
+function badgeIconExpr(){
+  const m = ["match", ["get", "class"]];
+  for (const [cls, badge] of Object.entries(POI_CLASS_BADGE)) m.push(cls, "poib_" + badge);
+  m.push("");   // anything not in our keep-list draws no icon at all
+  return m;
+}
+/* Apple tints the POI's LABEL to its category colour too, which is a lot of
+   why their map reads as designed rather than plotted. Same match, but the
+   colours are lightened on a dark map so pink-on-near-black stays legible. */
+function badgeTextExpr(dark){
+  const m = ["match", ["get", "class"]];
+  for (const [cls, badge] of Object.entries(POI_CLASS_BADGE)){
+    const c = POI_BADGE[badge].color;
+    m.push(cls, dark ? shadeHex(c, 0.34, true) : shadeHex(c, 0.18, false));
+  }
+  m.push(dark ? "#a8a8af" : "#6a6a70");   // the keep-list's own fallback
+  return m;
+}
+function badgesLive(){
+  return map.hasImage("poib_medical")
+    && POI_LAYERS.some(id => map.getLayer(id)
+         && map.getLayoutProperty(id, "icon-size") === 0.9);
+}
+let badgeBusy = false;
+function ensurePoiBadges(){
+  if (badgeBusy || badgesLive()) return;
+  if (!badgeCache){ prepareBadges().then(ok => { if (ok) ensurePoiBadges(); }); return; }
+  badgeBusy = true;
+  try {
+    for (const [id, img] of badgeCache){
+      if (!map.hasImage(id)) map.addImage(id, img, { pixelRatio: 2 });
+    }
+    const expr = badgeIconExpr();
+    const dark = (PALETTES[mapLook[themeMode()]] || {}).dark ?? darkMql.matches;
+    const tint = badgeTextExpr(dark);
+    for (const id of POI_LAYERS){
+      if (!map.getLayer(id)) continue;
+      map.setLayoutProperty(id, "icon-image", expr);
+      map.setLayoutProperty(id, "icon-size", 0.9);
+      // the stock sprite icons were wider than tall; our badges are round,
+      // so the label needs re-centring under them
+      map.setLayoutProperty(id, "text-offset", [0, 1.1]);
+      map.setLayoutProperty(id, "text-anchor", "top");
+      map.setPaintProperty(id, "text-color", tint);
+    }
+  } finally { badgeBusy = false; }
+}
+map.on("styledata", ensurePoiBadges);
+
 /* standalone map-look button, top-right like Apple Maps' map-type control
    (Sam 2026-07-20: wanted its own button, not buried in Options). Opens a
    small menu of the current theme's looks. */
@@ -1312,7 +1546,10 @@ map.on("styledata", ensureShields);
     const mode = themeMode();
     pop.innerHTML = '<div class="lp-h">MAP LOOK</div>' + LOOKS[mode].map(k =>
       `<button data-look="${k}" class="${k === mapLook[mode] ? "on" : ""}">${
-        LOOK_NAME[k]}${k === "classic" ? " (the old map)" : ""}</button>`).join("");
+        LOOK_NAME[k]}${k === "classic" ? " (the old map)" : ""}</button>`).join("")
+      // the lines live here too: this button is already "what the map shows"
+      + '<div class="lp-sep"></div><div class="lp-h">ON THE MAP</div>'
+      + `<button data-toggle="transit" class="${transitOn ? "on" : ""}">Transit lines</button>`;
   }
   window.__closeLookPop = () => pop.classList.remove("open");
   btn.onclick = e => {
@@ -1322,6 +1559,9 @@ map.on("styledata", ensureShields);
     pop.classList.toggle("open");
   };
   pop.onclick = e => {
+    // the lines toggle stays open: you want to see it happen behind the menu
+    const t = e.target.closest("[data-toggle]");
+    if (t){ setTransitLines(!transitOn); renderPop(); return; }
     const b = e.target.closest("[data-look]"); if (!b) return;
     mapLook[themeMode()] = b.dataset.look; saveLook(); applyLook();
     pop.classList.remove("open");
@@ -1340,7 +1580,8 @@ map.on("styledata", ensureShields);
 (function(){
   const btn = document.createElement("button");
   btn.id = "d3Btn"; btn.textContent = "3D";
-  btn.title = "Tilt the map into 3D";
+  btn.title = "Tilt the map into 3D. Hold Option and drag two fingers to "
+            + "spin and tilt, or drag the compass that appears below.";
   btn.setAttribute("aria-label", "Tilt the map into 3D");
   btn.setAttribute("aria-pressed", "false");
   document.body.append(btn);
@@ -1359,6 +1600,160 @@ map.on("styledata", ensureShields);
   // keep the label in step if the user tilts by hand
   map.on("pitchend", sync);
   map.on("pitch", sync);
+})();
+
+/* Trackpad rotate (Sam 2026-08-01). On a laptop the built-in ways to spin the
+   map are all bad: MapLibre only rotates on a RIGHT-button drag or a
+   ctrl-drag, and a plain two-finger trackpad drag is already spoken for (it
+   zooms), so there was nothing for a trackpad. Two additions:
+
+   - Hold OPTION and drag two fingers. Sideways spins, up and down tilts.
+     Works in every browser. Option was picked over shift and ctrl on purpose:
+     ctrl+wheel is how browsers signal a pinch, and shift+wheel gets rewritten
+     into horizontal scroll by the browser, which would swap the two axes and
+     make up/down do the spinning.
+   - An actual two-finger TWIST, in Safari only. macOS reports a twist to the
+     page as a GestureEvent, which Chrome does not implement at all, so this is
+     a bonus for Safari rather than the main path. It is deliberately narrow:
+     it only acts on a real rotation and never touches the zoom, so pinch to
+     zoom keeps behaving exactly as it did.
+
+   Both work tilted or flat. Rotating while flat is normal map behaviour and
+   the compass turns up to show you which way is north either way. */
+(function(){
+  const el = map.getContainer();
+  // capture on the CONTAINER, which is an ancestor of the canvas MapLibre
+  // binds to, so this runs first and stopPropagation keeps the map from
+  // also zooming on the same gesture
+  el.addEventListener("wheel", e => {
+    if (!e.altKey) return;
+    e.preventDefault(); e.stopPropagation();
+    map.stop();
+    if (Math.abs(e.deltaX) > 0.4) map.setBearing(map.getBearing() + e.deltaX * 0.4);
+    // fingers UP tilts INTO 3D, matching Maps on the iPhone. With macOS
+    // natural scrolling, fingers-up is a POSITIVE deltaY, hence the sign.
+    if (Math.abs(e.deltaY) > 0.4){
+      // the map's own ceiling, not a number of our own: MapLibre caps pitch
+      // at 60 by default and silently clamps anything higher
+      const cap = map.getMaxPitch ? map.getMaxPitch() : 60;
+      map.setPitch(Math.min(cap, Math.max(0, map.getPitch() + e.deltaY * 0.25)));
+    }
+  }, { capture: true, passive: false });
+
+  /* The real two-finger TWIST. This is what Sam actually wanted (2026-08-01:
+     "i think it should be the two finger rotating guesture, not the press
+     down, its less intuitive") and he is right, but it is SAFARI ONLY and
+     that is not a limitation we can code around: macOS reports a trackpad
+     twist to a web page through Safari's non-standard GestureEvent, and
+     Chrome does not implement it at all. Verified in the Chromium preview:
+     `typeof GestureEvent` is "undefined" and `'ongesturestart' in window` is
+     false, so in Chrome the page is simply never told the fingers turned.
+     That is why the Option gesture above stays: it is the only one that
+     works in Chrome, which is what Sam runs.
+
+     Once we take the gesture we own all of it, so pinch has to be handled
+     here too or Safari would fall back to zooming the whole PAGE. Zoom is
+     anchored on the fingers rather than the map centre, the way a pinch
+     should behave.
+
+     NOT TESTED: the preview browser is Chromium and never fires these. */
+  const cc = map.getCanvasContainer();
+  let gOn = false, gBearing = 0, gZoom = 0;
+  cc.addEventListener("gesturestart", e => {
+    e.preventDefault();
+    gOn = true; gBearing = map.getBearing(); gZoom = map.getZoom();
+    map.stop();
+  });
+  cc.addEventListener("gesturechange", e => {
+    if (!gOn) return;
+    e.preventDefault();
+    const r = cc.getBoundingClientRect();
+    const opts = { duration: 0,
+                   around: map.unproject([e.clientX - r.left, e.clientY - r.top]) };
+    // a deadzone, so the small incidental turn that rides along with a pinch
+    // does not leave the map sitting a few degrees off north
+    if (Math.abs(e.rotation) > 2) opts.bearing = gBearing - e.rotation;
+    if (e.scale > 0) opts.zoom = gZoom + Math.log2(e.scale);
+    map.easeTo(opts);
+  });
+  cc.addEventListener("gestureend", e => { e.preventDefault(); gOn = false; });
+})();
+
+/* Compass: turn the map while you're in 3D (Sam 2026-08-01). The map could
+   always be spun - right-drag, or shift + arrow keys - but nothing on screen
+   said so, so in practice 3D was stuck facing north. This adds a real compass
+   under the 3D button that only appears once the map is tilted or off north:
+   drag it to spin the map (the needle follows your pointer), tap it to face
+   north again, or nudge it with the arrow keys when it has focus. */
+(function(){
+  const btn = document.createElement("button");
+  btn.id = "compassBtn";
+  btn.title = "Drag to turn the map, tap to face north";
+  btn.setAttribute("aria-label", "Turn the map. Press to face north, arrow keys to turn");
+  // classic two-tone needle: red half points north, grey half points south.
+  // Each half is two triangles so it reads as a folded pointer, not a lozenge.
+  btn.innerHTML =
+    '<svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">' +
+      '<g class="cneedle">' +
+        '<path d="M13 2.5 L17.6 14.6 L13 12.4 Z" fill="var(--bad)"/>' +
+        '<path d="M13 2.5 L8.4 14.6 L13 12.4 Z" fill="var(--bad)" opacity=".68"/>' +
+        '<path d="M13 23.5 L8.4 11.4 L13 13.6 Z" fill="currentColor" opacity=".5"/>' +
+        '<path d="M13 23.5 L17.6 11.4 L13 13.6 Z" fill="currentColor" opacity=".26"/>' +
+      '</g></svg>';
+  document.body.append(btn);
+  const needle = btn.querySelector(".cneedle");
+
+  let turning = false, startAngle = 0, startBearing = 0, swung = 0;
+  function render(){
+    const b = map.getBearing();
+    needle.setAttribute("transform", "rotate(" + (-b) + " 13 13)");
+    // off north by more than a hair, or tilted: worth showing
+    btn.classList.toggle("show", turning || map.getPitch() > 5 || Math.abs(b) > 0.5);
+  }
+  // angle from the button's centre out to the pointer, in degrees
+  function angleTo(e){
+    const r = btn.getBoundingClientRect();
+    return Math.atan2(e.clientY - (r.top + r.height / 2),
+                      e.clientX - (r.left + r.width / 2)) * 180 / Math.PI;
+  }
+  btn.addEventListener("pointerdown", e => {
+    turning = true; swung = 0;
+    startAngle = angleTo(e); startBearing = map.getBearing();
+    btn.classList.add("turning");
+    try { btn.setPointerCapture(e.pointerId); } catch (_){}
+    map.stop();            // drop any easeTo still running, else it fights us
+    e.preventDefault();    // no text selection / no page scroll on touch
+  });
+  btn.addEventListener("pointermove", e => {
+    if (!turning) return;
+    const d = angleTo(e) - startAngle;
+    swung = Math.max(swung, Math.abs(d));
+    // screen angle of the needle is -bearing, so turning the needle by +d
+    // means the map's bearing goes down by d - the needle tracks the pointer
+    map.setBearing(startBearing - d);
+  });
+  function letGo(e){
+    if (!turning) return;
+    turning = false;
+    btn.classList.remove("turning");
+    try { btn.releasePointerCapture(e.pointerId); } catch (_){}
+    if (swung < 4) map.easeTo({ bearing: 0, duration: 400 });  // that was a tap
+    render();
+  }
+  btn.addEventListener("pointerup", letGo);
+  btn.addEventListener("pointercancel", letGo);
+  // keyboard: Enter/Space faces north, left/right nudge the map around
+  btn.addEventListener("keydown", e => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault(); map.easeTo({ bearing: 0, duration: 400 });
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      e.preventDefault();
+      map.easeTo({ bearing: map.getBearing() + (e.key === "ArrowLeft" ? -15 : 15),
+                   duration: 200 });
+    }
+  });
+  ["rotate","rotateend","pitch","pitchend","move"].forEach(ev => map.on(ev, render));
+  render();
 })();
 
 /* route layers survive style swaps: whenever the style (re)loads and our
@@ -1419,8 +1814,142 @@ function orderRouteForPitch(){
 map.on("pitchend", orderRouteForPitch);
 function drawRoute(fc){
   lastRouteFC = fc;
+  syncTransitEmphasis();
   if (map.isStyleLoaded()) addRouteLayers(fc);
   // if the style is mid-load, the style.load handler above draws it
+}
+
+/* ---- The transit lines, painted on the map for good (Sam 2026-08-01).
+   Apple Maps and Transit both draw the rapid transit permanently; we drew
+   nothing until you planned a trip, which is the biggest single reason our
+   map did not read as a transit map. Built by make_transit_lines.py out of
+   the GTFS feeds in this folder, in each line's own official colour, so the
+   Yonge line is Yonge-yellow and Stouffville is GO brown without us hard
+   coding a single hex. Re-run that script when the feeds are refreshed.
+   Buses are deliberately not in the file: 210 grey squiggles is not a map. */
+let transitFC = null, transitRetry = 0;
+// not loadStored(): that one only hands back objects, so a stored "off"
+// would come out as the default "on" and the toggle would never stick
+let transitOn = true;
+try { transitOn = localStorage.getItem("transitLines") !== "false"; } catch (e){}
+(async function loadTransit(){
+  try {
+    transitFC = await (await fetch("transit-lines.json")).json();
+    ensureTransit();
+  } catch (e){ /* file not built yet: the map is simply as it was before */ }
+})();
+function ensureTransit(){
+  if (!transitFC || map.getSource("transit")) return;
+  try {
+    map.addSource("transit", { type: "geojson", data: transitFC });
+    /* Where to slot the lines in. Two traps here, both found the hard way
+       (Sam 2026-08-01: "at a certain zoom the subway lines will be covered by
+       buildings because its 3d"):
+       1. "building-3d" sits ABOVE most of the style, so anchoring to the first
+          symbol layer buried the lines under the extrusions and they vanished
+          the moment you tilted and zoomed in.
+       2. the first symbol layer in this style is "road_one_way_arrow", a road
+          decoration rather than a label, so it is not the label boundary
+          either.
+       So: sit just under the first symbol layer that comes AFTER the
+       buildings. Above the extrusions, still below the place and street
+       labels. If the style has no 3D buildings, the first symbol will do. */
+    const layers = map.getStyle().layers || [];
+    const b3d = layers.findIndex(l => l.id === "building-3d");
+    const anchor = layers.findIndex((l, i) => l.type === "symbol" && i > b3d);
+    const under = anchor >= 0 ? layers[anchor].id
+                : (layers.find(l => l.type === "symbol") || {}).id;
+    const vis = transitOn ? "visible" : "none";
+    /* A thin dark casing under every line, the way a printed transit map
+       outlines them. Not decoration: Line 1's official yellow (#d5c82b) is
+       nearly invisible against the light map's near-white land without it.
+       On the dark map it reads as a soft shadow and costs nothing. */
+    const casing = "rgba(0,0,0,0.28)";
+    map.addLayer({ id: "transit-major-casing", type: "line", source: "transit",
+      filter: ["match", ["get","mode"], ["subway","rail","lrt"], true, false],
+      layout: { "line-cap": "round", "line-join": "round", visibility: vis },
+      paint: { "line-color": casing,
+               "line-width": ["interpolate", ["linear"], ["zoom"],
+                              8, 2.6, 11, 3.8, 14, 5.8, 16, 8.2],
+               "line-opacity": ["interpolate", ["linear"], ["zoom"],
+                                7, 0, 8.5, 0.85] } }, under);
+    map.addLayer({ id: "transit-minor-casing", type: "line", source: "transit",
+      minzoom: 11,
+      filter: ["==", ["get","mode"], "streetcar"],
+      layout: { "line-cap": "round", "line-join": "round", visibility: vis },
+      paint: { "line-color": casing,
+               "line-width": ["interpolate", ["linear"], ["zoom"],
+                              11, 2, 14, 3.8, 16, 5.4],
+               "line-opacity": ["interpolate", ["linear"], ["zoom"],
+                                11, 0, 12, 0.7] } }, under);
+    // subway, LRT and the GO/UP rail: the backbone, visible from way out
+    map.addLayer({ id: "transit-major", type: "line", source: "transit",
+      filter: ["match", ["get","mode"], ["subway","rail","lrt"], true, false],
+      layout: { "line-cap": "round", "line-join": "round", visibility: vis },
+      paint: { "line-color": ["get","color"],
+               "line-width": ["interpolate", ["linear"], ["zoom"],
+                              8, 1.4, 11, 2.4, 14, 4, 16, 6],
+               // fade in rather than pop, and never clutter the province view
+               "line-opacity": ["interpolate", ["linear"], ["zoom"],
+                                7, 0, 8.5, 0.85] } }, under);
+    // streetcars are dense downtown, so they only turn up once you are close
+    map.addLayer({ id: "transit-minor", type: "line", source: "transit",
+      minzoom: 11,
+      filter: ["==", ["get","mode"], "streetcar"],
+      layout: { "line-cap": "round", "line-join": "round", visibility: vis },
+      paint: { "line-color": ["get","color"],
+               "line-width": ["interpolate", ["linear"], ["zoom"],
+                              11, 1, 14, 2.4, 16, 3.6],
+               "line-opacity": ["interpolate", ["linear"], ["zoom"],
+                                11, 0, 12, 0.7] } }, "transit-major");
+    transitRetry = 0;
+    syncTransitEmphasis();   // a trip already on screen keeps the lines quiet
+    orderRouteForPitch();
+  } catch (e){ if (transitRetry++ < 40) setTimeout(ensureTransit, 250); }
+}
+map.on("style.load", ensureTransit);
+map.on("styledata", ensureTransit);
+// follow the tilt live, not just when it settles, so the lines fade smoothly
+// as the 3D button's 700ms ease runs rather than snapping at the end
+map.on("pitch", syncTransitEmphasis);
+map.on("pitchend", syncTransitEmphasis);
+/* How loud the lines are. With a trip on screen they step back so the route
+   stays the brightest thing on the map. This matters most in 3D: the route
+   deliberately runs BEHIND the building extrusions (Sam 2026-07-20, so it
+   reads as passing between them), and once the lines moved in front of the
+   buildings a full-strength background line painted straight over the top of
+   the route, leaving the actual trip as the faintest thing on screen. */
+const transitFade = peak => ({
+  major: ["interpolate", ["linear"], ["zoom"], 7, 0, 8.5, peak],
+  minor: ["interpolate", ["linear"], ["zoom"], 11, 0, 12, peak * 0.82],
+});
+/* The lines belong to the FLAT map, so they get out of the way as you tilt
+   (Sam 2026-08-01: "you cant see anything if transit lines are enabled, it
+   just looks odd"). Drawn over the rooftops they cut across the towers like
+   pen on glass; drawn under them they simply vanish behind the buildings.
+   There is no third option for a street-level line in a tilted city, so
+   rather than pick the least-bad occlusion we fade them out: full strength
+   flat, gone by the time the 3D button's 60 degrees is reached. */
+function tiltFade(){
+  const p = map.getPitch();
+  return p <= 20 ? 1 : p >= 48 ? 0 : (48 - p) / 28;
+}
+function syncTransitEmphasis(){
+  const o = transitFade((lastRouteFC ? 0.3 : 0.85) * tiltFade());
+  const set = (id, v) => {
+    if (map.getLayer(id)) map.setPaintProperty(id, "line-opacity", v);
+  };
+  set("transit-major", o.major); set("transit-major-casing", o.major);
+  set("transit-minor", o.minor); set("transit-minor-casing", o.minor);
+}
+function setTransitLines(on){
+  transitOn = on;
+  try { localStorage.setItem("transitLines", on ? "true" : "false"); } catch (e){}
+  ["transit-major-casing","transit-minor-casing","transit-minor","transit-major"]
+    .forEach(id => {
+      if (map.getLayer(id))
+        map.setLayoutProperty(id, "visibility", on ? "visible" : "none");
+    });
 }
 
 /* ---- Bike Share docks on the map (small green dots, zoom in to see).
@@ -1536,6 +2065,7 @@ window.flyDock = function(lng, lat){ map.flyTo({ center: [lng, lat], zoom: 15.5 
 let sweepToken = 0;
 function animateRoute(fc){
   lastRouteFC = fc;
+  syncTransitEmphasis();
   if (!map.isStyleLoaded()){ ensureRoute(); return; }
   if (!map.getSource("route")){
     try { addRouteLayers(fc); } catch (e){ return; }
@@ -3059,6 +3589,7 @@ document.getElementById("clear").onclick = () => {
   fromPt = toPt = fromMarker = toMarker = null;
   pickOverride = null; refreshPick();
   lastParts = null; lastRouteFC = null;
+  syncTransitEmphasis();   // no trip on screen: the lines come back up
   clearTripDocks();
   localStorage.removeItem("pts");
   closeDetail();

@@ -61,6 +61,7 @@ echo ""
 echo "=== 2/4 Re-applying the TTC transfer patch + GO fare table ==="
 python3 patch_ttc_transfers.py   # TTC ships no transfers.txt - see HANDOFF
 python3 make_go_fares.py         # real GO fare table -> web/go-fares.json
+python3 make_transit_lines.py    # lines drawn on the map -> web/transit-lines.json
 
 echo ""
 echo "=== 3/4 Rebuilding the reach-map graph (2.5 engine, ~4 min) ==="
