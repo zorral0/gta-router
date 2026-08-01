@@ -51,6 +51,9 @@ python3 patch_ttc_transfers.py
 # Extract GO's real station-to-station fare table for the cost model
 python3 make_go_fares.py
 
+# The subway/streetcar/GO lines painted on the map, in their own colours
+python3 make_transit_lines.py
+
 echo ""
 echo "=== Step 4/5: Downloading OpenStreetMap data for Ontario (~1.5 GB) ==="
 if [ ! -f ontario-latest.osm.pbf ]; then
