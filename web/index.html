@@ -68,6 +68,12 @@
     /* stays pinned so you never lose sight of where you're routing while
        the results scroll underneath it */
     position: sticky; top: 0; z-index: 4; }
+  /* #panelScroll's 14px top padding is a transparent strip ABOVE the pinned
+     card, so scrolled content (the blue Trip options pills) showed through it
+     and appeared sliced across the top of the panel. Cap it in the panel
+     colour, pulled out to the panel's edges. */
+  .search::before { content: ""; position: absolute; left: -14px; right: -14px;
+    top: -15px; height: 15px; background: var(--panel); }
   .srow { display: flex; align-items: center; gap: 10px; position: relative; }
   .srow + .srow { border-top: .5px solid var(--line); }
   .srow .pt { width: 10px; height: 10px; border-radius: 50%; flex: none;
@@ -83,11 +89,16 @@
     color: var(--text); font: inherit; padding: 11px 0; min-width: 0; }
   .srow input::placeholder { color: var(--muted); }
 
-  /* search suggestions */
-  .sug { position: absolute; left: -12px; right: -12px; top: calc(100% + 1px);
-    background: var(--card-solid); border-radius: 12px; z-index: 40;
+  /* search suggestions.
+     Fixed, not absolute: the list lives inside #panelScroll, which sits in
+     #panel's overflow:hidden box, so an absolutely positioned list got sliced
+     off at the panel's bottom edge - with a short panel the last 2 of 8
+     suggestions were invisible and unclickable. Same trick as #moreMenu; JS
+     sets left/top/width/max-height on open (see place() in attachSuggest). */
+  .sug { position: fixed; z-index: 40;
+    background: var(--card-solid); border-radius: 12px;
     box-shadow: 0 0 0 .5px var(--line), 0 10px 30px rgba(0,0,0,.22);
-    overflow: hidden; display: none; }
+    overflow-y: auto; overscroll-behavior: contain; display: none; }
   .sug.open { display: block; }
   .sug .item { padding: 9px 14px; cursor: pointer; }
   .sug .item + .item { border-top: .5px solid var(--line); }
@@ -315,7 +326,12 @@
   .optsrow.on .ochev { transform: rotate(180deg); }
   /* collapsed "Options" drawer - the extra controls live behind one chip */
   #optWrap { display: none; }
-  #optWrap.open { display: block; margin-bottom: 2px; }
+  /* Capped and self-scrolling: fully expanded this block is ~490px, which on
+     a laptop pushed the results and the itinerary clean off the bottom of the
+     panel, so you couldn't see what your own toggles had just done. */
+  #optWrap.open { display: block; margin-bottom: 2px;
+    max-height: min(42vh, 380px); overflow-y: auto;
+    overscroll-behavior: contain; }
   /* the drawer is grouped under quiet labels so seven controls read as
      organized, not dumped */
   .optgrp { margin-top: 11px; }
@@ -669,11 +685,9 @@
   @keyframes reachpulse {
     0% { box-shadow: 0 0 0 0 rgba(10,132,255,.5); }
     100% { box-shadow: 0 0 0 22px rgba(10,132,255,0); } }
-  #reachClose { position: absolute; top: 9px; right: 10px; width: 22px;
-    height: 22px; border: none; background: transparent; color: var(--muted);
-    cursor: pointer; border-radius: 999px; padding: 0; font-size: 13px;
-    display: inline-flex; align-items: center; justify-content: center; }
-  #reachClose:hover { background: var(--chip); color: var(--text); }
+  /* the card's own X is gone: the column icon below is the show/hide toggle
+     and its label tracks state, so the two used to sit 18px apart carrying
+     the same "Hide the reach map" action. One control, one label. */
   /* top of the right-hand column, and shaped like its two neighbours so the
      three read as one stack rather than a pill sitting on two squares */
   #reachLauncher { position: absolute; top: 14px; right: 14px; z-index: 6;
@@ -2245,7 +2259,18 @@ function normalizeSuggestions(features){
     const key = p1 + "|" + p2;
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({ p1, p2, lon, lat });
+    /* One real place shows up as several OSM objects, so "Union Station" used
+       to fill seven of the eight rows (the building, the plaza, the bus
+       terminal, each platform). Same name within ~250 m is the same place as
+       far as a rider is concerned: keep the first and drop the rest. Two
+       genuinely different places that share a name (a Tim Hortons in
+       Brampton and one in Ajax) are far apart, so they both survive. */
+    const n1 = tidyName(p1), n2 = tidyName(p2);
+    const dup = out.some(o => o.p1 === n1
+      && Math.abs(o.lat - lat) < 0.00225
+      && Math.abs(o.lon - lon) < 0.0031);
+    if (dup) continue;
+    out.push({ p1: n1, p2: n2, lon, lat });
     if (out.length >= 8) break;
   }
   return out;
@@ -2259,6 +2284,20 @@ function attachSuggest(which){
   let items = [], hi = -1, timer = null, ctrl = null, note = null;
 
   const hide = () => { box.classList.remove("open"); hi = -1; note = null; };
+  /* .sug is position:fixed to escape the panel's clip, so it has to be told
+     where the field is - and told again whenever the panel scrolls or the
+     window resizes underneath it. Anchored to the search card's edges (which
+     is what the old left/right:-12px inset worked out to) and capped so the
+     list always ends above the bottom of the window. */
+  const place = () => {
+    const card = input.closest(".search") || row;
+    const cr = card.getBoundingClientRect(), rr = row.getBoundingClientRect();
+    const top = rr.bottom + 1;
+    box.style.left = cr.left + "px";
+    box.style.width = cr.width + "px";
+    box.style.top = top + "px";
+    box.style.maxHeight = Math.max(120, innerHeight - top - 10) + "px";
+  };
   const render = () => {
     if (!items.length && !note){ hide(); return; }
     box.innerHTML = items.map((it, i) =>
@@ -2267,7 +2306,14 @@ function attachSuggest(which){
         ${it.p2 ? `<div class="p2">${esc(it.p2)}</div>` : ""}</div>`).join("")
       + (note ? `<div class="sugmsg">${esc(note)}</div>` : "");
     box.classList.add("open");
+    place();
+    // innerHTML reset scrollTop, so keep the arrow-key highlight on screen
+    const cur = box.querySelector(".item.hi");
+    if (cur) cur.scrollIntoView({ block: "nearest" });
   };
+  const reposition = () => { if (box.classList.contains("open")) place(); };
+  document.getElementById("panelScroll").addEventListener("scroll", reposition, { passive: true });
+  addEventListener("resize", reposition);
   const pick = i => {
     const it = items[i];
     if (!it) return;
@@ -2482,8 +2528,19 @@ function cleanAlerts(raw){
     const key = a.id || (head + "|" + desc);
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({ id: key, header: head || desc,
-      desc: desc && desc !== head ? desc : "",
+    /* The TTC feed hard-caps alertHeaderText at 32 characters and cuts
+       mid-word ("16 Mccowan: Buses are not stoppi"). Measured against the
+       live feed on 2026-08-01: no header anywhere exceeded 32, 29 of 79 sat
+       exactly at 32, every one of those had a description, and none ended in
+       sentence punctuation. So a 32-char header that doesn't end a sentence
+       is a truncated one. The description is the whole story (sometimes
+       worded differently, not just a longer prefix), so show that instead of
+       a broken title followed by the real text. */
+    const cut = head && desc
+      && ((head.length === 32 && !/[.!?]$/.test(head))
+          || (desc.length > head.length && desc.slice(0, head.length) === head));
+    out.push({ id: key, header: cut ? desc : (head || desc),
+      desc: cut ? "" : (desc && desc !== head ? desc : ""),
       url: a.alertUrl || "", severity: a.alertSeverityLevel || "",
       feed: a.feed || "" });   // present on the global query, absent on legs
   }
@@ -2614,6 +2671,19 @@ function legRow(it){
 const esc = s => String(s).replace(/[&<>"']/g, c =>
   ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
 const hhmm = t => new Date(t).toLocaleTimeString([], { hour:"numeric", minute:"2-digit" });
+/* GO/TTC trip headsigns carry 24-hour clock times baked into the text
+   ("Union Station GO 18:00 - Unionville GO 18:50"). Everything else in the app
+   is 12-hour, so the raw headsign put both formats three lines apart in one
+   card. Rewrite just the HH:MM runs and leave the rest of the string alone;
+   route numbers ("506") and stop codes ("L2 Gates 8-14") don't match. */
+const to12h = s => String(s).replace(/\b([01]\d|2[0-3]):([0-5]\d)\b/g, (m, h, mi) => {
+  h = +h;
+  return (h % 12 || 12) + ":" + mi + " " + (h < 12 ? "AM" : "PM");
+});
+/* OSM/GTFS names arrive with double hyphens where a range dash belongs
+   ("Union Station Bus Terminal L2 Gates 8--14"). En dashes are fine here;
+   only em dashes are off-limits. */
+const tidyName = s => String(s).replace(/\s*-{2,}\s*/g, "–");
 
 let itinsById = {}, selId = null, lastParts = null, fcCache = {};
 
@@ -2677,8 +2747,18 @@ function cardHTML(it, cid, fastestIt, cheapestIt, latestIt){
       ? '<span class="badge late">Latest leave</span>' : "") +
     (it === cheapestIt ? '<span class="badge cheap">Cheapest</span>' : "");
   const alts = (it.altTimes || []).slice().sort((a,b) => a-b).slice(0, 2);
+  /* The card is the app's main control and it reached the a11y tree with no
+     name at all, so a screen reader just said "button". Spell out the same
+     things the card shows: how long, when, what it costs, why it's badged. */
+  const badgeWords = [
+    it === fastestIt ? "fastest" : "",
+    it === latestIt && it !== fastestIt ? "latest leave" : "",
+    it === cheapestIt ? "cheapest" : ""].filter(Boolean);
+  const label = `${Math.round(it.duration/60)} minute trip, `
+    + `${hhmm(it.startTime)} to ${hhmm(it.endTime)}, $${cost.toFixed(2)}`
+    + (badgeWords.length ? ", " + badgeWords.join(", ") : "");
   return `<div class="card" id="${cid}" onclick="openIt('${cid}')"
-      tabindex="0" role="button">
+      tabindex="0" role="button" aria-label="${esc(label)}">
     <div class="head"><span class="mins">${Math.round(it.duration/60)} min</span>
       <span class="times">${hhmm(it.startTime)} &ndash; ${hhmm(it.endTime)}${
         alts.length ? " &middot; also " + alts.map(hhmm).join(", ") : ""}${
@@ -3013,6 +3093,26 @@ function renderResults(parts, opts){
     if (hit) pick = hit[0];
   }
   if (pick) window.select(pick, { fit: !opts.noFit, sweep: !opts.noSweep });
+  if (pool.length) revealResults();
+}
+/* With Trip options open, the results sit below ~380px of toggles, so a
+   re-plan you triggered from those toggles landed out of sight. Bring the
+   results up to just under the pinned search card. Only while the options
+   are open - otherwise the panel should stay where the user left it. */
+function revealResults(){
+  const wrap = document.getElementById("optWrap");
+  if (!wrap || !wrap.classList.contains("open")) return;
+  const ps = document.getElementById("panelScroll");
+  const res = document.getElementById("results");
+  const search = document.querySelector(".search");
+  const delta = res.getBoundingClientRect().top - ps.getBoundingClientRect().top
+    - (search ? search.offsetHeight : 0) - 8;
+  if (Math.abs(delta) < 2) return;
+  // Plain assignment, not scrollTo({behavior:"smooth"}): smooth scrolling is
+  // driven by requestAnimationFrame, which this app already knows gets frozen
+  // in a background tab - a dropped animation would leave the results exactly
+  // where they were, off-screen. Landing there instantly always works.
+  ps.scrollTop = Math.max(0, ps.scrollTop + delta);
 }
 window.toggleMore = function(exId, btn, n){
   const el = document.getElementById(exId);
@@ -3166,9 +3266,9 @@ function renderDetail(cid){
       const bg = routeColor(r) || agencyColor(agencyOf(l));
       what = `<span class="rt" style="background:${bg}">${esc(r.shortName || r.longName || "")}</span>
         ${esc(prettyAgency(agencyOf(l)))}`
-        + (l.headsign ? ` <span style="font-weight:500;color:var(--muted)">&middot; ${esc(l.headsign)}</span>` : "");
-      sub = `Board at ${esc(l.from.name)} &middot; ride ${stops} stop${stops>1?"s":""}
-             (${mins} min) &middot; get off at ${esc(l.to.name)}`;
+        + (l.headsign ? ` <span style="font-weight:500;color:var(--muted)">&middot; ${esc(to12h(tidyName(l.headsign)))}</span>` : "");
+      sub = `Board at ${esc(tidyName(l.from.name))} &middot; ride ${stops} stop${stops>1?"s":""}
+             (${mins} min) &middot; get off at ${esc(tidyName(l.to.name))}`;
       // live delay note (rtDelaySec set only when the engine had real-time
       // data for this leg; shown times already include the delay)
       if (l.rtDelaySec != null){
@@ -3233,9 +3333,10 @@ function renderDetail(cid){
       ${fares}
       <div class="fitem total"><span>Total</span><span>$${total.toFixed(2)}</span></div>
       <div class="fnote">PRESTO-level fares, verified July 2026. One Fare makes local
-        transit free when a GO trip is part of the journey. Youth rates applied
-        for every system. Driving times assume light traffic, so rush hour
-        will be slower.</div>
+        transit free when a GO trip is part of the journey. ${rider === "youth"
+          ? "Youth rates applied for every system."
+          : "Adult rates applied for every system."}
+        Driving times assume light traffic, so rush hour will be slower.</div>
     </div>`;
 }
 window.closeDetail = function(){
@@ -3876,10 +3977,11 @@ skinSelect(document.getElementById("daySel"), { calendar: true });
   if (el) skinSelect(el);
 });
 
-/* Open a trip from a shared ?f=..&t=.. link. This WINS over the saved pins
-   below: someone sent this exact trip, so show it and plan it right away.
-   A malformed/half link falls through to the normal restore. Returns the
-   two points (so we know a link was consumed) or null. */
+/* Open a trip from a shared ?f=..&t=.. link: someone sent this exact trip,
+   so show it and plan it right away. This is now the ONLY way the app opens
+   with points already set (the saved-pins restore was dropped). A malformed
+   or half link falls through to an empty form. Returns the two points (so we
+   know a link was consumed) or null. */
 function tripFromURL(){
   const q = new URLSearchParams(location.search);
   const parse = s => {
@@ -3914,19 +4016,15 @@ function tripFromURL(){
   return { from: f, to: t };
 }
 
-/* restore the last trip's pins - the daily commute shouldn't be re-typed
-   every day. Planning stays one click away (no auto-query on load) UNLESS
-   a shared link is present, in which case we plan it straight away. */
+/* The app used to reopen with the last trip's pins already dropped and both
+   search boxes pre-filled with those place names. Sam asked for the boxes to
+   start empty (2026-08-01), so a restored trip no longer loads. A SHARED link
+   still fills both ends and plans itself straight away - that's the point of
+   the link. savePts() still writes "pts"; nothing reads it on load now. */
 (function(){
   const shared = tripFromURL();
-  const j = shared
-    ? { from: { ...shared.from }, to: { ...shared.to } }
-    : loadStored("pts", {});
+  const j = shared ? { from: { ...shared.from }, to: { ...shared.to } } : {};
   const ok = p => p && isFinite(p.lng) && isFinite(p.lat);
-  if (!shared){
-    if (ok(j.from)) setPoint("from", { lng: j.from.lng, lat: j.from.lat }, j.from.label);
-    if (ok(j.to)) setPoint("to", { lng: j.to.lng, lat: j.to.lat }, j.to.label);
-  }
   if (ok(j.from) && ok(j.to)){
     try {
       const b = new maplibregl.LngLatBounds(
@@ -4092,6 +4190,9 @@ const FEED_LABEL = { TTC:"TTC", YRT:"York/Viva", MIWAY:"MiWay",
     }
     noneEl.hidden = true; tog.hidden = false;
     countEl.textContent = n;
+    // the count chip alone left this menu item unnamed in the a11y tree
+    tog.setAttribute("aria-label",
+      `Service alerts, ${n} active`);
     moreBtn.classList.add("hasalerts");   // amber dot on the ellipsis
     listEl.innerHTML = alerts.map(a =>
       `<div class="abitem"><div class="ah">${a.feedLabel
@@ -4224,10 +4325,9 @@ const FEED_LABEL = { TTC:"TTC", YRT:"York/Viva", MIWAY:"MiWay",
   const card = document.createElement("div");
   card.id = "reachCard";
   card.innerHTML = `
-    <button id="reachToggle" type="button">
+    <button id="reachToggle" type="button" aria-pressed="false"
+      title="Tap the map to see how far you can get by transit">
       <span class="rt-dot"></span> Reach map</button>
-    <button id="reachClose" type="button" title="Hide the reach map"
-      aria-label="Hide the reach map">${icn("x")}</button>
     <div id="reachBody" hidden>
       <div class="reach-hint" id="reachStatus">Tap anywhere to see how far you can travel by transit on a weekday morning.</div>
       <div class="reach-schemes" id="reachSchemes"></div>
@@ -4274,6 +4374,7 @@ const FEED_LABEL = { TTC:"TTC", YRT:"York/Viva", MIWAY:"MiWay",
   function setMode(on){
     window.__reachMode = on;
     toggle.classList.toggle("on", on);
+    toggle.setAttribute("aria-pressed", on ? "true" : "false");
     bodyEl.hidden = !on;
     if (!on){ clearReach(); hidePulse(); }
     map.getCanvas().style.cursor = on ? "crosshair" : "";
@@ -4284,24 +4385,36 @@ const FEED_LABEL = { TTC:"TTC", YRT:"York/Viva", MIWAY:"MiWay",
   // The icon now lives in the column permanently and works as the toggle;
   // the panel hangs to its left. Hiding still stops tap-to-bloom and clears
   // the bloom, so a closed panel can't leave colours stranded on the map.
+  /* The launcher is a toggle, so its label has to say what the NEXT press
+     does. It used to be a fixed "Show the reach map", which meant that with
+     the card open you had an X labelled "Hide the reach map" sitting 18px
+     from a button labelled "Show the reach map" - two controls, opposite
+     labels, same action. */
+  function labelLauncher(shown){
+    const t = shown ? "Hide the reach map" : "Show the reach map";
+    launcher.title = t;
+    launcher.setAttribute("aria-label", t);
+    launcher.setAttribute("aria-pressed", shown ? "true" : "false");
+  }
   function showReach(persist){
     window.__closeLookPop && window.__closeLookPop();  // both hang at right:62
     card.style.display = "";
     launcher.classList.add("on");
+    labelLauncher(true);
     if (persist) localStorage.setItem("reachHidden", "0");
   }
   function hideReach(persist){
     setMode(false);                 // stop tap-to-bloom + clear any bloom
     card.style.display = "none";
     launcher.classList.remove("on");
+    labelLauncher(false);
     if (persist) localStorage.setItem("reachHidden", "1");
   }
   window.__closeReachCard = () => hideReach(false);
-  card.querySelector("#reachClose").onclick = () => hideReach(true);
   launcher.onclick = () =>
     (card.style.display === "none" ? showReach : hideReach)(true);
   if (localStorage.getItem("reachHidden") === "1") hideReach(false);
-  else launcher.classList.add("on");
+  else { launcher.classList.add("on"); labelLauncher(true); }
 
   paintSchemes(); paintLegend();
 })();
