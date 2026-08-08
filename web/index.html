@@ -1062,22 +1062,32 @@ const PALETTES = {
      Maps on the web over downtown Toronto, by laying candidate swatches over
      the live map and picking the ones with no visible seam; see HANDOFF. The
      tells are the water (much bluer than our other looks, near-navy at night)
-     and roads that are plain white with a warm grey casing, no gold. */
-  appleday: { dark: false, dropPois: false,
+     and roads that are plain white with a warm grey casing, no gold.
+
+     2026-08-08: two colour values moved as a consequence of the geometry
+     pass below, not because the original matches were wrong.
+       - applenight's four road greys went up about two steps. The old ones
+         were matched on FAT roads; once the roads were thinned to Apple's
+         proportions the same grey nearly vanished into the land.
+       - `building` on both palettes moved to within a hair of `land`. That
+         is how Apple keeps buildings from mattering when you are looking
+         straight down, and it replaces a fill-opacity fade that would have
+         re-broken the tilted view. See appleGeometry. */
+  appleday: { dark: false, dropPois: false, apple: true,
     land: "#f5f3ee", residential: "#f0ede6", civic: "#ece9e1",
     water: "#8fcfee", wood: "#bcdfa9", park: "#c6e2b4", grass: "#cfe7be",
-    sand: "#f0e8d4", building: "#e7e3da", aeroway: "#e9e6df",
+    sand: "#f0e8d4", building: "#eeebe4", aeroway: "#e9e6df",
     casing1: "#e2ded4", road1: "#ffffff", casing15: "#dcd7cc", road15: "#ffffff",
     casing2: "#d6d0c4", road2: "#ffffff", casing3: "#d9d2c2", road3: "#fdfbf4",
     rail: "#dad5cb", path: "#e8e2d6", boundary: "#c3bcae",
     label: "#46464b", strong: "#1f1f24", roadLabel: "#6c6c73",
     waterLabel: "#5b9dc4", poiLabel: "#6a6a70", halo: "#f7f5f0" },
-  applenight: { dark: true, dropPois: false,
+  applenight: { dark: true, dropPois: false, apple: true,
     land: "#2c2c30", residential: "#303034", civic: "#333338",
     water: "#2c3d78", wood: "#24382a", park: "#2a4531", grass: "#28402e",
-    sand: "#38352c", building: "#35353a", aeroway: "#313136",
-    casing1: "#232327", road1: "#3d3d43", casing15: "#232327", road15: "#47474e",
-    casing2: "#26262b", road2: "#52525a", casing3: "#2a2a30", road3: "#5f5f68",
+    sand: "#38352c", building: "#2f2f33", aeroway: "#313136",
+    casing1: "#232327", road1: "#4c4c54", casing15: "#232327", road15: "#57575f",
+    casing2: "#26262b", road2: "#62626b", casing3: "#2a2a30", road3: "#6d6d76",
     rail: "#3a3a41", path: "#35353b", boundary: "#4a4a55",
     label: "#b6b6bd", strong: "#e4e4e8", roadLabel: "#9a9aa2",
     waterLabel: "#7f93c8", poiLabel: "#8c8c94", halo: "#1c1c1f" },
@@ -1150,6 +1160,134 @@ function buildingPaint(p){
     "fill-extrusion-opacity": 1,
     "fill-extrusion-vertical-gradient": true,
   };
+}
+
+/* ---- Apple geometry pass (Sam 2026-08-08) ----------------------------
+   The Apple palettes got the COLOURS close, but side by side against the
+   real Apple Maps (screenshotted on this Mac over the suburbs and downtown
+   Toronto) the map still read as "not Apple", and every remaining tell was
+   shape or type, not colour:
+
+     1. our roads were far too fat, and the gap between a laneway and an
+        arterial was far too dramatic. Apple draws a compressed hierarchy -
+        a main street is maybe 1.5x a side street, not 3x - so downtown
+        stays legible instead of matting over into one grey slab.
+     2. liberty puts a casing on everything. Apple's night map has
+        essentially NO casing; its day map has a hairline one.
+     3. street labels: Apple sets them ALL CAPS, letter-spaced, and small
+        (~10px). Ours were mixed-case Noto at 13px. This is the single
+        loudest tell, and the cheapest to fix.
+     4. liberty labels POIs in ITALIC. Apple is upright throughout.
+     5. minor roads and footpaths appeared several zooms too early.
+     6. buildings sat too bright, so downtown was a field of pale blobs.
+
+   None of this touches the other looks - it only runs when the palette is
+   flagged apple:true, so Midnight / Graphite / Daylight / Quiet / Classic
+   stay exactly as Sam picked them. We cannot match Apple's ABBREVIATIONS
+   ("RICHMOND ST W"): the vector tiles only carry the full name, and
+   MapLibre expressions have no string-replace to shorten it with. */
+
+/* rebuild a liberty width ramp at Apple's proportions. Stops are
+   [zoom, px, zoom, px, ...] and keep liberty's exponential base so the
+   growth between stops still feels the same while you pinch-zoom. */
+const aw = (...stops) => ["interpolate", ["exponential", 1.2], ["zoom"], ...stops];
+/* a casing is the fill plus a fixed number of pixels, so the outline stays
+   a constant hairline instead of ballooning with the road. */
+function acase(fill, delta){
+  const out = fill.slice();
+  for (let i = 4; i < out.length; i += 2) out[i] = Math.round((out[i] + delta) * 100) / 100;
+  return out;
+}
+const APPLE_W = {
+  motorway:  aw(5, 0, 7, 0.8, 11, 2.2, 14, 4.2, 17, 10, 20, 20),
+  trunk:     aw(5, 0, 7, 0.6, 11, 1.6, 14, 3.4, 17, 9, 20, 18),
+  secondary: aw(8, 0.4, 12, 1.1, 14, 2.4, 17, 7, 20, 15),
+  minor:     aw(13.5, 0, 14, 1.8, 16, 3.4, 17, 5.5, 20, 14),
+  link:      aw(12.5, 0, 13, 1, 14, 1.8, 17, 5, 20, 10),
+  service:   aw(15.5, 0, 16, 1.2, 17, 2.4, 20, 7),
+  path:      aw(14, 0.6, 17, 1.6, 20, 6),
+};
+// which ramp a given liberty layer id belongs to. Order matters: "link" and
+// "service_track" have to be tested before the broader motorway/minor tests.
+function appleRamp(id){
+  if (/_link/.test(id)) return APPLE_W.link;
+  if (/service_track/.test(id)) return APPLE_W.service;
+  if (/path|pedestrian/.test(id)) return APPLE_W.path;
+  if (/motorway/.test(id)) return APPLE_W.motorway;
+  if (/trunk|primary/.test(id)) return APPLE_W.trunk;
+  if (/secondary|tertiary/.test(id)) return APPLE_W.secondary;
+  if (/minor|street/.test(id)) return APPLE_W.minor;
+  return null;
+}
+// how much later than liberty each class earns its first pixel
+const APPLE_MINZOOM = { service_track: 15.5, path_pedestrian: 15 };
+
+function appleGeometry(s, p){
+  // Apple's night map has no visible casing; its day map has a hairline.
+  const casingDelta = p.dark ? 0.5 : 1.5;
+  for (const l of s.layers){
+    const id = l.id, sl = l["source-layer"] || "";
+
+    if (sl === "transportation" && l.type === "line"){
+      const ramp = appleRamp(id);
+      if (ramp){
+        l.paint = l.paint || {};
+        l.paint["line-width"] = /casing/.test(id) ? acase(ramp, casingDelta) : ramp.slice();
+      }
+      // rounded ends and corners everywhere - liberty only sets them on some
+      l.layout = Object.assign({}, l.layout, { "line-cap": "round", "line-join": "round" });
+      for (const k in APPLE_MINZOOM)
+        if (id.includes(k)) l.minzoom = Math.max(l.minzoom || 0, APPLE_MINZOOM[k]);
+      continue;
+    }
+
+    if (l.type === "symbol"){
+      l.layout = Object.assign({}, l.layout);
+      if (sl === "transportation_name" && !/shield/.test(id)){
+        // the loudest tell: small, upright, ALL CAPS, generously tracked
+        l.layout["text-transform"] = "uppercase";
+        l.layout["text-letter-spacing"] = 0.09;
+        l.layout["text-font"] = ["Noto Sans Regular"];
+        l.layout["text-size"] = ["interpolate", ["linear"], ["zoom"], 13, 9, 16, 10.5, 20, 12];
+        // and far fewer of them, far later
+        if (/minor/.test(id)) l.minzoom = Math.max(l.minzoom || 0, 15.5);
+        if (/path/.test(id))  l.minzoom = Math.max(l.minzoom || 0, 16.5);
+        if (/major/.test(id)) l.minzoom = Math.max(l.minzoom || 0, 13);
+      } else if (sl === "poi" || sl === "aerodrome_label"){
+        // liberty ships these italic; Apple is upright
+        l.layout["text-font"] = ["Noto Sans Regular"];
+        l.layout["text-size"] = 11;
+      } else if (sl === "place" && /label_other|label_village|label_town/.test(id)){
+        // neighbourhood and suburb names: Apple's small tracked caps
+        l.layout["text-transform"] = "uppercase";
+        l.layout["text-letter-spacing"] = 0.14;
+        l.layout["text-font"] = ["Noto Sans Regular"];
+        l.layout["text-size"] = ["interpolate", ["linear"], ["zoom"], 10, 9.5, 14, 11];
+      }
+      continue;
+    }
+
+    /* The FLAT footprint layer, which is what you see when the map is not
+       tilted (see syncAppleBuildings). Apple's footprints are visible but
+       barely - a half-step off the land, no more - so this is set here
+       rather than taken from p.building, which also feeds the extrusions
+       and wants to stay closer to land than this. */
+    if (l.type === "fill" && sl === "building"){
+      l.paint = l.paint || {};
+      l.paint["fill-color"] = p.dark ? "#333338" : "#e8e4db";
+      l.paint["fill-opacity"] = 1;
+      continue;
+    }
+
+    /* The EXTRUSIONS need no work here: on Apple's map they are a whisper, and
+       the two Apple palettes get that by setting `building` almost to the
+       land colour rather than by fading the layer out. Turning the opacity
+       down would have been the obvious fix and is the WRONG one - it brings
+       back the exact smearing Sam reported on 2026-08-01, where translucent
+       boxes show through each other in the tilted view. Opaque + a quiet
+       colour is subtle when flat and still separates towers when pitched. */
+  }
+  return s;
 }
 
 /* repaint every layer of the liberty style with one palette. Grouping is
@@ -1228,7 +1366,8 @@ function recolorStyle(base, p){
       l.paint["text-halo-width"] = halo;
     }
   }
-  return s;
+  // shape and type pass - Apple looks only, every other look untouched
+  return p.apple ? appleGeometry(s, p) : s;
 }
 
 // Apple is the new out-of-the-box look (Sam 2026-08-01).
@@ -1291,6 +1430,10 @@ async function applyLook(){
   // "styledata" (not "idle") re-points the layers: it fires as soon as the
   // new layers exist, before the default sprite boxes can show through.
   ensureShields();
+  // Same reason this cannot rely on "style.load" alone: setStyle DIFFS when
+  // it can, and a diffed swap never fires that event, so switching looks
+  // from the layers menu left the buildings in the previous look's state.
+  syncAppleBuildings();
 }
 const map = new maplibregl.Map({
   container: "map", style: initialMapStyle(),
@@ -1307,6 +1450,29 @@ function applyBuildingLight(){
                        color: "#ffffff", intensity: 0.32 }); } catch (e){}
 }
 map.on("style.load", applyBuildingLight);
+
+/* Apple looks only: extruded buildings appear when you TILT, and not before
+   (Sam 2026-08-08). Looking straight down, Apple's map draws buildings as
+   flat footprints - even at pitch 0 a perspective camera shows the walls of
+   anything away from the centre of the screen, and a screen full of little
+   grey boxes was the last big thing separating our flat map from Apple's.
+   Tilt and the extrusions come back, so the 3D work from 2026-08-01 is
+   untouched; this only decides WHEN it is on. Every other look keeps its
+   old always-on behaviour. */
+function syncAppleBuildings(){
+  if (!map.getLayer("building-3d")) return;
+  // hands off every other look - they keep liberty's always-on buildings
+  if (!(PALETTES[mapLook[themeMode()]] || {}).apple) return;
+  const extruded = map.getPitch() > 5;
+  try {
+    map.setLayoutProperty("building-3d", "visibility", extruded ? "visible" : "none");
+    if (map.getLayer("building"))
+      map.setLayoutProperty("building", "visibility", extruded ? "none" : "visible");
+  } catch (e){}   // layer can vanish mid style-swap; the next call fixes it
+}
+map.on("style.load", syncAppleBuildings);
+map.on("pitch", syncAppleBuildings);
+map.on("pitchend", syncAppleBuildings);
 darkMql.addEventListener("change", applyLook);
 // first visit with a non-classic look: upgrade as soon as the JSON arrives
 if (!libertyBase && mapLook[themeMode()] !== "classic") applyLook();
