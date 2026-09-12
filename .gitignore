@@ -12,3 +12,9 @@ otp29/
 ttc-gtfs/
 ttc-gtfs 2/
 rt-test/
+deploy/build/
+deploy/oracle-ip.txt
+# private or not ours to share
+metrolinx.env
+.claude/
+ttc-rider-efficiency-guide-2005.pdf

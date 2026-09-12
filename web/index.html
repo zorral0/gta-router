@@ -822,7 +822,11 @@ if (typeof maplibregl === "undefined"){
   document.body.innerHTML = '<div style="display:flex;height:100%;align-items:center;justify-content:center;font:15px/1.5 -apple-system,sans-serif;color:#6e6e73;text-align:center;padding:30px">The map library didn&#39;t load. The web/vendor/ files are missing or unreadable.<br>Restore them, then reload this page.</div>';
   throw new Error("maplibre-gl missing");
 }
-const OTP = "http://localhost:8080/otp/gtfs/v1";
+/* On your Mac the page talks straight to the engines. On the hosted copy
+   (Vercel) it asks its own address, and Vercel passes /otp/... on to the
+   cloud engine. See DEPLOY.md. */
+const LOCAL = ["localhost", "127.0.0.1", ""].includes(location.hostname);
+const OTP = LOCAL ? "http://localhost:8080/otp/gtfs/v1" : "/otp/gtfs/v1";
 
 /* localStorage can hold junk (old versions, other tabs, a bad write) -
    never let one broken value kill the whole script */
@@ -4377,7 +4381,7 @@ const FEED_LABEL = { TTC:"TTC", YRT:"York/Viva", MIWAY:"MiWay",
    "reach" engine on :8090 (walk+transit, tied to the app's date/time).
    If that engine isn't running, the card says so and nothing else breaks. */
 (function(){
-  const ISO_API = "http://localhost:8090/otp/traveltime/isochrone";
+  const ISO_API = LOCAL ? "http://localhost:8090/otp/traveltime/isochrone" : "/otp/traveltime/isochrone";
   const CUTS = ["900","1800","2700","3600","4500","5400","6300","7200","8100","9000"];
   const MINS = { "900":"15","1800":"30","2700":"45","3600":"60","4500":"75","5400":"90",
     "6300":"105","7200":"120","8100":"135","9000":"150" };

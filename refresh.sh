@@ -9,7 +9,7 @@
 # warning.
 #
 # WHAT IT DOES (roughly 10-15 minutes):
-#   1. re-downloads the seven GTFS schedule zips (a failed or broken
+#   1. re-downloads the ten GTFS schedule zips (a failed or broken
 #      download keeps the old copy - never leaves you worse off)
 #   2. re-applies the TTC transfers patch + regenerates the GO fare table
 #   3. rebuilds BOTH graphs (main 2.9 + the 2.5 reach-map one), keeping
@@ -56,6 +56,10 @@ fetch yrt-gtfs.zip      "https://www.yrt.ca/google/google_transit.zip"
 fetch miway-gtfs.zip    "https://www.miapp.ca/GTFS/google_transit.zip"
 fetch brampton-gtfs.zip "https://www.arcgis.com/sharing/rest/content/items/a355aabd5a8c490186bdce559c9c75fb/data"
 fetch drt-gtfs.zip      "https://maps.durham.ca/OpenDataGTFS/GTFS_Durham_TXT.zip"
+# Halton local buses (added 2026-09-12 for the transit gaps research)
+fetch oakville-gtfs.zip   "https://www.arcgis.com/sharing/rest/content/items/d78a1c1ad6a940009de8b68839a8f606/data"
+fetch burlington-gtfs.zip "https://opendata.burlington.ca/gtfs-rt/GTFS_Data.zip"
+fetch milton-gtfs.zip     "https://metrolinx.tmix.se/gtfs/gtfs-milton.zip"
 
 echo ""
 echo "=== 2/4 Re-applying the TTC transfer patch + GO fare table ==="

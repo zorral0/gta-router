@@ -112,6 +112,9 @@
     // so it is not wired yet. Re-probe it during UP service hours; if it has
     // entities whose trip ids match up-gtfs.zip, add the same two lines with
     // feedId "UP". See HANDOFF.md "What else the Metrolinx API gives us".
+    // ${METROLINX_KEY} is filled in by OTP from the environment at startup.
+    // The real key lives in metrolinx.env (git-ignored); run.sh and the
+    // Oracle service both load it. Without it the engine refuses to start.
     { "type": "stop-time-updater", "frequency": "1m", "feedId": "GO",
       "url": "https://api.openmetrolinx.com/OpenDataAPI/api/V1/Gtfs.proto/Feed/TripUpdates?key=${METROLINX_KEY}" },
     { "type": "stop-time-updater", "frequency": "1m", "feedId": "YRT",
