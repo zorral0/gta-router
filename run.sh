@@ -5,6 +5,16 @@
 
 cd "$(dirname "$0")"
 
+# 0) The GO real-time feeds need a free Metrolinx key. It lives in
+#    metrolinx.env, which is never uploaded to GitHub. router-config.json
+#    reads it as ${METROLINX_KEY}; without it the engine won't start.
+if [ ! -f metrolinx.env ]; then
+  echo "Missing metrolinx.env. Copy metrolinx.env.example to metrolinx.env"
+  echo "and put your Metrolinx Open Data key in it."
+  exit 1
+fi
+set -a; . ./metrolinx.env; set +a
+
 # 1) The app page (the pretty UI in web/), served at :8081
 python3 -m http.server 8081 --directory web >/dev/null 2>&1 &
 WEB_PID=$!

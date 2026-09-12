@@ -29,6 +29,11 @@
     { "type": "gtfs", "source": "yrt-gtfs.zip",      "feedId": "YRT"      },
     { "type": "gtfs", "source": "miway-gtfs.zip",    "feedId": "MIWAY"    },
     { "type": "gtfs", "source": "brampton-gtfs.zip", "feedId": "BRAMPTON" },
-    { "type": "gtfs", "source": "drt-gtfs.zip",      "feedId": "DRT"      }
+    { "type": "gtfs", "source": "drt-gtfs.zip",      "feedId": "DRT"      },
+    // Halton local buses, added 2026-09-12 for the transit gaps research.
+    // Without them Halton looks like it only has GO.
+    { "type": "gtfs", "source": "oakville-gtfs.zip",   "feedId": "OAKVILLE"   },
+    { "type": "gtfs", "source": "burlington-gtfs.zip", "feedId": "BURLINGTON" },
+    { "type": "gtfs", "source": "milton-gtfs.zip",     "feedId": "MILTON"     }
   ]
 }

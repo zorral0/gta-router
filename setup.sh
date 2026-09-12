@@ -43,6 +43,11 @@ curl -L -o miway-gtfs.zip "https://www.miapp.ca/GTFS/google_transit.zip"
 curl -L -o brampton-gtfs.zip "https://www.arcgis.com/sharing/rest/content/items/a355aabd5a8c490186bdce559c9c75fb/data"
 # DRT (Durham Region Transit)
 curl -L -o drt-gtfs.zip "https://maps.durham.ca/OpenDataGTFS/GTFS_Durham_TXT.zip"
+# Halton local buses: Oakville, Burlington, Milton (without them Halton only
+# has GO). Sources found via mobilitydatabase.org and transit.land.
+curl -L -o oakville-gtfs.zip "https://www.arcgis.com/sharing/rest/content/items/d78a1c1ad6a940009de8b68839a8f606/data"
+curl -L -o burlington-gtfs.zip "https://opendata.burlington.ca/gtfs-rt/GTFS_Data.zip"
+curl -L -o milton-gtfs.zip "https://metrolinx.tmix.se/gtfs/gtfs-milton.zip"
 
 # TTC publishes no transfers.txt; inject subway interchange transfers so
 # the router knows Bloor-Yonge etc. are internal (see patch_ttc_transfers.py)
@@ -106,7 +111,7 @@ fi
 # Basic sanity checks on the downloads
 echo ""
 echo "=== Verifying downloads ==="
-for f in go-gtfs.zip up-gtfs.zip ttc-gtfs.zip yrt-gtfs.zip miway-gtfs.zip brampton-gtfs.zip drt-gtfs.zip; do
+for f in go-gtfs.zip up-gtfs.zip ttc-gtfs.zip yrt-gtfs.zip miway-gtfs.zip brampton-gtfs.zip drt-gtfs.zip oakville-gtfs.zip burlington-gtfs.zip milton-gtfs.zip; do
   if unzip -l "$f" | grep -q "stops.txt"; then
     echo "OK: $f looks like a valid GTFS feed"
   else
