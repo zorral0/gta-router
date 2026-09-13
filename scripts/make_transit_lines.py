@@ -1,28 +1,22 @@
 #!/usr/bin/env python3
-"""Build web/transit-lines.json: the rapid-transit lines drawn on the map.
+"""Build web/transit-lines.json: the rapid transit lines drawn on the map.
 
-Sam 2026-08-01 wanted the map itself to look like a transit app's, and the
-biggest thing missing was the obvious one - the lines. Apple Maps and Transit
-both paint the subway permanently on the map; we painted nothing until you
-planned a trip.
+Takes the GTFS feeds in engine/ and pulls out one polyline per
+rapid transit route, in the route's official colour from route_color. Buses
+are left out on purpose: 210 TTC bus routes would bury the map.
 
-Takes the GTFS feeds already in this folder and pulls out one polyline per
-rapid-transit route, in that route's own official colour, straight from
-route_color in the feed. Buses are deliberately left out: 210 TTC bus routes
-would be a grey hairball, and they are not what anyone means by "the lines".
+Run it after refresh.sh or setup.sh downloads new feeds:
 
-Run it after refresh.sh / setup.sh pulls new feeds:
+    python3 scripts/make_transit_lines.py
 
-    python3 make_transit_lines.py
-
-No dependencies. Reads the zips in place, takes ~30s (TTC's shapes.txt is
-17 MB and trips.txt is 12 MB), and writes a file of roughly 150 KB.
+No dependencies. Reads the zips in place, takes about 30 seconds (TTC's
+shapes.txt is 17 MB and trips.txt is 12 MB), and writes roughly 150 KB.
 """
 
 import csv, io, json, os, sys, zipfile
 from collections import defaultdict
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Which feeds to mine, and which GTFS route_types count as rapid transit.
 # 0 = tram/streetcar/LRT, 1 = subway, 2 = rail. 3 (bus) is deliberately absent.
@@ -173,7 +167,7 @@ def build_feed(path, agency, want_types):
 def main():
     feats = []
     for fname, agency, types in FEEDS:
-        path = os.path.join(HERE, fname)
+        path = os.path.join(ROOT, "engine", fname)
         if not os.path.exists(path):
             print("skipping %s (not here)" % fname)
             continue
@@ -188,7 +182,7 @@ def main():
     order = {"streetcar": 0, "lrt": 1, "rail": 2, "subway": 3}
     feats.sort(key=lambda f: order.get(f["properties"]["mode"], 0))
 
-    dest = os.path.join(HERE, "web", "transit-lines.json")
+    dest = os.path.join(ROOT, "web", "transit-lines.json")
     with open(dest, "w") as fh:
         json.dump({"type": "FeatureCollection", "features": feats}, fh,
                   separators=(",", ":"))

@@ -8,12 +8,12 @@ the client decodes a car leg's geometry and measures how much of it lands in
 one, so "did this drive use the toll road" is a lookup, not a geometry
 library.
 
-setup.sh now runs this automatically after it crops and patches the OSM
-extract (see its "Rebuilding the toll-road grid" step), so a fresh download
-can't leave a stale grid behind. To do it by hand:
-    osmium tags-filter gta.osm.pbf w/toll=yes -o toll.osm.pbf --overwrite
+setup.sh runs this automatically after it crops and patches the OSM extract
+(see its "Rebuilding the toll-road grid" step), so a fresh download can't
+leave a stale grid behind. To do it by hand:
+    osmium tags-filter engine/gta.osm.pbf w/toll=yes -o toll.osm.pbf --overwrite
     osmium export toll.osm.pbf -f geojson -o toll.geojson --overwrite
-    python3 make_toll_cells.py toll.geojson web/toll-roads.json
+    python3 scripts/make_toll_cells.py toll.geojson web/toll-roads.json
 """
 import json, math, sys
 

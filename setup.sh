@@ -1,11 +1,13 @@
 #!/bin/bash
 # GTA Router - one-time setup script for macOS
-# Installs Java, downloads OTP2 and all GTA data.
+# Installs Java, downloads OpenTripPlanner and all GTA data, and builds the
+# routing graph. The engine's files all live in engine/.
 # Run from inside the gta-router folder:  bash setup.sh
 
 set -e  # stop on first error
+cd "$(dirname "$0")"
 
-echo "=== Step 1/5: Installing Java 25 and osmium (via Homebrew) ==="
+echo "=== Step 1/6: Installing Java 25 and osmium (via Homebrew) ==="
 if ! command -v brew &> /dev/null; then
   echo "Homebrew not found. Install it first from https://brew.sh then re-run this script."
   exit 1
@@ -15,8 +17,11 @@ brew install openjdk@25 osmium-tool || true
 sudo ln -sfn "$(brew --prefix)/opt/openjdk@25/libexec/openjdk.jdk" /Library/Java/JavaVirtualMachines/openjdk-25.jdk || true
 java -version
 
+# downloads, map data and the graph all go in engine/
+cd engine
+
 echo ""
-echo "=== Step 2/5: Downloading OpenTripPlanner 2.9.0 (~150 MB) ==="
+echo "=== Step 2/6: Downloading OpenTripPlanner 2.9.0 (~150 MB) ==="
 if [ ! -f otp.jar ]; then
   curl -L -o otp.jar "https://repo1.maven.org/maven2/org/opentripplanner/otp-shaded/2.9.0/otp-shaded-2.9.0-shaded.jar"
 else
@@ -24,7 +29,7 @@ else
 fi
 
 echo ""
-echo "=== Step 3/5: Downloading GTFS transit schedules ==="
+echo "=== Step 3/6: Downloading GTFS transit schedules ==="
 # GO Transit (Metrolinx open data)
 curl -L -o go-gtfs.zip "https://assets.metrolinx.com/raw/upload/v1683228856/Documents/Metrolinx/Open%20Data/GO-GTFS.zip"
 # UP Express
@@ -50,17 +55,17 @@ curl -L -o burlington-gtfs.zip "https://opendata.burlington.ca/gtfs-rt/GTFS_Data
 curl -L -o milton-gtfs.zip "https://metrolinx.tmix.se/gtfs/gtfs-milton.zip"
 
 # TTC publishes no transfers.txt; inject subway interchange transfers so
-# the router knows Bloor-Yonge etc. are internal (see patch_ttc_transfers.py)
-python3 patch_ttc_transfers.py
+# the router knows Bloor-Yonge etc. are internal
+python3 ../scripts/patch_ttc_transfers.py
 
 # Extract GO's real station-to-station fare table for the cost model
-python3 make_go_fares.py
+python3 ../scripts/make_go_fares.py
 
 # The subway/streetcar/GO lines painted on the map, in their own colours
-python3 make_transit_lines.py
+python3 ../scripts/make_transit_lines.py
 
 echo ""
-echo "=== Step 4/5: Downloading OpenStreetMap data for Ontario (~1.5 GB) ==="
+echo "=== Step 4/6: Downloading OpenStreetMap data for Ontario (~1.5 GB) ==="
 if [ ! -f ontario-latest.osm.pbf ]; then
   curl -L -o ontario-latest.osm.pbf "https://download.geofabrik.de/north-america/canada/ontario-latest.osm.pbf"
 else
@@ -68,7 +73,7 @@ else
 fi
 
 echo ""
-echo "=== Step 5/5: Cropping OSM data to the GTA ==="
+echo "=== Step 5/6: Cropping OSM data to the GTA ==="
 # Bounding box covers Hamilton to Oshawa, Lake Ontario to Barrie fringe.
 # Cropping keeps the graph build fast and memory use reasonable.
 osmium extract --bbox -80.30,43.20,-78.40,44.35 ontario-latest.osm.pbf -o gta.osm.pbf --overwrite
@@ -77,8 +82,8 @@ osmium extract --bbox -80.30,43.20,-78.40,44.35 ontario-latest.osm.pbf -o gta.os
 # park_ride=yes tag on ~28 real commuter lots (TTC subway lots like
 # Hwy 407 / Pioneer Village / Finch West, several GO lots, MTO carpool
 # lots), so the router would never park at them; this also adds a working
-# entrance point for the Centennial GO garage. See HANDOFF.md.
-osmium apply-changes gta.osm.pbf parking-patch.osc -o gta-parkfix.osm.pbf --overwrite
+# entrance point for the Centennial GO garage.
+osmium apply-changes gta.osm.pbf ../data/parking-patch.osc -o gta-parkfix.osm.pbf --overwrite
 mv gta-parkfix.osm.pbf gta.osm.pbf
 
 echo ""
@@ -87,7 +92,7 @@ echo "=== Rebuilding the toll-road grid (web/toll-roads.json) ==="
 # much of a drive runs on Highway 407 and prices it - from this grid, built
 # out of the OSM data we just downloaded. Stale grid = wrong toll marks and
 # wrong toll dollars, so it is rebuilt here, from the SAME gta.osm.pbf the
-# graph will be built from. See make_toll_cells.py and HANDOFF.md.
+# graph will be built from. See scripts/make_toll_cells.py.
 # Deliberately non-fatal: a missing grid only costs the toll marks (the app
 # checks and carries on), which is not worth failing a 2 GB setup over.
 toll_grid () {
@@ -95,7 +100,7 @@ toll_grid () {
   tmp="$(mktemp -d)" || return 1
   osmium tags-filter gta.osm.pbf w/toll=yes -o "$tmp/toll.osm.pbf" --overwrite \
     && osmium export "$tmp/toll.osm.pbf" -f geojson -o "$tmp/toll.geojson" --overwrite \
-    && python3 make_toll_cells.py "$tmp/toll.geojson" web/toll-roads.json
+    && python3 ../scripts/make_toll_cells.py "$tmp/toll.geojson" ../web/toll-roads.json
   local rc=$?
   rm -rf "$tmp"
   return $rc
@@ -105,7 +110,7 @@ if toll_grid; then
 else
   echo "WARNING: could not rebuild web/toll-roads.json. Everything still"
   echo "works, but the app will not mark or price Highway 407 tolls until"
-  echo "this succeeds. Re-run:  bash setup.sh  (or see make_toll_cells.py)"
+  echo "this succeeds. Re-run:  bash setup.sh  (or see scripts/make_toll_cells.py)"
 fi
 
 # Basic sanity checks on the downloads
@@ -120,4 +125,8 @@ for f in go-gtfs.zip up-gtfs.zip ttc-gtfs.zip yrt-gtfs.zip miway-gtfs.zip brampt
 done
 
 echo ""
-echo "Setup complete. Next:  bash build.sh"
+echo "=== Step 6/6: Building the routing graph (5-15 minutes) ==="
+java -Xmx8G -jar otp.jar --build --save .
+
+echo ""
+echo "Setup complete. Next:  bash run.sh"

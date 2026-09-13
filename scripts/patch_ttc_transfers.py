@@ -1,23 +1,25 @@
 """
-GTA Router - inject subway interchange transfers into the TTC feed.
+Add subway interchange transfers to the TTC feed.
 
 The TTC's published schedule data has no transfers.txt, so the router
-doesn't know Bloor-Yonge, St George, etc. are internal transfers - it
-routes you out to the sidewalk and back in, which makes every subway
-transfer look slower than it is and skews rankings toward streetcars.
+doesn't know Bloor-Yonge, St George, etc. are internal transfers. It routes
+you out to the sidewalk and back in, which makes every subway transfer look
+slower than it is and skews rankings toward streetcars.
 
 This script adds a transfers.txt to ttc-gtfs.zip declaring a minimum
 transfer time between the subway platforms of each interchange station.
-Re-run it after every fresh TTC download (setup.sh does this).
+Re-run it after every fresh TTC download (setup.sh and refresh.sh do this).
 
-Usage:  python3 patch_ttc_transfers.py    (then rebuild the graph)
+Usage:  python3 scripts/patch_ttc_transfers.py    (then rebuild the graph)
 """
 
 import csv
 import io
+import os
 import zipfile
 
-FEED = "ttc-gtfs.zip"
+FEED = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                    "engine", "ttc-gtfs.zip")
 TRANSFER_SECONDS = 180  # 3 min: realistic for stairs between platforms
 
 # Platforms are matched by stop_name prefix. Stations that interchange

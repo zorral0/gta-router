@@ -63,11 +63,8 @@
     },
 
     "bicycle": {
-      // Prefer safer streets over absolute shortest path.
-      // NOTE 2026-07-18: the old { "type": "safest-streets" } object was
-      // the 2.5 spelling - 2.9 SILENTLY IGNORED it (startup log said
-      // "The enum value '' is not legal"). This enum form is verified
-      // warning-free on 2.9.
+      // Prefer safer streets over absolute shortest path. OTP 2.9 wants this
+      // enum; the older { "type": "safest-streets" } object is silently ignored.
       "optimization": "SAFEST_STREETS",
       "speed": 4.5
     },
@@ -91,30 +88,21 @@
       "frequency": "1m"
     },
 
-    // LIVE BUS DELAYS (GTFS-RT TripUpdates), added 2026-07-18. A restart
-    // picks these up - no graph rebuild. Validated on a throwaway engine:
-    // YRT 97.6% / MiWay 100% / DRT ~92% of updates applied (the failures
-    // are malformed entries in the agencies' own feeds; those trips just
-    // stay on schedule times). After a restart the log shows per-feed
-    // "X of Y update messages were applied" lines every minute.
-    // TTC is deliberately ABSENT: its RT trip ids belong to a NEWER
-    // schedule generation than our Jul 6 static zip - every update is
-    // TRIP_NOT_FOUND until the TTC feed is re-downloaded and the graph
-    // rebuilt (and its feed's "NEW" trips crash OTP outright without
-    // ttc-rt-filter.py). See HANDOFF.md before wiring TTC.
-    // GO added 2026-07-25 with Sam's free Metrolinx Open Data key (does not
-    // expire). Probed live: 74 of 76 trip ids in TripUpdates matched
-    // go-gtfs.zip trips.txt. Note the GO static feed carries UP Express as its
-    // own route 35 ("Union Pearson Express"), so some UP trains arrive through
-    // this GO updater. There IS also a SEPARATE UP feed at
-    // .../api/V1/UP/Gtfs/Feed/TripUpdates for the up-gtfs.zip feed id - it
-    // returned an EMPTY entity list every time it was probed on 2026-07-25,
-    // so it is not wired yet. Re-probe it during UP service hours; if it has
-    // entities whose trip ids match up-gtfs.zip, add the same two lines with
-    // feedId "UP". See HANDOFF.md "What else the Metrolinx API gives us".
-    // ${METROLINX_KEY} is filled in by OTP from the environment at startup.
-    // The real key lives in metrolinx.env (git-ignored); run.sh and the
-    // Oracle service both load it. Without it the engine refuses to start.
+    // Live delays (GTFS-RT TripUpdates). A restart picks these up; no graph
+    // rebuild needed. A few updates in each agency's feed fail to match, and
+    // those trips stay on scheduled times. The log reports "X of Y update
+    // messages were applied" per feed every minute.
+    //
+    // TTC is not wired: its realtime trip ids only match a freshly
+    // downloaded static feed, and its NEW trips crash OTP unless they are
+    // filtered out first.
+    //
+    // GO needs a free Metrolinx Open Data key. OTP fills it in from the
+    // METROLINX_KEY environment variable, which run.sh loads from
+    // metrolinx.env; the engine will not start without it. The GO static
+    // feed carries UP Express as route 35, so some UP trains update through
+    // this feed. Metrolinx's separate UP feed has returned no entities so far
+    // and is not wired.
     { "type": "stop-time-updater", "frequency": "1m", "feedId": "GO",
       "url": "https://api.openmetrolinx.com/OpenDataAPI/api/V1/Gtfs.proto/Feed/TripUpdates?key=${METROLINX_KEY}" },
     { "type": "stop-time-updater", "frequency": "1m", "feedId": "YRT",
@@ -124,21 +112,11 @@
     { "type": "stop-time-updater", "frequency": "1m", "feedId": "DRT",
       "url": "https://drtonline.durhamregiontransit.com/gtfsrealtime/TripUpdates" },
 
-    // LIVE SERVICE ALERTS (GTFS-RT ServiceAlerts), added 2026-07-19. These
-    // are the TEXT disruptions ("Line 1: no service Bloor-St George"), a
-    // SEPARATE feed from the TripUpdates above. A restart picks them up - no
-    // graph rebuild. feedId must match the static feed ids in
-    // build-config.json (TTC/YRT/MIWAY). Feeds probed live 2026-07-19: TTC
-    // 8.7KB active, MiWay 11KB active, YRT valid-but-empty.
-    // TTC IS INCLUDED here even though TTC TripUpdates are NOT (see above):
-    // alerts reference ROUTES and STOPS (stable ids like "1", "Kennedy"),
-    // not the mismatched live TRIP ids that make TripUpdates TRIP_NOT_FOUND -
-    // so there's no "NEW trip" crash and ttc-rt-filter.py is NOT needed here.
-    // (Verified on a throwaway engine before shipping - TTC alerts ingested
-    // without aborting the batch.)
-    // DRT alerts: no public endpoint found (every path 403s) - omitted.
-    // GO alerts added 2026-07-25, same Metrolinx key and same one-feed-covers-
-    // both caveat as the TripUpdates line above (40KB of live alerts probed).
+    // Service alerts (GTFS-RT ServiceAlerts): text disruptions such as
+    // "Line 1: no service Bloor-St George". feedId must match the static
+    // feed ids in build-config.json. TTC alerts work without the filter
+    // above because they reference routes and stops, not trip ids. DRT has
+    // no public alerts endpoint.
     { "type": "real-time-alerts", "frequency": "1m", "feedId": "GO",
       "url": "https://api.openmetrolinx.com/OpenDataAPI/api/V1/Gtfs.proto/Feed/Alerts?key=${METROLINX_KEY}" },
     { "type": "real-time-alerts", "frequency": "1m", "feedId": "TTC",

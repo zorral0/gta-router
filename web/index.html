@@ -8,9 +8,8 @@
 <link href="vendor/maplibre-gl.css" rel="stylesheet">
 <script src="vendor/maplibre-gl.js"></script>
 <style>
-  /* SOLID surfaces (Apple-material pass, 2026-07-19): the old translucent
-     gray-on-gray read muddy - now the sheet, cards and chips are opaque
-     with real contrast (dark mode: black cards on a #1b sheet). */
+  /* Solid surfaces: the sheet, cards and chips are opaque for contrast
+     (dark mode: black cards on a #1b sheet). */
   :root {
     --panel: #f4f4f6; --card: #ffffff;
     --card-solid: #ffffff; --text: #1d1d1f; --muted: #6e6e73;
@@ -296,14 +295,10 @@
     background: var(--chip); color: var(--muted); }
   .have.on { background: var(--accent); color: #fff; }
   .have:active { transform: scale(.96); }
-  /* The drawer's front door. This was a small grey "Options" chip parked
-     between two icon buttons: easy to miss, and the word alone never said
-     what was inside (Sam 2026-07-26: "should be more prominent and clear
-     as to what purpose it serves"). Now it's a full-width row that names
-     its own contents, and its second line does double duty - it lists
-     what's inside while everything is default, and switches to what you
-     have CHANGED as soon as anything is off-default, so a filter can
-     never sit there hidden and quietly drop trips. */
+  /* The Trip options row. Its second line lists what's inside while
+     everything is default, and switches to what you have changed as soon
+     as anything is off-default, so a filter can never sit collapsed and
+     quietly drop trips. */
   .optsrow { display: flex; align-items: center; gap: 11px; width: 100%;
     border: none; cursor: pointer; font: inherit; text-align: left;
     color: var(--text); background: var(--card); border-radius: 13px;
@@ -315,9 +310,8 @@
   .optsrow .otx { min-width: 0; flex: 1; }
   .optsrow .ott { display: block; font-size: 13.5px; font-weight: 620;
     letter-spacing: -.01em; }
-  /* wraps instead of trailing off in "...": the changed-settings list can be
-     long, and a cut-off filter is exactly the hidden filter this row exists
-     to prevent (Sam 2026-09-13) */
+  /* wraps instead of truncating: a cut-off list of changed settings would
+     hide exactly what this row is meant to show */
   .optsrow .osub { display: block; font-size: 11.5px; color: var(--muted);
     margin-top: 1px; line-height: 1.35; }
   /* off-default reads as a live setting, not as helper text */
@@ -376,9 +370,8 @@
   .slider::-moz-range-progress { height: 4px; border-radius: 999px; background: var(--accent); }
   .slider::-moz-range-thumb { width: 18px; height: 18px; border: none; border-radius: 50%;
     background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
-  /* the filter is allowed to hide fast options - say so instead of
-     silently dropping them (this is what hid the Fairview trips). One
-     quiet chip row, not a paragraph of blue text. */
+  /* the filter is allowed to hide fast options, but says so instead of
+     silently dropping them. One quiet chip row, not a paragraph of text. */
   .slhint { display: flex; align-items: center; gap: 8px; width: 100%;
     border: none; background: var(--chip); color: var(--muted); font: inherit;
     font-size: 11.5px; font-weight: 550; text-align: left; cursor: pointer;
@@ -443,8 +436,8 @@
     }
   }
 
-  /* zoom controls restyled to match the app (Sam 2026-07-20: the stock
-     +/- felt cheap): app card material, rounded, our own +/- glyphs */
+  /* zoom controls restyled to match the app: card material, rounded,
+     custom +/- glyphs */
   .maplibregl-ctrl-group { background: var(--card-solid) !important;
     border-radius: 12px !important; box-shadow: var(--shadow) !important;
     overflow: hidden; }
@@ -464,8 +457,8 @@
     font-weight: 400; line-height: 1; }
   .maplibregl-ctrl-zoom-in::after { content: "+"; }
   .maplibregl-ctrl-zoom-out::after { content: "\2212"; }
-  /* map popups (Bike Share dock hover) - match the app card so the text
-     is readable in dark mode (Sam 2026-07-20: was invisible before) */
+  /* map popups (Bike Share dock hover) match the app card so the text is
+     readable in dark mode */
   .maplibregl-popup-content { background: var(--card-solid) !important;
     color: var(--text) !important; border-radius: 10px !important;
     box-shadow: var(--shadow) !important; padding: 8px 11px !important;
@@ -478,7 +471,7 @@
   .maplibregl-popup-anchor-top-right .maplibregl-popup-tip
     { border-bottom-color: var(--card-solid) !important; }
 
-  /* map-look button - standalone, top-right, Apple-style (Sam 2026-07-20) */
+  /* map look button: standalone, top-right */
   #lookBtn { position: absolute; top: 62px; right: 14px; z-index: 6;
     width: 40px; height: 40px; border: none; border-radius: 12px;
     background: var(--card-solid); color: var(--text); cursor: pointer;
@@ -486,11 +479,9 @@
     justify-content: center; }
   #lookBtn:hover { background: var(--chip); }
   #lookBtn:active { transform: scale(.94); }
-  /* 3D tilt toggle - bottom of the right-hand column: Reach / layers / 3D
-     (Sam 2026-07-20 wanted the three top-right controls stacked vertically;
-     2026-07-25 he wanted Reach first, so all three are now equal-sized
-     icons and the reach panel opens to the LEFT instead of sitting in the
-     column - a card in the column would cover whatever came after it) */
+  /* 3D tilt toggle, bottom of the right-hand column: Reach / layers / 3D.
+     All three are equal-sized icons, and the reach panel opens to the left
+     because a card in the column would cover the buttons below it. */
   #d3Btn { position: absolute; top: 110px; right: 14px; z-index: 6;
     width: 40px; height: 40px; border: none; border-radius: 12px;
     background: var(--card-solid); color: var(--text); cursor: pointer;
@@ -500,9 +491,9 @@
   #d3Btn:hover { background: var(--chip); }
   #d3Btn:active { transform: scale(.94); }
   #d3Btn.on { background: var(--accent); color: #fff; }
-  /* compass - only shows once the map is tilted or turned off north, so the
-     column stays three icons tall in plain 2D (Sam 2026-08-01 wanted to be
-     able to spin the map in 3D). Drag it to turn, tap it to face north. */
+  /* compass: only shows once the map is tilted or turned off north, so the
+     column stays three icons tall in plain 2D. Drag it to turn, tap it to
+     face north. */
   #compassBtn { position: absolute; top: 158px; right: 14px; z-index: 6;
     width: 40px; height: 40px; border: none; border-radius: 12px;
     background: var(--card-solid); color: var(--text); cursor: grab;
@@ -825,9 +816,8 @@ if (typeof maplibregl === "undefined"){
   document.body.innerHTML = '<div style="display:flex;height:100%;align-items:center;justify-content:center;font:15px/1.5 -apple-system,sans-serif;color:#6e6e73;text-align:center;padding:30px">The map library didn&#39;t load. The web/vendor/ files are missing or unreadable.<br>Restore them, then reload this page.</div>';
   throw new Error("maplibre-gl missing");
 }
-/* On your Mac the page talks straight to the engines. On the hosted copy
-   (Vercel) it asks its own address, and Vercel passes /otp/... on to the
-   cloud engine. See DEPLOY.md. */
+/* Run locally, the page talks straight to the engines. A hosted copy uses
+   its own address and expects /otp/... to be proxied to the engine. */
 const LOCAL = ["localhost", "127.0.0.1", ""].includes(location.hostname);
 const OTP = LOCAL ? "http://localhost:8080/otp/gtfs/v1" : "/otp/gtfs/v1";
 
@@ -869,9 +859,9 @@ function icn(name, size){
 const modeIcon = m => ({ WALK:"walk", BICYCLE:"bike", CAR:"car", BUS:"bus",
   RAIL:"rail", SUBWAY:"subway", TRAM:"subway" }[m] || "bus");
 
-/* ---- fare model: keep in sync with costs.py ---- */
+/* ---- fare model ---- */
 // [name-match, adult fare, youth fare (null = not modelled), verified?]
-// ALL verified 2026-07-18 against each agency's official fare page
+// verified July 2026 against each agency's official fare page
 // (PRESTO-level; unverified fares would say so in the UI via the flag)
 const LOCAL_FARES = [["TTC",3.30,2.35,true],["TORONTO",3.30,2.35,true],
                      ["YORK",4.24,3.29,true],["MIWAY",3.50,2.90,true],
@@ -1024,8 +1014,6 @@ function itineraryCostDetail(it){
       // Highway 407 is billed by the kilometre and the engine knows nothing
       // about it, so the app measures the tolled metres off the route
       // geometry and prices them itself - see the toll blocks below.
-      // (Not in costs.py: that one prices from distances alone and has no
-      // route geometry to measure, so it cannot compute this.)
       const toll = legTollCost(l);
       if (toll > 0)
         items.push({ label: `Highway 407 toll (estimated, `
@@ -1033,9 +1021,8 @@ function itineraryCostDetail(it){
       if (later){ if (GO_PARKING > 0) items.push({ label: "Station parking", amount: GO_PARKING }); }
       // car AFTER transit = a pickup or your car already waiting - no
       // parking fee; only a start-of-trip drive to the destination pays it.
-      // (Unreachable in the app today - trips without transit are filtered
-      // out before pricing. Kept so the model matches costs.py, which DOES
-      // price pure-car trips for carprobe comparisons.)
+      // (Unreachable today: trips without transit are filtered out before
+      // pricing. Kept so pure-car trips price correctly if they are added.)
       else if (!earlier) items.push({ label: "Downtown parking", amount: DOWNTOWN_PARKING });
     }
   });
@@ -1044,11 +1031,9 @@ function itineraryCostDetail(it){
 function itineraryCost(it){ return itineraryCostDetail(it).total; }
 
 /* ---- map (vector, light/dark follows the system) ----
-   MAP LOOKS (Sam's picks, 2026-07-19): the map is OpenFreeMap's "liberty"
-   style recolored right here in the browser - no API key, no new host.
-   Defaults: "midnight" (dark) / "daylight" (light); "classic" = the
-   untouched hosted styles (fiord / liberty) from before, kept as options
-   via the little layers button bottom-right. The liberty style JSON
+   Map looks: OpenFreeMap's "liberty" style recolored in the browser, so
+   there is no API key or extra host. "classic" is the untouched hosted
+   styles (fiord / liberty), picked from the layers button. The liberty style JSON
    (~43 KB) is cached in localStorage so later visits start straight in
    the chosen look; the first visit (or a cleared cache) briefly shows
    classic, then swaps once the JSON arrives. Offline = classic. */
@@ -1063,23 +1048,18 @@ const LOOK_NAME = { appleday: "Apple", applenight: "Apple",
                     midnight: "Midnight", graphite: "Graphite",
                     daylight: "Daylight", quiet: "Quiet", classic: "Classic" };
 const PALETTES = {
-  /* "Apple" (Sam 2026-08-01, after asking whether we could just use the real
-     Apple map - we cannot without a paid Apple Developer account, so these two
-     palettes chase the look instead). The colours were matched against Apple
-     Maps on the web over downtown Toronto, by laying candidate swatches over
-     the live map and picking the ones with no visible seam; see HANDOFF. The
-     tells are the water (much bluer than our other looks, near-navy at night)
-     and roads that are plain white with a warm grey casing, no gold.
+  /* "Apple": two palettes that approximate Apple Maps. Using Apple's own map
+     on the web needs a paid developer account, so these chase the look on
+     our own tiles instead. The colours were matched over downtown Toronto
+     by laying candidate swatches over Apple's map and keeping the ones with
+     no visible seam. The tells are the water (much bluer than the other
+     looks, near-navy at night) and plain white roads with a warm grey casing.
 
-     2026-08-08: two colour values moved as a consequence of the geometry
-     pass below, not because the original matches were wrong.
-       - applenight's four road greys went up about two steps. The old ones
-         were matched on FAT roads; once the roads were thinned to Apple's
-         proportions the same grey nearly vanished into the land.
-       - `building` on both palettes moved to within a hair of `land`. That
-         is how Apple keeps buildings from mattering when you are looking
-         straight down, and it replaces a fill-opacity fade that would have
-         re-broken the tilted view. See appleGeometry. */
+     applenight's road greys are a couple of steps lighter than a straight
+     match, because appleGeometry thins the roads and a thin road needs more
+     contrast. `building` sits within a hair of `land` on both palettes,
+     which keeps buildings quiet looking straight down without fading the
+     layer (fading breaks the tilted view). See appleGeometry. */
   appleday: { dark: false, dropPois: false, apple: true,
     land: "#f5f3ee", residential: "#f0ede6", civic: "#ece9e1",
     water: "#8fcfee", wood: "#bcdfa9", park: "#c6e2b4", grass: "#cfe7be",
@@ -1144,8 +1124,8 @@ function shadeHex(hex, amt, dark){
     Math.max(0, Math.min(255, Math.round(dark ? v + (255 - v) * amt : v * (1 - amt)))));
   return "#" + ch.map(v => v.toString(16).padStart(2, "0")).join("");
 }
-/* Downtown in 3D was an unreadable grey mass (Sam 2026-08-01: "the buildings
-   blend together"). Three causes, all fixed here:
+/* 3D buildings. Left as the base style ships them, downtown in 3D reads as
+   one grey mass. Three fixes:
    1. the base style ships fill-extrusion-opacity 0.8, and ~2000 translucent
       boxes in view show THROUGH each other and smear into one lump. Opaque
       is the single biggest win.
@@ -1169,11 +1149,9 @@ function buildingPaint(p){
   };
 }
 
-/* ---- Apple geometry pass (Sam 2026-08-08) ----------------------------
-   The Apple palettes got the COLOURS close, but side by side against the
-   real Apple Maps (screenshotted on this Mac over the suburbs and downtown
-   Toronto) the map still read as "not Apple", and every remaining tell was
-   shape or type, not colour:
+/* ---- Apple geometry ---------------------------------------------------
+   Colour alone doesn't make the map read like Apple Maps. Side by side, the
+   remaining differences are shape and type:
 
      1. our roads were far too fat, and the gap between a laneway and an
         arterial was far too dramatic. Apple draws a compressed hierarchy -
@@ -1190,7 +1168,7 @@ function buildingPaint(p){
 
    None of this touches the other looks - it only runs when the palette is
    flagged apple:true, so Midnight / Graphite / Daylight / Quiet / Classic
-   stay exactly as Sam picked them. We cannot match Apple's ABBREVIATIONS
+   are unchanged. We cannot match Apple's ABBREVIATIONS
    ("RICHMOND ST W"): the vector tiles only carry the full name, and
    MapLibre expressions have no string-replace to shorten it with. */
 
@@ -1289,9 +1267,9 @@ function appleGeometry(s, p){
     /* The EXTRUSIONS need no work here: on Apple's map they are a whisper, and
        the two Apple palettes get that by setting `building` almost to the
        land colour rather than by fading the layer out. Turning the opacity
-       down would have been the obvious fix and is the WRONG one - it brings
-       back the exact smearing Sam reported on 2026-08-01, where translucent
-       boxes show through each other in the tilted view. Opaque + a quiet
+       down would be the obvious fix and is the wrong one: it brings back
+       the smearing where translucent boxes show through each other in the
+       tilted view. Opaque + a quiet
        colour is subtle when flat and still separates towers when pitched. */
   }
   return s;
@@ -1307,8 +1285,8 @@ function recolorStyle(base, p){
     if (p.dropPois && /^poi_r/.test(l.id)) return false;  // POI icon clutter
     return true;
   });
-  // Curate POIs to a few important landmark classes (Sam 2026-07-23: "just a
-  // few important ones" - drop shops/parking/bins). Applies to every look.
+  // Keep only important landmark classes (drop shops, parking, bins).
+  // Applies to every look.
   const POI_KEEP = ["hospital","university","college","museum","aquarium",
     "stadium","monument","attraction","theatre","cinema","library","town_hall",
     "police","fire_station","place_of_worship","park","railway","ferry_terminal"];
@@ -1377,19 +1355,17 @@ function recolorStyle(base, p){
   return p.apple ? appleGeometry(s, p) : s;
 }
 
-// Apple is the new out-of-the-box look (Sam 2026-08-01).
+// Apple is the default look.
 const mapLook = Object.assign({ dark: "applenight", light: "appleday" },
                               loadStored("mapLook", {}));
 function saveLook(){
   try { localStorage.setItem("mapLook", JSON.stringify(mapLook)); } catch (e){}
 }
-/* One-time move across to the new look. A saved choice normally wins over the
-   default, which meant a browser that had been here before kept showing the
-   old map and it looked like nothing had changed at all (Sam, straight away).
-   So: if the saved look is still one of the OLD defaults, treat that as "never
-   really chose" and move it to Apple once. A look Sam actually went and picked
-   (Graphite, Quiet, Classic) is left alone, and the flag means we only ever do
-   this once - pick Midnight after this and Midnight is what you keep. */
+/* One-time migration to the Apple default. A saved look normally wins over
+   the default, so a returning browser would never see the change. If the
+   saved look is still one of the old defaults, treat it as never chosen and
+   move it to Apple once. Looks picked on purpose (Graphite, Quiet, Classic)
+   are left alone, and the flag means this only ever runs once. */
 (function(){
   try {
     if (localStorage.getItem("sawAppleLook")) return;
@@ -1419,10 +1395,9 @@ function initialMapStyle(){
 let shieldFor = null;
 async function applyLook(){
   const look = mapLook[themeMode()];
-  // Shields FIRST. Images added with addImage survive setStyle's diff, so
-  // the previous look's shields stayed painted on the new map until the
-  // swap finished - Sam: "the old highway logo shows up briefly when
-  // switching the map theme". Decoding them before the style changes (and
+  // Shields first. Images added with addImage survive setStyle's diff, so
+  // the previous look's shields would stay painted on the new map until the
+  // swap finished. Decoding them before the style changes (and
   // installing them into the outgoing style, which is about to be replaced
   // anyway) means the new map's first painted frame already has the right
   // artwork. Cached after the first time, so a repeat switch is instant.
@@ -1458,14 +1433,11 @@ function applyBuildingLight(){
 }
 map.on("style.load", applyBuildingLight);
 
-/* Apple looks only: extruded buildings appear when you TILT, and not before
-   (Sam 2026-08-08). Looking straight down, Apple's map draws buildings as
-   flat footprints - even at pitch 0 a perspective camera shows the walls of
-   anything away from the centre of the screen, and a screen full of little
-   grey boxes was the last big thing separating our flat map from Apple's.
-   Tilt and the extrusions come back, so the 3D work from 2026-08-01 is
-   untouched; this only decides WHEN it is on. Every other look keeps its
-   old always-on behaviour. */
+/* Apple looks only: extruded buildings appear when you tilt, not before.
+   Looking straight down, Apple's map draws buildings as flat footprints;
+   even at pitch 0 a perspective camera shows the walls of anything away from
+   the centre of the screen, which fills the map with little grey boxes.
+   Every other look keeps always-on extrusions. */
 function syncAppleBuildings(){
   if (!map.getLayer("building-3d")) return;
   // hands off every other look - they keep liberty's always-on buildings
@@ -1484,7 +1456,7 @@ darkMql.addEventListener("change", applyLook);
 // first visit with a non-classic look: upgrade as soon as the JSON arrives
 if (!libertyBase && mapLook[themeMode()] !== "classic") applyLook();
 
-/* Ontario King's Highway crown shields (Sam's request 2026-07-23). The liberty
+/* Ontario King's Highway crown shields. The liberty
    style draws plain sprite boxes for the 400-series; we swap in the real
    public-domain crown shield artwork (web/highway-shield.svg), recolored per
    theme, drawn small and low-opacity so it blends into the map. Re-runs on
@@ -1588,9 +1560,7 @@ function ensureShields(){
 // idle, where the plain sprite boxes used to show through first
 map.on("styledata", ensureShields);
 
-/* POI badges (Sam 2026-08-01: the stock icons "theyre not the same as apple
-   maps logos/illustrations at all", asking whether to bin them or replicate).
-   We cannot copy Apple's icons, that artwork is theirs. But their visual
+/* POI badges. Apple's icons are Apple's artwork, but their visual
    LANGUAGE is simple and reproducible: a small rounded badge in a
    category colour with a white glyph. So the generic OSM sprite icons are
    replaced with our own badges, drawn from the same Lucide-style glyph set
@@ -1600,8 +1570,8 @@ map.on("styledata", ensureShields);
    Same install machinery as the shields above, including the same trap:
    addImage and setLayoutProperty both fire "styledata" SYNCHRONOUSLY, so
    without the latch this re-enters itself and blows the stack. */
-/* Every glyph is a SOLID filled shape, never a stroke (Sam 2026-08-01: Apple's
-   "theyre more natural looking"). That is most of the difference: a thin
+/* Every glyph is a solid filled shape, never a stroke. That is most of the
+   difference from stock icons: a thin
    2px stroke reads as wiry and technical at 20px, a filled silhouette reads
    as drawn. Cut-outs use fill-rule="evenodd" rather than a second colour, so
    the badge colour shows through the holes. */
@@ -1642,8 +1612,7 @@ const POI_CLASS_BADGE = {
   airport: "air",
 };
 const POI_LAYERS = ["poi_r1", "poi_r7", "poi_r20", "poi_transit"];
-/* A CIRCLE, not a rounded square (Sam's Apple screenshot: their POI pins are
-   round). The 1px white ring is not decoration either, it is what keeps a
+/* A circle, not a rounded square, like Apple's POI pins. The 1px white ring is not decoration either, it is what keeps a
    dark-purple or slate badge from disappearing into the dark map, and it is
    what Apple's have. Drawn on a 24 box with 2px of padding so the ring is
    never clipped. */
@@ -1719,9 +1688,8 @@ function ensurePoiBadges(){
 }
 map.on("styledata", ensurePoiBadges);
 
-/* standalone map-look button, top-right like Apple Maps' map-type control
-   (Sam 2026-07-20: wanted its own button, not buried in Options). Opens a
-   small menu of the current theme's looks. */
+/* standalone map look button, top-right like Apple Maps' map type control.
+   Opens a small menu of the current theme's looks. */
 (function(){
   const btn = document.createElement("button");
   btn.id = "lookBtn"; btn.title = "Map look";
@@ -1762,8 +1730,7 @@ map.on("styledata", ensurePoiBadges);
 /* 3D button: tilt the camera so the map's building extrusions stand up,
    like Apple/Google Maps' 3D. Toggles between flat (pitch 0) and tilted.
    You can also tilt by hand any time - right-drag, or two-finger drag on a
-   trackpad - this button is just the one-tap way. (Sam 2026-07-20 asked
-   how to get 3D.) */
+   trackpad; this button is the one-tap way. */
 (function(){
   const btn = document.createElement("button");
   btn.id = "d3Btn"; btn.textContent = "3D";
@@ -1789,7 +1756,7 @@ map.on("styledata", ensurePoiBadges);
   map.on("pitch", sync);
 })();
 
-/* Trackpad rotate (Sam 2026-08-01). On a laptop the built-in ways to spin the
+/* Trackpad rotate. On a laptop the built-in ways to spin the
    map are all bad: MapLibre only rotates on a RIGHT-button drag or a
    ctrl-drag, and a plain two-finger trackpad drag is already spoken for (it
    zooms), so there was nothing for a trackpad. Two additions:
@@ -1827,23 +1794,18 @@ map.on("styledata", ensurePoiBadges);
     }
   }, { capture: true, passive: false });
 
-  /* The real two-finger TWIST. This is what Sam actually wanted (2026-08-01:
-     "i think it should be the two finger rotating guesture, not the press
-     down, its less intuitive") and he is right, but it is SAFARI ONLY and
-     that is not a limitation we can code around: macOS reports a trackpad
-     twist to a web page through Safari's non-standard GestureEvent, and
-     Chrome does not implement it at all. Verified in the Chromium preview:
-     `typeof GestureEvent` is "undefined" and `'ongesturestart' in window` is
-     false, so in Chrome the page is simply never told the fingers turned.
-     That is why the Option gesture above stays: it is the only one that
-     works in Chrome, which is what Sam runs.
+  /* The real two-finger twist. It is Safari only, and that can't be coded
+     around: macOS reports a trackpad twist to a web page through Safari's
+     non-standard GestureEvent, which Chrome does not implement (there,
+     `typeof GestureEvent` is "undefined"). That is why the Option gesture
+     above stays: it is the one that works in Chrome.
 
      Once we take the gesture we own all of it, so pinch has to be handled
      here too or Safari would fall back to zooming the whole PAGE. Zoom is
      anchored on the fingers rather than the map centre, the way a pinch
      should behave.
 
-     NOT TESTED: the preview browser is Chromium and never fires these. */
+     Chromium never fires these events, so this path only runs in Safari. */
   const cc = map.getCanvasContainer();
   let gOn = false, gBearing = 0, gZoom = 0;
   cc.addEventListener("gesturestart", e => {
@@ -1866,7 +1828,7 @@ map.on("styledata", ensurePoiBadges);
   cc.addEventListener("gestureend", e => { e.preventDefault(); gOn = false; });
 })();
 
-/* Compass: turn the map while you're in 3D (Sam 2026-08-01). The map could
+/* Compass: turn the map while you're in 3D. The map could
    always be spun - right-drag, or shift + arrow keys - but nothing on screen
    said so, so in practice 3D was stuck facing north. This adds a real compass
    under the 3D button that only appears once the map is tilted or off north:
@@ -1958,7 +1920,7 @@ map.on("style.load", ensureRoute);
 function addRouteLayers(fc){
   if (map.getSource("route")){ map.getSource("route").setData(fc); return; }
   map.addSource("route", { type: "geojson", data: fc });
-  /* Apple-style line (Sam's request 2026-07-19): the outline is a darker
+  /* Apple-style line: the outline is a darker
      shade of the line's own color (not a white sticker edge), and widths
      grow with zoom so the route feels drawn on the map, not pasted on. */
   const previewOpacity = ["case", ["==", ["get","preview"], 1], 0.55, 1];
@@ -1982,8 +1944,8 @@ function addRouteLayers(fc){
              "line-opacity": previewOpacity } });
   orderRouteForPitch();
 }
-/* In 3D the flat route line was painting ON TOP of the building extrusions,
-   so it looked like it climbed into the buildings (Sam 2026-07-20). When the
+/* In 3D a flat route line painted on top of the building extrusions looks
+   like it climbs into the buildings. When the
    map is tilted, slide the route BELOW the 3D buildings so they hide it where
    it passes behind them - it reads as running under/between the buildings.
    Flat (2D) keeps the route on top so it's always visible from above. */
@@ -2006,11 +1968,9 @@ function drawRoute(fc){
   // if the style is mid-load, the style.load handler above draws it
 }
 
-/* ---- The transit lines, painted on the map for good (Sam 2026-08-01).
-   Apple Maps and Transit both draw the rapid transit permanently; we drew
-   nothing until you planned a trip, which is the biggest single reason our
-   map did not read as a transit map. Built by make_transit_lines.py out of
-   the GTFS feeds in this folder, in each line's own official colour, so the
+/* ---- Transit lines, always drawn on the map.
+   Built by scripts/make_transit_lines.py from the GTFS feeds, in each
+   line's own official colour, so the
    Yonge line is Yonge-yellow and Stouffville is GO brown without us hard
    coding a single hex. Re-run that script when the feeds are refreshed.
    Buses are deliberately not in the file: 210 grey squiggles is not a map. */
@@ -2029,9 +1989,7 @@ function ensureTransit(){
   if (!transitFC || map.getSource("transit")) return;
   try {
     map.addSource("transit", { type: "geojson", data: transitFC });
-    /* Where to slot the lines in. Two traps here, both found the hard way
-       (Sam 2026-08-01: "at a certain zoom the subway lines will be covered by
-       buildings because its 3d"):
+    /* Where to slot the lines in. Two traps:
        1. "building-3d" sits ABOVE most of the style, so anchoring to the first
           symbol layer buried the lines under the extrusions and they vanished
           the moment you tilted and zoomed in.
@@ -2102,17 +2060,16 @@ map.on("pitch", syncTransitEmphasis);
 map.on("pitchend", syncTransitEmphasis);
 /* How loud the lines are. With a trip on screen they step back so the route
    stays the brightest thing on the map. This matters most in 3D: the route
-   deliberately runs BEHIND the building extrusions (Sam 2026-07-20, so it
-   reads as passing between them), and once the lines moved in front of the
+   deliberately runs behind the building extrusions (so it reads as
+   passing between them), and once the lines moved in front of the
    buildings a full-strength background line painted straight over the top of
    the route, leaving the actual trip as the faintest thing on screen. */
 const transitFade = peak => ({
   major: ["interpolate", ["linear"], ["zoom"], 7, 0, 8.5, peak],
   minor: ["interpolate", ["linear"], ["zoom"], 11, 0, 12, peak * 0.82],
 });
-/* The lines belong to the FLAT map, so they get out of the way as you tilt
-   (Sam 2026-08-01: "you cant see anything if transit lines are enabled, it
-   just looks odd"). Drawn over the rooftops they cut across the towers like
+/* The lines belong to the flat map, so they get out of the way as you tilt.
+   Drawn over the rooftops they cut across the towers like
    pen on glass; drawn under them they simply vanish behind the buildings.
    There is no third option for a street-level line in a tilted city, so
    rather than pick the least-bad occlusion we fade them out: full strength
@@ -2175,8 +2132,7 @@ function ensureDocks(){
     map.addSource("docks", { type: "geojson", data: dockFC });
     // slide under the route lines when they exist; routes added later go on top
     map.addLayer({ id: "docks", type: "circle", source: "docks", minzoom: 11,
-      // muted teal-blue, NOT the start-pin green (Sam 2026-07-20: the green
-      // docks clashed with the green Start dot). Smaller + semi-transparent
+      // muted teal-blue, not the green of the Start dot. Smaller + semi-transparent
       // so they read as background amenities, not trip points.
       paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 11, 2, 14, 4, 16, 5.5],
                "circle-color": "#3a9ec4",
@@ -2189,9 +2145,9 @@ function ensureDocks(){
 }
 map.on("style.load", ensureDocks);
 map.on("styledata", ensureDocks);
-/* dock info is HOVER-only (Sam 2026-07-20: downtown is so dense that
-   dock clicks made it impossible to drop a pin anywhere) - clicking a
-   dot now places your pin like anywhere else on the map */
+/* dock info is hover-only: downtown is dense enough that clickable docks
+   would make it impossible to drop a pin, so clicking a dot places your pin
+   like anywhere else on the map */
 let dockHover = null;
 map.on("mouseenter", "docks", e => {
   const p = e.features[0].properties;
@@ -2290,8 +2246,7 @@ function animateRoute(fc){
 let fromPt = null, toPt = null, fromMarker = null, toMarker = null;
 /* which end the NEXT map click drops. Normally it auto-points at the first
    empty end (start, then destination); clicking a coloured dot overrides it
-   so you can re-place the start after both are set (Sam 2026-07-20: the old
-   flow forced the second click to always be the destination). */
+   so you can re-place the start after both are set. */
 let pickOverride = null;
 function currentPick(){
   if (pickOverride) return pickOverride;
@@ -2590,40 +2545,34 @@ const COMBOS = [
   { key: "Bike + drive at the end",
     access: ["BICYCLE_PARKING"], egress: ["WALK", "CAR_PICKUP"],
     need: ["bike", "carEnd"], drive: true, needsLeg: "BICYCLE", carAfter: true },
-  // PURE MODES - no transit at all (Sam 2026-07-25: "what if biking the
-  // entire way is just faster"). Until now fetchCombo dropped every
-  // itinerary without a transit leg, so a straight ride could never surface
-  // however fast it was. `directOnly` is what stops the engine padding the
+  // Pure modes, no transit at all, for when biking or walking the whole way
+  // is simply faster. `directOnly` is what stops the engine padding the
   // answer with the walk+transit trips it otherwise prefers - ask for
   // direct:[BICYCLE] alone and you get transit itineraries back instead.
   //
   // maxMin keeps these honest rather than noisy. A pure ride is free, and
   // renderResults deliberately never hides the cheapest option, so an
   // uncapped 3-hour walk would pin itself to the top of every long trip.
-  // Past these limits nobody is choosing to walk or ride anyway. Raise them
-  // if Sam says otherwise; they are the only tuning here.
+  // Past these limits nobody is choosing to walk or ride anyway.
   { key: "Bike the whole way", pure: "BICYCLE", need: ["bike"], maxMin: 60 },
   { key: "Walk the whole way", pure: "WALK",    need: [],       maxMin: 45 },
 ];
 
 /* How reluctant to drive, once per query, for every combo with drive:true.
-   Reluctance is the ONLY knob that changes which lot the engine picks (OTP
+   Reluctance is the only knob that changes which lot the engine picks (OTP
    2.9 has no "max drive distance" and no way to name a station: the request
-   preferences are car.reluctance, car.boardCost and parking filters, nothing
-   else - introspected 2026-07-25), and each value returns the ONE lot that
-   is optimal at it. That is why a pair of values bracketed the middle out.
-   MEASURED against the live engine (a suburban origin 2 km from its GO station ->
-   U of T, both time modes), distinct lots returned per value:
+   preferences are car.reluctance, car.boardCost and parking filters), and
+   each value returns the one lot that is optimal at it. Measured from a
+   suburban origin to downtown, distinct lots returned per value:
      30 and up  2.3 / 2.4 km  (the walk-to-your-own-station tier)
      4 to 12    2.5 km only
      2 to 3     2.5 km + 24.8 km
      1 to 1.5   2.5 + 24.8 + 33.5 + 38.6 km   <- the only wide answer
-   So 1.0 is what actually surfaces a middle-distance station (Fairview at
-   24.6 km was Sam's report on 2026-07-25); 30 is kept because at 1.0 the
-   very-near lots drop out, and 2.0 because the near/middle split is
+   So 1.0 is what surfaces a middle-distance station; 30 is kept because at
+   1.0 the very-near lots drop out, and 2.0 because the near/middle split is
    origin-dependent and one more query is cheap (they all run in parallel).
-   Sub-1.0 values were not added: they only buy longer drives, and the drive
-   cap plus driveHint already handle those. */
+   Values below 1.0 only buy longer drives, which the drive cap and
+   driveHint already handle. */
 const DRIVE_RELUCTANCE = [30.0, 2.0, 1.0];
 
 /* which mode mixes the user has switched on (persisted; loadStored so a
@@ -2703,7 +2652,7 @@ function cleanAlerts(raw){
     seen.add(key);
     /* The TTC feed hard-caps alertHeaderText at 32 characters and cuts
        mid-word ("16 Mccowan: Buses are not stoppi"). Measured against the
-       live feed on 2026-08-01: no header anywhere exceeded 32, 29 of 79 sat
+       live feed: no header anywhere exceeded 32, 29 of 79 sat
        exactly at 32, every one of those had a description, and none ended in
        sentence punctuation. So a 32-char header that doesn't end a sentence
        is a truncated one. The description is the whole story (sometimes
@@ -3136,9 +3085,7 @@ function visibleIts(p){
 
 /* the drive cap is allowed to hide options, but never silently: if
    something it dropped is FASTER than everything still on screen, say so
-   under the slider and offer the exact limit that would bring it back.
-   (This filter, at its old 15 km default, is what hid the 88 min
-   drive-to-Fairview trips behind a 113 min headline.) */
+   under the slider and offer the exact limit that would bring it back. */
 function driveHint(pool, raw){
   const hint = document.getElementById("driveHint");
   if (!hint) return;
@@ -3156,7 +3103,7 @@ function driveHint(pool, raw){
 }
 
 /* ---- results: ONE ranked list, every allowed mode mix pooled together.
-   Sam's rule (2026-07-10): an option that is slower AND not cheaper than
+   Rule: an option that is slower AND not cheaper than
    another visible option must never headline - it stays reachable under
    "more options", but can't pose as a recommendation. */
 const itinSig = it => Math.round(it.duration/60) + "|" + it.legs.map(l =>
@@ -3182,14 +3129,11 @@ function renderResults(parts, opts){
   itinsById = {}; selId = null; fcCache = {};
 
   // one pool, drive cap applied, deduped (departure alts collected).
-  // Ranking is FASTEST FIRST in both modes (Sam, 2026-07-25). "Arrive by"
-  // used to rank by how LATE you could leave, which buried genuinely fast
-  // trips: one suburban trip showed a 113 min trip on top while an
-  // 88 min drive-to-Fairview one sat under "more options" purely because it
-  // left 35 min earlier. Leaving late is still worth something when you're
-  // pinned to a deadline, so in Arrive-by mode departure time stays a
-  // dominance dimension and keeps its own badge - it just doesn't set the
-  // order any more.
+  // Ranking is fastest first in both modes. Ranking "Arrive by" results by
+  // how late you can leave buries genuinely fast trips that happen to leave
+  // a little earlier. Leaving late still matters under a deadline, so in
+  // Arrive-by mode departure time stays a dominance dimension and keeps its
+  // own badge; it just doesn't set the order.
   const metric = it => it.duration;
   const all = [], raw = [];
   for (const p of parts){ all.push(...visibleIts(p)); raw.push(...(p.its || [])); }
@@ -3529,11 +3473,9 @@ window.closeDetail = function(){
 /* ---- controls ---- */
 document.getElementById("go").onclick = plan;
 /* ---- drive-distance slider ----
-   Was a 4-step dropdown (8 / 15 / 30 km / Any) that reset to 15 km on
-   every reload. 15 km is exactly where the useful park-and-ride stations
-   start, so the default silently hid them - see HANDOFF, "Fastest-first
-   ranking". Now: a continuous slider, remembered between visits, with a
-   line underneath when the cap is hiding something faster. */
+   A continuous slider, remembered between visits, with a line underneath
+   when the cap is hiding something faster. Useful park-and-ride stations
+   often start around 15 km, so a low fixed cap would silently hide them. */
 (function(){
   const rng = document.getElementById("driveRange"),
         out = document.getElementById("driveVal"),
@@ -4189,11 +4131,9 @@ function tripFromURL(){
   return { from: f, to: t };
 }
 
-/* The app used to reopen with the last trip's pins already dropped and both
-   search boxes pre-filled with those place names. Sam asked for the boxes to
-   start empty (2026-08-01), so a restored trip no longer loads. A SHARED link
-   still fills both ends and plans itself straight away - that's the point of
-   the link. savePts() still writes "pts"; nothing reads it on load now. */
+/* The app opens with empty search boxes; the previous trip is not restored.
+   A shared link still fills both ends and plans itself straight away.
+   savePts() still writes "pts"; nothing reads it on load. */
 (function(){
   const shared = tripFromURL();
   const j = shared ? { from: { ...shared.from }, to: { ...shared.to } } : {};
@@ -4213,9 +4153,8 @@ function tripFromURL(){
    and the app must not keep answering confidently from expired timetables.
 
    serviceTimeRange covers ALL feeds at once, so it reports whichever agency
-   expires LAST. On 2026-07-25 that read "156 days left" (GO runs to
-   December) while TTC had hours left, so nothing warned before the app
-   started planning TTC trips that did not exist. Ask each feed for its OWN
+   expires last: it can read "156 days left" (GO runs to December) while
+   TTC has hours left. Ask each feed for its OWN
    last service day instead and warn on the EARLIEST, by name.
 
    The probe: routes(feeds:[F], serviceDates:{start:D, end:LAST}) comes back

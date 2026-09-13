@@ -31,7 +31,7 @@ TWO INPUTS:
 2. toll.geojson - the tolled ways out of the OSM extract, the same file
    make_toll_cells.py reads. setup.sh already produces it.
 
-Run:  python3 make_toll_rates.py rates.json toll.geojson web/toll-rates.json
+Run:  python3 scripts/make_toll_rates.py rates.json toll.geojson web/toll-rates.json
 """
 import json, math, sys
 
@@ -45,7 +45,7 @@ STEP_M = 2000.0                                 # centreline sample spacing
 # this same OSM extract (every crossing node of that road within 60 m of the
 # 407 mainline, averaged). Interchanges do not move, so these are constants;
 # they were checked against the highway's own exit numbers, which are
-# kilometre posts - see HANDOFF.md.
+# kilometre posts.
 ZONE_STARTS = [
     ("QEW",              -79.83128, 43.34392),
     ("Dundas St",        -79.83398, 43.38310),
