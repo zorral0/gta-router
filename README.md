@@ -1,98 +1,154 @@
 # GTA Router
 
-A trip planner for the Greater Toronto Area that answers the question Google
-and Apple Maps don't: **is it faster and cheaper to drive to a GO station and
-take the train, bike to the subway, or just take transit the whole way?**
+A trip planner for the Greater Toronto Area that compares transit,
+park-and-ride and bike-and-ride trips side by side, by travel time and by
+what the trip actually costs.
 
-Pick a start and an end on the map, and it lays the options side by side,
-each with the travel time **and the real dollar cost**: fares with One Fare
-transfers, gas, parking, and 407 tolls from the public rate card.
-
-<!-- Add a screenshot here: save one as docs/screenshot.png, then replace
-     this comment with:  ![GTA Router](docs/screenshot.png)  -->
+![GTA Router: the trip panel over a map of Toronto with the subway and GO lines drawn on it](docs/screenshot.png)
 
 ## Why I built it
 
-I kept seeing trip planners that treat "drive" and "transit" as two separate
-worlds, when a lot of GTA commutes are really both: drive to the GO lot, then
-ride in. I wanted to see those trips properly, with what they actually cost.
-I tested every version on my own commute and fixed whatever felt wrong.
+My daily commute in high school was a little more than an hour each way. We
+joked that my house is literally green on the map, next to forests and farms,
+and while it's funny to laugh, I live so inconveniently far that transiting to
+school was literally impossible. At least, that's what I thought.
 
-## What it does
+A result of that devilishly long commute was a fact that shaped my life more
+than almost anything else: school was just that, a place for education. It
+would be a disservice to the awesome people in my life then (and now) to say I
+didn't have friends, but similarly unfaithful to say I had the kind of
+friendships most people my age got to have. I rarely stayed after school to
+play sports or join extracurriculars, and I could not tell you about many days
+where I didn't rush out of the classroom at 3:15, scared that I was gonna be
+late.
 
-- **Park-and-ride and bike-and-ride routing** across GO, UP Express, TTC,
-  YRT, MiWay, Brampton Transit and Durham Region Transit, all in one network.
-- **Money next to minutes** for every option, including 407 ETR tolls.
-- **Live GO train delays and service alerts** from Metrolinx open data.
-- **A map styled after Apple Maps**, with the subway, GO and bus lines drawn
-  on it, 3D buildings, and trackpad rotate and tilt.
-- **A "Reach" map** that colours everywhere you can get to within a
-  given time.
-- **A test suite** of real GTA trips with known sane answers, run after every
-  routing change.
+I carpooled with a friend those years. Staying late meant my parents had to
+drive more than an hour just to pick me up.
 
-## How it was built
+One morning in maybe junior year, in some delirious moment of genius, I
+thought: "Hm. What if I could build a map that could illustrate the distance we
+could travel with transit in a given amount of time? And if I could do that,
+couldn't I also add a short drive in each trip?" Back then, I had long stopped
+coding. I remember getting so frustrated debugging software whose
+documentation seemed written for people who already knew the answer, I hated
+asking for help on Stack Overflow, and amid a busy academic schedule, debate
+tournaments across the country, and then the countless university essays, I
+never really got to building it.
 
-- Routing engine: [OpenTripPlanner 2.9](https://www.opentripplanner.org/),
-  fed with each agency's public GTFS schedules and an OpenStreetMap extract
-  of the GTA.
-- Map: [MapLibre GL](https://maplibre.org/) with
-  [OpenFreeMap](https://openfreemap.org/) tiles.
-- Data prep scripts in Python; the app itself is one HTML page.
-- Built with Claude Code as my coding partner. I came up with the idea,
-  made the design calls, tested it on real trips, and directed every change.
+It was also around that time that I realized that despite York Region
+Transit's questionable inadequacies, I could at least take the TTC part way
+home, or even head downtown and catch a GO train. In those first few months,
+3:15 stopped being a deadline; I would go to the gym with my friends, I learned
+the guitar, I went to a concert, everything that a normal person my age would
+have seen as, well, normal.
 
-## Running it yourself
+So this past summer, when I opened up my terminal for the first time in so
+long, I remembered there was something I could build that might genuinely be
+useful. That's where this planner comes from. I wanted to know: is it possible
+to turn those logistically exhausting trips, the ones that opened the door to
+so many stories, into something more manageable, if we used every option we
+had?
 
-You need a Mac or Linux machine with about 8 GB of free memory.
+If you've ever looked at the map and decided a trip was impossible, it might be
+worth checking again.
 
-1. Get a free Metrolinx Open Data key
-   ([register here](https://api.openmetrolinx.com/OpenDataAPI/Help/Registration/en)),
-   copy `metrolinx.env.example` to `metrolinx.env`, and put the key in it.
-2. `bash setup.sh`: downloads the engine, all transit schedules and the
-   GTA street map (about 2 GB, takes a while).
-3. `bash build.sh`: stitches it into one routing graph (5-15 min).
-4. `bash run.sh`: starts everything and opens the app at
-   http://localhost:8081. Ctrl+C stops it.
+## Features
 
-To check routing quality any time (while it's running):
+- **Mixed-mode routing** across GO Transit, UP Express, TTC, YRT, MiWay,
+  Brampton Transit, Durham Region Transit and the Halton local systems, as one
+  network: transit only, drive to a station, bike to a station, and Bike Share
+  at either end.
+- **Real trip costs**: PRESTO fares with One Fare transfers, GO's
+  station-to-station fare table, adult and youth pricing, fuel, parking, and
+  Highway 407 ETR tolls billed by zone, direction and time of day.
+- **Live data**: GTFS-Realtime delays and service alerts where agencies
+  publish them, including GO trains.
+- **Arrive-by planning**, shareable trip links, and a drive-distance limit.
+- **A custom map style** with the rapid transit lines drawn in their official
+  colours, Ontario highway shields, 3D buildings, and trackpad rotation.
+- **Reach map**: shades everywhere you can get to within a given time.
 
-    python3 benchmark.py
+## How it works
 
-## What each file does
+The routing engine is [OpenTripPlanner 2.9](https://www.opentripplanner.org/),
+built from each agency's GTFS feed and an OpenStreetMap extract of the GTA,
+with a small patch that tags commuter lots OpenStreetMap is missing. The web
+app is a single page (`web/index.html`) that queries OpenTripPlanner's GraphQL
+API and renders the map with [MapLibre GL JS](https://maplibre.org/) on
+[OpenFreeMap](https://openfreemap.org/) tiles.
 
-- setup.sh / refresh.sh: download (or re-download) the schedules and map.
-- build.sh: builds the routing graph. Re-run when schedules update.
-- run.sh: starts the routing engine plus the app.
-- web/index.html: THE APP (what run.sh opens).
-- build-config.json / router-config.json / otp-config.json: settings the
-  engine reads. router-config.json is where routing behaviour gets tuned.
-- costs.py: the dollar-cost model (fares, One Fare transfers, gas,
-  parking). The web page has the same model built in; if you change one,
-  change the other.
-- compare.py: command-line demo of the same comparison for one trip.
-- benchmark.py + benchmarks.json: the test suite.
-- make_*.py: generate the fare zones, toll rates and line shapes the app
-  draws.
-- patch_ttc_transfers.py: adds subway interchange transfers the TTC feed
-  leaves out (Bloor-Yonge etc.).
-- deploy/: scripts for putting the app online.
+OpenTripPlanner has no concept of fares for most of these agencies or of
+tolls, so both are computed in the client. The Python scripts in `scripts/`
+generate the data that needs: the GO fare table and the transit line shapes
+from the GTFS feeds, and a 407 toll grid and rate table from OpenStreetMap
+and the published rate chart.
 
-## Known rough edges
+## Getting started
 
-- YRT's download sometimes requires accepting a licence on their site.
-  If setup.sh warns about it, grab the zip manually from
-  yrt.ca > About us > Open Data, save as yrt-gtfs.zip.
-- Brampton's download URL changes occasionally; setup.sh has the current
-  one and a comment on where to find a replacement (transit.land).
-- Some fare constants in costs.py are marked UNVERIFIED (YRT, DRT,
-  Brampton PRESTO, UP Express). TTC and MiWay were verified July 2026.
-- Park-and-ride routing depends on GO lots being tagged in OpenStreetMap.
-  Most are, but if a station you know isn't offered, that's why.
-- The search box uses the free OpenStreetMap geocoder, so search and map
-  tiles need internet; routing itself runs locally.
+Requirements: macOS with [Homebrew](https://brew.sh), Python 3, about 8 GB of
+free memory and 5 GB of disk space.
 
-## Data
+```bash
+git clone https://github.com/zorral0/gta-router.git
+cd gta-router
+cp metrolinx.env.example metrolinx.env   # then add your Metrolinx key
+bash setup.sh    # installs Java and osmium, downloads the engine, feeds and map, builds the graph
+bash run.sh      # starts the engine and the web app, and opens it in your browser
+```
 
-Transit schedules come from each agency's open data program. Map data
-© OpenStreetMap contributors.
+GO real-time data needs a free
+[Metrolinx Open Data key](https://api.openmetrolinx.com/OpenDataAPI/Help/Registration/en).
+
+Transit agencies replace their schedules every few weeks. To pull fresh feeds
+and rebuild, stop the app and run `bash refresh.sh`.
+
+### Tests
+
+`tests/benchmarks.json` holds a set of GTA trips with known good answers. With
+the engine running:
+
+```bash
+python3 tests/benchmark.py        # grade every trip
+python3 tests/benchmark.py -v     # print each itinerary in full
+```
+
+## Project structure
+
+```
+web/                 the web app, plus the data files it loads
+engine/              OpenTripPlanner configuration; downloaded feeds, map and graphs go here
+scripts/             data generation (fares, tolls, transit lines, feed patches)
+tests/               routing benchmark
+data/                OpenStreetMap patch for missing park-and-ride lots
+docs/                screenshot
+setup.sh, run.sh, refresh.sh
+```
+
+## Known limitations
+
+- Park-and-ride options depend on lots being tagged in OpenStreetMap.
+  `data/parking-patch.osc` fills in the ones found missing so far.
+- Fares for YRT, DRT, Brampton and UP Express are modelled from published
+  PRESTO rates and have not been checked against real trips.
+- The Reach map runs on a separate OpenTripPlanner 2.5 instance. To enable
+  it, save the OpenTripPlanner 2.5 jar as `engine/otp25.jar` and run
+  `bash refresh.sh`. The rest of the app works without it.
+- Search uses the public Photon geocoder, so it needs an internet
+  connection. Routing itself runs locally.
+
+## Data and credits
+
+- Schedules: GO Transit and UP Express (Metrolinx), TTC (City of Toronto Open
+  Data), York Region Transit, MiWay, Brampton Transit, Durham Region Transit,
+  Oakville Transit, Burlington Transit and Milton Transit open data.
+- Map data © [OpenStreetMap](https://www.openstreetmap.org/copyright)
+  contributors, available under the ODbL. Tiles by OpenFreeMap.
+- Toll rates from the 407 ETR published rate chart.
+- [MapLibre GL JS](https://github.com/maplibre/maplibre-gl-js) is included
+  under its BSD 3-Clause license.
+
+This project is not affiliated with any transit agency, 407 ETR or Apple.
+
+## License
+
+[MIT](LICENSE)
