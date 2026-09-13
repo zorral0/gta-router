@@ -1,20 +1,15 @@
 .DS_Store
+__pycache__/
 *.log
+*.bak
+*.prev
+
+# downloaded data and build output
+*.zip
 *.pbf
 *.pbf.orig
-*.zip
 *.jar
-*.jar.bak
-*.bak
 graph.obj*
-report/
-otp29/
-ttc-gtfs/
-ttc-gtfs 2/
-rt-test/
-deploy/build/
-deploy/oracle-ip.txt
-# private or not ours to share
+
+# secrets
 metrolinx.env
-.claude/
-ttc-rider-efficiency-guide-2005.pdf

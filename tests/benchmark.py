@@ -1,20 +1,21 @@
 """
-GTA Router - benchmark harness.
+Routing benchmark.
 
-Runs every trip in benchmarks.json through the local OTP server three ways
-(transit-only, bike+transit, drive-to-station), compares what came back
-against the expected sane answer, and prints PASS/MISS per trip plus an
-overall miss rate. Run it after every fix to see if things actually improved.
+Runs every trip in benchmarks.json through the local OpenTripPlanner server
+three ways (transit only, bike and ride, drive to station), compares the
+results against the expected answer, and prints PASS or MISS per trip plus
+an overall miss rate.
 
-Usage (server must be running via run.sh):
-    python3 benchmark.py            # grade all trips
-    python3 benchmark.py -v         # also print every itinerary in full
-    python3 benchmark.py unionville # only trips whose id contains a word
+Usage (with the engine running):
+    python3 tests/benchmark.py            # grade all trips
+    python3 tests/benchmark.py -v         # also print every itinerary
+    python3 tests/benchmark.py union      # only trips whose id contains a word
 
-No extra installs needed (uses only Python's standard library).
+Standard library only.
 """
 
 import json
+import os
 import sys
 import urllib.request
 from datetime import date, timedelta
@@ -174,7 +175,9 @@ def main():
     verbose = "-v" in sys.argv
     words = [a for a in sys.argv[1:] if a != "-v"]
 
-    trips = json.load(open("benchmarks.json"))["trips"]
+    here = os.path.dirname(os.path.abspath(__file__))
+    with open(os.path.join(here, "benchmarks.json")) as fh:
+        trips = json.load(fh)["trips"]
     if words:
         trips = [t for t in trips if any(w in t["id"] for w in words)]
 

@@ -1,23 +1,25 @@
 """
-GTA Router - extract GO Transit's real fare table.
+Extract GO Transit's station-to-station fare table.
 
-GO publishes its exact station-to-station adult fares inside its GTFS
-feed (fare_rules.txt + fare_attributes.txt, keyed by stop zone). This
-script converts them to web/go-fares.json, which both the web app and
-costs.py use instead of guessing fares from distance.
+GO publishes its exact adult fares inside its GTFS feed (fare_rules.txt and
+fare_attributes.txt, keyed by stop zone). This script converts them to
+web/go-fares.json, which the web app uses instead of estimating fares from
+distance.
 
-Re-run after every fresh GO download (setup.sh does this).
+Re-run after every fresh GO download (setup.sh and refresh.sh do this).
 
-Usage:  python3 make_go_fares.py
+Usage:  python3 scripts/make_go_fares.py
 """
 
 import csv
 import io
 import json
+import os
 import zipfile
 
-FEED = "go-gtfs.zip"
-OUT = "web/go-fares.json"
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FEED = os.path.join(ROOT, "engine", "go-gtfs.zip")
+OUT = os.path.join(ROOT, "web", "go-fares.json")
 
 
 def rows(z, name):

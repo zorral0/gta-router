@@ -9,8 +9,8 @@
     "  must_include_any - at least ONE of these place/route names must appear",
     "                     in the suggested itinerary for it to count as sane.",
     "  max_minutes      - slower than this is a miss even if the shape is right.",
-    "  known_unfair     - true = expected to fail until missing feeds (MiWay,",
-    "                     Brampton, DRT...) are added; tracked separately.",
+    "  known_unfair     - true = expected to fail for a known data reason;",
+    "                     tracked separately.",
     "day: 'weekday' resolves to next Tuesday, 'saturday' to next Saturday."
   ],
   "trips": [
