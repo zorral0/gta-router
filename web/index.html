@@ -1390,8 +1390,7 @@ function initialMapStyle(){
     return recolorStyle(libertyBase, PALETTES[look]);
   return HOSTED[themeMode()];
 }
-// which shield artwork is installed right now (declared up here because
-// applyLook can run during module init, before the shield block below)
+// which shield artwork is installed right now
 let shieldFor = null;
 async function applyLook(){
   const look = mapLook[themeMode()];
@@ -1453,8 +1452,6 @@ map.on("style.load", syncAppleBuildings);
 map.on("pitch", syncAppleBuildings);
 map.on("pitchend", syncAppleBuildings);
 darkMql.addEventListener("change", applyLook);
-// first visit with a non-classic look: upgrade as soon as the JSON arrives
-if (!libertyBase && mapLook[themeMode()] !== "classic") applyLook();
 
 /* Ontario King's Highway crown shields. The liberty
    style draws plain sprite boxes for the 400-series; we swap in the real
@@ -1525,8 +1522,6 @@ function installShields(key){
   }
   return true;
 }
-// function declarations, not const arrows: applyLook calls these during
-// module init, above this block
 function shieldKey(){
   const look = mapLook[themeMode()];
   const dark = look === "classic" ? darkMql.matches : (PALETTES[look] || {}).dark;
@@ -1559,6 +1554,10 @@ function ensureShields(){
 // styledata fires as soon as the new style's layers exist - far earlier than
 // idle, where the plain sprite boxes used to show through first
 map.on("styledata", ensureShields);
+// First visit with a non-classic look: upgrade as soon as the JSON arrives.
+// This has to come after the shield block, because applyLook reaches its
+// const/let declarations before its first await.
+if (!libertyBase && mapLook[themeMode()] !== "classic") applyLook();
 
 /* POI badges. Apple's icons are Apple's artwork, but their visual
    LANGUAGE is simple and reproducible: a small rounded badge in a
