@@ -315,8 +315,11 @@
   .optsrow .otx { min-width: 0; flex: 1; }
   .optsrow .ott { display: block; font-size: 13.5px; font-weight: 620;
     letter-spacing: -.01em; }
+  /* wraps instead of trailing off in "...": the changed-settings list can be
+     long, and a cut-off filter is exactly the hidden filter this row exists
+     to prevent (Sam 2026-09-13) */
   .optsrow .osub { display: block; font-size: 11.5px; color: var(--muted);
-    margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    margin-top: 1px; line-height: 1.35; }
   /* off-default reads as a live setting, not as helper text */
   .optsrow.set .osub { color: var(--accent); font-weight: 600; }
   /* inline-flex, not inline: a bare inline span ignores transform, so the
@@ -716,12 +719,12 @@
       style="background:#34c759;color:#34c759"
       title="Set the start: click this, then click the map"
       aria-label="Set the start point, then click the map" role="button" tabindex="0"></span>
-      <input id="fromBox" type="text" placeholder="Start: click the map or type a place"></div>
+      <input id="fromBox" type="text" aria-label="Start"></div>
     <div class="srow"><span class="pt pick" id="dotTo" data-field="to"
       style="background:#ff453a;color:#ff453a"
       title="Set the destination: click this, then click the map"
       aria-label="Set the destination, then click the map" role="button" tabindex="0"></span>
-      <input id="toBox" type="text" placeholder="End: e.g. '155 College St' or 'Union Station'"></div>
+      <input id="toBox" type="text" aria-label="End"></div>
   </div>
   <div class="ctrls">
     <div class="seg" id="whenSeg" title="Plan by when you leave, or when you need to be there">
