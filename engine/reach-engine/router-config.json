@@ -1,0 +1,37 @@
+{
+  // Research copy of engine/router-config.json for the reach engine (port 8090).
+  // Same routing settings as the graph-embedded config the pilot used, but
+  // WITHOUT "updaters": no live delays, alerts or bike share, so study results
+  // depend only on the published schedules, not on when the run happens.
+  // Keep the settings below in sync with engine/router-config.json.
+  "transit": {
+    "dynamicSearchWindow": {
+      "minWindow": "1h"
+    }
+  },
+  "routingDefaults": {
+    "accessEgress": {
+      "maxDuration": "45m",
+      "maxStopCount": 4000,
+      "maxDurationForMode": {
+        "CAR_TO_PARK": "45m"
+      }
+    },
+    "itineraryFilters": {
+      "removeTransitWithHigherCostThanBestOnStreetOnly": "9h + 9.0 t",
+      "groupSimilarityKeepOne": 0.95
+    },
+    "transferPenalty": 300,
+    "walk": {
+      "speed": 1.4,
+      "stairsTimeFactor": 1.6
+    },
+    "bicycle": {
+      "optimization": "SAFEST_STREETS",
+      "speed": 4.5
+    },
+    "car": {
+      "reluctance": 3.0
+    }
+  }
+}

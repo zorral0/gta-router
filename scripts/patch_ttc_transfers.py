@@ -32,7 +32,12 @@ INTERCHANGES = [
     ["St George Station"],       # Line 1 <-> Line 2
     ["Spadina Station"],         # Line 1 <-> Line 2
     ["Sheppard-Yonge Station"],  # Line 1 <-> Line 4
-    ["Kennedy Station"],         # Line 2 terminal interchange
+    ["Kennedy Station"],         # Line 2 <-> Line 5 (LRT platforms match too)
+    # Line 5 and Line 6 LRT platforms are named "... Station Eastbound Platform",
+    # "... Station LRT Platform", so the "Platform" rule below picks them up.
+    ["Eglinton Station"],        # Line 1 <-> Line 5
+    ["Cedarvale Station"],       # Line 1 <-> Line 5
+    ["Finch West Station"],      # Line 1 <-> Line 6
 ]
 
 
