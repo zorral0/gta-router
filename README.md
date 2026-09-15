@@ -4,7 +4,7 @@ A trip planner for the Greater Toronto Area that compares transit,
 park-and-ride and bike-and-ride trips side by side, by travel time and by
 what the trip actually costs.
 
-https://github.com/user-attachments/assets/aacef92e-bc36-4f99-a59e-14027a2a1a12
+https://github.com/user-attachments/assets/5cb321db-b662-4e42-b88b-6676fe433e89
 
 ![GTA Router: the trip panel over a map of Toronto with the subway and GO lines drawn on it](docs/screenshot.png)
 
