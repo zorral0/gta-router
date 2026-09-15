@@ -63,6 +63,9 @@ worth checking again.
   Highway 407 ETR tolls billed by zone, direction and time of day.
 - **Live data**: GTFS-Realtime delays and service alerts where agencies
   publish them, including GO trains.
+- **Subway boarding tips**: each subway ride shows a small train diagram with
+  the car to get on, so you step off next to the exit, or next to the stairs
+  for your next line.
 - **Arrive-by planning**, shareable trip links, and a drive-distance limit.
 - **A custom map style** with the rapid transit lines drawn in their official
   colours, Ontario highway shields, 3D buildings, and trackpad rotation.
@@ -144,6 +147,11 @@ setup.sh, run.sh, refresh.sh
 - Map data © [OpenStreetMap](https://www.openstreetmap.org/copyright)
   contributors, available under the ODbL. Tiles by OpenFreeMap.
 - Toll rates from the 407 ETR published rate chart.
+- Subway boarding positions (`web/subway-boarding.json`) are transcribed from
+  Sean Lerner's [TTC Subway Rider Efficiency Guide](https://www.ttc-rider.ca/)
+  (2005) and shared under the guide's license,
+  [CC BY-NC-SA 2.0](https://creativecommons.org/licenses/by-nc-sa/2.0/).
+  Stations renovated since 2005 may be off by a car.
 - [MapLibre GL JS](https://github.com/maplibre/maplibre-gl-js) is included
   under its BSD 3-Clause license.
 
@@ -151,4 +159,6 @@ This project is not affiliated with any transit agency, 407 ETR or Apple.
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE), except `web/subway-boarding.json`, which is under
+[CC BY-NC-SA 2.0](https://creativecommons.org/licenses/by-nc-sa/2.0/) (see
+Data and credits).
