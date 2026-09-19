@@ -887,6 +887,9 @@ const LOCAL_FARES = [["TTC",3.30,2.35,true,"onefare"],["TORONTO",3.30,2.35,true,
                      // Milton takes no PRESTO at all: its single-use e-ticket
                      // price is modelled (cash is $4.25 for adult and youth).
                      ["OAKVILLE",3.50,0.00,true,"gocofare"],
+                     // Burlington youth also ride free on weekday evenings and
+                     // all weekend: see burlingtonYouthFree(), which is a rule
+                     // rather than a number because it depends on the clock.
                      ["BURLINGTON",2.85,2.00,true,"gocofare"],
                      ["MILTON TRANSIT",3.85,2.90,true,"gocofare"]];
 // UP: PRESTO fares, distance-based 4.71-5.02 - flat worst case modelled.
@@ -991,6 +994,18 @@ function prettyAgency(a){
   return a;
 }
 
+/* Burlington youth 13-19 ride free on weekdays after 6 pm and all weekend
+   (burlington.ca/en/transit/fares.aspx, checked 2026-09-19). It is the only
+   fare here that depends on WHEN you board, so it cannot live as a number in
+   LOCAL_FARES. Judged on the time you board that agency, not on when the
+   whole trip starts: an afternoon trip that reaches Burlington after 6 pm
+   qualifies, and the rider is the one standing at the stop. */
+function burlingtonYouthFree(ms){
+  if (!ms) return false;             // unknown time: charge the fare
+  const d = new Date(ms), day = d.getDay();   // 0 Sunday ... 6 Saturday
+  return day === 0 || day === 6 || d.getHours() >= 18;
+}
+
 function itineraryCostDetail(it){
   const legs = it.legs, tlegs = legs.filter(l => TRANSIT.has(l.mode));
   const items = [];
@@ -1017,7 +1032,8 @@ function itineraryCostDetail(it){
     const a = agencyOf(l);
     const hit = LOCAL_FARES.find(([k]) => a.includes(k));
     if (hit && !ridden.some(r => r.a === a))
-      ridden.push({ a, fare: (rider === "youth" && hit[2] != null) ? hit[2] : hit[1],
+      ridden.push({ a, key: hit[0], at: l.startTime,
+                    fare: (rider === "youth" && hit[2] != null) ? hit[2] : hit[1],
                     ver: hit[3], prog: hit[4] });
   }
   /* Who rides free depends on WHICH programme the agency is in, not just on
@@ -1030,6 +1046,11 @@ function itineraryCostDetail(it){
     if (r.prog === "gocofare"){ free = usedGo; why = "GO co-fare"; }
     else if (ONE_FARE && (usedGo || paidOneFare)){ free = true; why = "One Fare transfer"; }
     else paidOneFare = true;
+    // a free ride for another reason still beats paying, whatever programme
+    if (!free && rider === "youth" && r.key === "BURLINGTON"
+        && burlingtonYouthFree(r.at)){
+      free = true; why = "youth, evenings and weekends";
+    }
     items.push({ label: prettyAgency(r.a)
       + (free ? `, free (${why})`
               : (r.ver ? "" : ", fare unverified")), amount: free ? 0 : r.fare });
