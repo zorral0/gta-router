@@ -15,6 +15,25 @@ if [ ! -f metrolinx.env ]; then
 fi
 set -a; . ./metrolinx.env; set +a
 
+# 0b) Metrolinx's alerts feed ships empty agency_id/route_id fields that make
+#     OTP throw once a minute and drop EVERY GO alert. This rewrites a clean
+#     copy next to this script; router-config.json reads that file instead of
+#     the live URL. One pass now so the file exists before the engine starts,
+#     then a loop to keep it fresh.
+export GTA_ROUTER_DIR="$(pwd)"
+python3 scripts/go-alerts-filter.py --once >/dev/null 2>&1 \
+  || echo "Note: GO service alerts could not be fetched. Everything else still works."
+python3 scripts/go-alerts-filter.py >/dev/null 2>&1 &
+ALERTS_PID=$!
+
+# 0c) Durham's trip updates list stops that are not on the trip, which makes
+#     OTP throw out the whole trip (about a fifth of the feed). Same idea as
+#     0b: rewrite a clean copy and let router-config.json read that.
+python3 scripts/drt-rt-filter.py --once >/dev/null 2>&1 \
+  || echo "Note: Durham live delays could not be fetched. Everything else still works."
+python3 scripts/drt-rt-filter.py >/dev/null 2>&1 &
+DRT_PID=$!
+
 # 1) The app page (the pretty UI in web/), served at :8081
 python3 -m http.server 8081 --directory web >/dev/null 2>&1 &
 WEB_PID=$!
@@ -33,8 +52,8 @@ OTP_PID=$!
 java -Xmx3G -jar engine/otp25.jar --load engine/reach-engine --port 8090 >engine/reach-engine/reach.log 2>&1 &
 REACH_PID=$!
 
-# Ctrl+C (or the engine dying) stops all three
-trap 'kill $WEB_PID $OTP_PID $REACH_PID 2>/dev/null' EXIT INT TERM
+# Ctrl+C (or the engine dying) stops all three, plus the two feed filters
+trap 'kill $WEB_PID $OTP_PID $REACH_PID $ALERTS_PID $DRT_PID 2>/dev/null' EXIT INT TERM
 
 # 3) Wait until the engine answers, then open the app in the browser
 echo ""
