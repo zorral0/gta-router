@@ -11,137 +11,233 @@
     "  max_minutes      - slower than this is a miss even if the shape is right.",
     "  known_unfair     - true = expected to fail for a known data reason;",
     "                     tracked separately.",
-    "day: 'weekday' resolves to next Tuesday, 'saturday' to next Saturday."
+    "day: 'weekday' resolves to next Tuesday, 'saturday' to next Saturday.",
+    "Trips 2 and 10 (markham_to_square_one, richmond_hill_to_scarborough_centre) were corrected on 2026-09-19 by a rider who knows these corridors, and then cross-checked against the GO schedule. The other eight are still the original agent-written guesses and have NOT been confirmed by a person."
   ],
   "trips": [
     {
       "id": "unionville_to_union",
       "description": "Markham (Unionville area) to Union Station, weekday 8am",
-      "from": { "latitude": 43.8563, "longitude": -79.3105 },
-      "to": { "latitude": 43.6453, "longitude": -79.3806 },
+      "from": {
+        "latitude": 43.8563,
+        "longitude": -79.3105
+      },
+      "to": {
+        "latitude": 43.6453,
+        "longitude": -79.3806
+      },
       "day": "weekday",
       "time": "08:00",
       "expected_plain": "Drive (or bike) to Unionville or Centennial GO, Stouffville line train to Union.",
       "expected_combo": "drive_to_station",
-      "must_include_any": ["Unionville GO", "Centennial GO"],
+      "must_include_any": [
+        "Unionville GO",
+        "Centennial GO"
+      ],
       "max_minutes": 80,
       "known_unfair": false
     },
     {
       "id": "markham_to_square_one",
       "description": "Markham (Unionville area) to Square One, Mississauga, weekday 8am",
-      "from": { "latitude": 43.8563, "longitude": -79.3105 },
-      "to": { "latitude": 43.5931, "longitude": -79.6423 },
+      "from": {
+        "latitude": 43.8563,
+        "longitude": -79.3105
+      },
+      "to": {
+        "latitude": 43.5931,
+        "longitude": -79.6423
+      },
       "day": "weekday",
       "time": "08:00",
-      "expected_plain": "UNCERTAIN - suburb to suburb. The GO 56 bus along the 407 lands about 500m from Square One, so transit-only ~90 min may genuinely be the answer. MiWay is loaded now.",
-      "expected_combo": "drive_to_station",
-      "must_include_any": ["Square One"],
-      "max_minutes": 120,
+      "expected_plain": "A GO 407 bus to Square One, no driving needed. A local rider named the 40, which does run from Unionville all morning: the 40M at 06:55, 07:50, 08:10, 08:50 and 09:10, the 40C at 06:05, 07:05 and 09:25. Of the morning departures that reach Square One, the 40M takes 87-90 min and the 56 takes 72, every ~30 min. From the residential origin in this test the router prefers GO 52 then 47 at about 85 min, because walking to Unionville GO Bus costs more than the direct bus saves. All of these are sane; driving to a station is not required.",
+      "expected_combo": "transit_only",
+      "must_include_any": [
+        "Square One"
+      ],
+      "max_minutes": 100,
       "known_unfair": false
     },
     {
       "id": "guildwood_to_downtown",
       "description": "Scarborough (Guildwood area) to King & Bay downtown, weekday 8am",
-      "from": { "latitude": 43.7554, "longitude": -79.1982 },
-      "to": { "latitude": 43.6487, "longitude": -79.3817 },
+      "from": {
+        "latitude": 43.7554,
+        "longitude": -79.1982
+      },
+      "to": {
+        "latitude": 43.6487,
+        "longitude": -79.3817
+      },
       "day": "weekday",
       "time": "08:00",
       "expected_plain": "GO Lakeshore East train from Guildwood GO, or TTC bus to Line 2 at Kennedy.",
       "expected_combo": "transit_only",
-      "must_include_any": ["Guildwood GO", "Eglinton GO", "Kennedy"],
+      "must_include_any": [
+        "Guildwood GO",
+        "Eglinton GO",
+        "Kennedy"
+      ],
       "max_minutes": 65,
       "known_unfair": false
     },
     {
       "id": "richmond_hill_to_north_york",
       "description": "Richmond Hill (Yonge & Major Mackenzie) to North York Centre, weekday 8am",
-      "from": { "latitude": 43.8828, "longitude": -79.4403 },
-      "to": { "latitude": 43.7679, "longitude": -79.4128 },
+      "from": {
+        "latitude": 43.8828,
+        "longitude": -79.4403
+      },
+      "to": {
+        "latitude": 43.7679,
+        "longitude": -79.4128
+      },
       "day": "weekday",
       "time": "08:00",
       "expected_plain": "YRT/Viva down Yonge to Finch, then subway Line 1 two stops to North York Centre.",
       "expected_combo": "transit_only",
-      "must_include_any": ["Finch", "North York Centre"],
+      "must_include_any": [
+        "Finch",
+        "North York Centre"
+      ],
       "max_minutes": 60,
       "known_unfair": false
     },
     {
       "id": "annex_control",
       "description": "CONTROL: The Annex (Bathurst & Bloor) to Yonge & Dundas, weekday 8am",
-      "from": { "latitude": 43.6655, "longitude": -79.4113 },
-      "to": { "latitude": 43.6561, "longitude": -79.3803 },
+      "from": {
+        "latitude": 43.6655,
+        "longitude": -79.4113
+      },
+      "to": {
+        "latitude": 43.6561,
+        "longitude": -79.3803
+      },
       "day": "weekday",
       "time": "08:00",
       "expected_plain": "Short downtown trip where plain transit IS the right answer: Line 2 from Bathurst to Yonge, or the 511/streetcar. Driving to a station would be silly here.",
       "expected_combo": "transit_only",
-      "must_include_any": ["Bathurst", "Spadina", "St. George", "Yonge", "Dundas"],
+      "must_include_any": [
+        "Bathurst",
+        "Spadina",
+        "St. George",
+        "Yonge",
+        "Dundas"
+      ],
       "max_minutes": 30,
       "known_unfair": false
     },
     {
       "id": "pickering_to_union",
       "description": "Pickering (residential, north of the 401) to Union Station, weekday 8am",
-      "from": { "latitude": 43.8560, "longitude": -79.1090 },
-      "to": { "latitude": 43.6453, "longitude": -79.3806 },
+      "from": {
+        "latitude": 43.856,
+        "longitude": -79.109
+      },
+      "to": {
+        "latitude": 43.6453,
+        "longitude": -79.3806
+      },
       "day": "weekday",
       "time": "08:00",
       "expected_plain": "Drive to Pickering GO, Lakeshore East train to Union. DRT local buses are loaded now, so transit-only should use a DRT bus to reach the station.",
       "expected_combo": "drive_to_station",
-      "must_include_any": ["Pickering GO", "Rouge Hill GO"],
+      "must_include_any": [
+        "Pickering GO",
+        "Rouge Hill GO"
+      ],
       "max_minutes": 75,
       "known_unfair": false
     },
     {
       "id": "maple_to_union",
       "description": "Vaughan (Maple, near Keele & Major Mackenzie) to Union Station, weekday 8am",
-      "from": { "latitude": 43.8561, "longitude": -79.5085 },
-      "to": { "latitude": 43.6453, "longitude": -79.3806 },
+      "from": {
+        "latitude": 43.8561,
+        "longitude": -79.5085
+      },
+      "to": {
+        "latitude": 43.6453,
+        "longitude": -79.3806
+      },
       "day": "weekday",
       "time": "08:00",
       "expected_plain": "Walk or drive to Maple GO, Barrie line train to Union. Driving to Line 1 at Vaughan Metropolitan Centre is a plausible alternative.",
       "expected_combo": "drive_to_station",
-      "must_include_any": ["Maple GO", "Rutherford GO", "Vaughan Metropolitan"],
+      "must_include_any": [
+        "Maple GO",
+        "Rutherford GO",
+        "Vaughan Metropolitan"
+      ],
       "max_minutes": 80,
       "known_unfair": false
     },
     {
       "id": "downtown_to_pearson",
       "description": "Downtown (near Union) to Pearson Airport Terminal 1, weekday 8am",
-      "from": { "latitude": 43.65, "longitude": -79.383 },
-      "to": { "latitude": 43.6818, "longitude": -79.6114 },
+      "from": {
+        "latitude": 43.65,
+        "longitude": -79.383
+      },
+      "to": {
+        "latitude": 43.6818,
+        "longitude": -79.6114
+      },
       "day": "weekday",
       "time": "08:00",
       "expected_plain": "UP Express from Union to Pearson, about 25 minutes. Tests that the UP feed is used.",
       "expected_combo": "transit_only",
-      "must_include_any": ["UP Express", "Pearson"],
+      "must_include_any": [
+        "UP Express",
+        "Pearson"
+      ],
       "max_minutes": 45,
       "known_unfair": false
     },
     {
       "id": "long_branch_to_union",
       "description": "Etobicoke (Long Branch) to Union Station, weekday 8am",
-      "from": { "latitude": 43.6018, "longitude": -79.4949 },
-      "to": { "latitude": 43.6453, "longitude": -79.3806 },
+      "from": {
+        "latitude": 43.6018,
+        "longitude": -79.4949
+      },
+      "to": {
+        "latitude": 43.6453,
+        "longitude": -79.3806
+      },
       "day": "weekday",
       "time": "08:00",
       "expected_plain": "GO Lakeshore West train from Long Branch GO (fast), or the 501 streetcar (slow but cheap). GO should be the headline answer at 8am.",
       "expected_combo": "transit_only",
-      "must_include_any": ["Long Branch GO", "Mimico GO", "Exhibition GO"],
+      "must_include_any": [
+        "Long Branch GO",
+        "Mimico GO",
+        "Exhibition GO"
+      ],
       "max_minutes": 50,
       "known_unfair": false
     },
     {
       "id": "richmond_hill_to_scarborough_centre",
       "description": "Richmond Hill (Yonge & Major Mackenzie) to Scarborough Town Centre, weekday 8am",
-      "from": { "latitude": 43.8828, "longitude": -79.4403 },
-      "to": { "latitude": 43.7745, "longitude": -79.2577 },
+      "from": {
+        "latitude": 43.8828,
+        "longitude": -79.4403
+      },
+      "to": {
+        "latitude": 43.7745,
+        "longitude": -79.2577
+      },
       "day": "weekday",
       "time": "08:00",
-      "expected_plain": "UNCERTAIN - awkward suburb-to-suburb trip with no obvious answer. Included to see what the router says.",
-      "expected_combo": null,
-      "must_include_any": [],
-      "max_minutes": 110,
+      "expected_plain": "Viva or YRT to Richmond Hill Centre, then the GO 41 bus across the top of the city to Scarborough Centre. Named by a local rider, and route 41 does serve both ends.",
+      "expected_combo": "transit_only",
+      "must_include_any": [
+        "Hamilton / Pickering",
+        "Scarborough Centre Bus Terminal"
+      ],
+      "max_minutes": 85,
       "known_unfair": false
     }
   ]
