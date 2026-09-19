@@ -863,9 +863,35 @@ const modeIcon = m => ({ WALK:"walk", BICYCLE:"bike", CAR:"car", BUS:"bus",
 // [name-match, adult fare, youth fare (null = not modelled), verified?]
 // verified July 2026 against each agency's official fare page
 // (PRESTO-level; unverified fares would say so in the UI via the flag)
-const LOCAL_FARES = [["TTC",3.30,2.35,true],["TORONTO",3.30,2.35,true],
-                     ["YORK",4.24,3.29,true],["MIWAY",3.50,2.90,true],
-                     ["DURHAM",3.84,3.46,true],["BRAMPTON",3.55,2.95,true]];
+/* [match key, adult, youth (null = no youth rate modelled), verified,
+    transfer program]. The key is matched as a SUBSTRING of the uppercased
+    agency name, so it has to be long enough not to collide: "MILTON" alone
+    also matches HAMILTON.
+
+    The transfer program decides who rides free, and the two are not the
+    same thing:
+      onefare   Ontario's One Fare. Free transfer to and from GO, and
+                between these agencies and the TTC.
+      gocofare  Halton. Checked against Metrolinx's own One Fare page on
+                2026-09-19: Oakville, Burlington and Milton are NOT in it.
+                Each runs its own GO co-fare instead, which makes the local
+                ride free when the trip touches GO, but a transfer from the
+                TTC with no GO in it is paid in full. */
+const LOCAL_FARES = [["TTC",3.30,2.35,true,"onefare"],["TORONTO",3.30,2.35,true,"onefare"],
+                     ["YORK",4.24,3.29,true,"onefare"],["MIWAY",3.50,2.90,true,"onefare"],
+                     ["DURHAM",3.84,3.46,true,"onefare"],["BRAMPTON",3.55,2.95,true,"onefare"],
+                     // Halton, verified 2026-09-19. Oakville youth 13-19 ride
+                     // FREE every day with PRESTO. Burlington youth also ride
+                     // free on weekdays after 6 pm and at weekends, which is
+                     // NOT modelled, so an evening Burlington fare reads high.
+                     // Milton takes no PRESTO at all: its single-use e-ticket
+                     // price is modelled (cash is $4.25 for adult and youth).
+                     ["OAKVILLE",3.50,0.00,true,"gocofare"],
+                     // Burlington youth also ride free on weekday evenings and
+                     // all weekend: see burlingtonYouthFree(), which is a rule
+                     // rather than a number because it depends on the clock.
+                     ["BURLINGTON",2.85,2.00,true,"gocofare"],
+                     ["MILTON TRANSIT",3.85,2.90,true,"gocofare"]];
 // UP: PRESTO fares, distance-based 4.71-5.02 - flat worst case modelled.
 // (12.35 was the paper/standard fare, not what a PRESTO rider pays.)
 const GO_BASE = 3.70, GO_PER_KM = 0.11, UP_FARE = 5.02, UP_YOUTH = 3.39,
@@ -961,7 +987,23 @@ function prettyAgency(a){
   if (a.includes("MIWAY")) return "MiWay";
   if (a.includes("DURHAM")) return "DRT";
   if (a.includes("BRAMPTON")) return "Brampton Transit";
+  if (a.includes("OAKVILLE")) return "Oakville Transit";
+  if (a.includes("BURLINGTON")) return "Burlington Transit";
+  // full name, not "MILTON": the short key also matches HAMILTON
+  if (a.includes("MILTON TRANSIT")) return "Milton Transit";
   return a;
+}
+
+/* Burlington youth 13-19 ride free on weekdays after 6 pm and all weekend
+   (burlington.ca/en/transit/fares.aspx, checked 2026-09-19). It is the only
+   fare here that depends on WHEN you board, so it cannot live as a number in
+   LOCAL_FARES. Judged on the time you board that agency, not on when the
+   whole trip starts: an afternoon trip that reaches Burlington after 6 pm
+   qualifies, and the rider is the one standing at the stop. */
+function burlingtonYouthFree(ms){
+  if (!ms) return false;             // unknown time: charge the fare
+  const d = new Date(ms), day = d.getDay();   // 0 Sunday ... 6 Saturday
+  return day === 0 || day === 6 || d.getHours() >= 18;
 }
 
 function itineraryCostDetail(it){
@@ -990,13 +1032,27 @@ function itineraryCostDetail(it){
     const a = agencyOf(l);
     const hit = LOCAL_FARES.find(([k]) => a.includes(k));
     if (hit && !ridden.some(r => r.a === a))
-      ridden.push({ a, fare: (rider === "youth" && hit[2] != null) ? hit[2] : hit[1],
-                    ver: hit[3] });
+      ridden.push({ a, key: hit[0], at: l.startTime,
+                    fare: (rider === "youth" && hit[2] != null) ? hit[2] : hit[1],
+                    ver: hit[3], prog: hit[4] });
   }
-  ridden.forEach((r, i) => {
-    const free = ONE_FARE && (usedGo || i > 0);
+  /* Who rides free depends on WHICH programme the agency is in, not just on
+     boarding order. A One Fare agency is free once GO is in the trip or once
+     another One Fare agency has been paid. A Halton co-fare agency is free
+     only when the trip touches GO: it has no free transfer from the TTC. */
+  let paidOneFare = false;
+  ridden.forEach(r => {
+    let free = false, why = "";
+    if (r.prog === "gocofare"){ free = usedGo; why = "GO co-fare"; }
+    else if (ONE_FARE && (usedGo || paidOneFare)){ free = true; why = "One Fare transfer"; }
+    else paidOneFare = true;
+    // a free ride for another reason still beats paying, whatever programme
+    if (!free && rider === "youth" && r.key === "BURLINGTON"
+        && burlingtonYouthFree(r.at)){
+      free = true; why = "youth, evenings and weekends";
+    }
     items.push({ label: prettyAgency(r.a)
-      + (free ? ", free (One Fare transfer)"
+      + (free ? `, free (${why})`
               : (r.ver ? "" : ", fare unverified")), amount: free ? 0 : r.fare });
   });
   legs.forEach((l,i) => {
@@ -2519,7 +2575,8 @@ const COMBOS = [
     need: ["share"], rentStart: true, walkReluctance: 6.0 },
   { key: "Drive to station",
     access: ["CAR_PARKING"], egress: ["WALK"],
-    need: ["carStart"], drive: true, needsLeg: "CAR" },
+    // one extra reluctance, this combo only: see the DRIVE_RELUCTANCE note
+    need: ["carStart"], drive: true, needsLeg: "CAR", extraReluctance: [8.0] },
   { key: "Drive at the end",
     access: ["WALK"], egress: ["WALK", "CAR_PICKUP"],
     need: ["carEnd"], drive: true, carAfter: true },
@@ -2571,7 +2628,20 @@ const COMBOS = [
    1.0 the very-near lots drop out, and 2.0 because the near/middle split is
    origin-dependent and one more query is cheap (they all run in parallel).
    Values below 1.0 only buy longer drives, which the drive cap and
-   driveHint already handle. */
+   driveHint already handle.
+
+   8.0 (see extraReluctance on "Drive to station") was added 2026-09-19 after
+   tests/reluctance-ladder.py priced every candidate ladder over 25 trips. The
+   band between 2 and 30 was a real hole: on Markham to Square One it is the
+   only value that reaches a lot catching a GO train 5 minutes earlier, and
+   neither a bigger `first`, a wider searchWindow nor a looser similar-legs
+   filter surfaces it at any other reluctance.
+
+   Be clear about the size of this: 5 minutes on 1 trip in 25, and querying
+   EVERY value from 30 down to 1 buys nothing beyond it. Measured in the
+   browser, adding 8.0 to ALL FOUR drive combos cost 0.8-2.4 s on every plan,
+   which is a bad trade for a 4% hit rate. It is on the primary drive combo
+   only, which is where the whole measured win came from. */
 const DRIVE_RELUCTANCE = [30.0, 2.0, 1.0];
 
 /* which mode mixes the user has switched on (persisted; loadStored so a
@@ -2844,7 +2914,8 @@ async function plan(){
       // Drive queries run once per DRIVE_RELUCTANCE and are merged, so the
       // drive slider always has near, middle and far lots to choose from
       // without re-querying.
-      const tries = await Promise.all(DRIVE_RELUCTANCE.map(r =>
+      const rels = DRIVE_RELUCTANCE.concat(c.extraReluctance || []);
+      const tries = await Promise.all(rels.map(r =>
         fetchCombo(c, date, time, r, ctrl.signal)));
       return { c, its: spreadByDrive(dedupeAlts([].concat(...tries))) };
     }
@@ -2897,9 +2968,16 @@ function cardHTML(it, cid, fastestIt, cheapestIt, latestIt){
     ${legRow(it)}</div>`;
 }
 
-function carDistance(it){
-  return it.legs.filter(l => l.mode === "CAR")
-                .reduce((s,l) => s + (l.distance||0), 0);
+/* The drive slider is labelled "Longest drive (to the station, or at the end)"
+   and that is now what it measures. It used to SUM every car leg, which was
+   the same number for every trip the app could produce, because no mode mix
+   made two car legs. Once one does, summing means a 2 km drive to the station
+   plus a 13 km lift at the far end reads as a 15 km drive and vanishes at the
+   default setting, even though neither drive is long. Measure the longest leg,
+   which is what the label promises and what a person pictures. */
+function longestCarLegM(it){
+  return it.legs.reduce((m, l) =>
+    l.mode === "CAR" ? Math.max(m, l.distance || 0) : m, 0);
 }
 
 /* Merge the drive queries keeping the pool WIDE IN DRIVE DISTANCE, not just
@@ -2915,7 +2993,7 @@ function spreadByDrive(its){
   const kept = new Set(byDur.slice(0, 4));          // the outright fastest
   const bands = new Map();
   for (const it of byDur){                          // already fastest-first
-    const b = Math.floor(carDistance(it) / DRIVE_BAND_M);
+    const b = Math.floor(longestCarLegM(it) / DRIVE_BAND_M);
     const n = (bands.get(b) || 0);
     if (n >= DRIVE_PER_BAND) continue;
     bands.set(b, n + 1);
@@ -3077,7 +3155,7 @@ const tollCost = it => it.legs.reduce((s, l) => s + legTollCost(l), 0);
 function visibleIts(p){
   let its = p.its || [];
   if (p.c.drive)
-    its = its.filter(it => carDistance(it) <= maxDriveM);
+    its = its.filter(it => longestCarLegM(it) <= maxDriveM);
   if (avoidTolls) its = its.filter(it => !isTolled(it));
   return its;
 }
@@ -3090,9 +3168,9 @@ function driveHint(pool, raw){
   if (!hint) return;
   const best = pool.length ? pool[0].it.duration : Infinity;
   const hidden = dedupeAlts(raw.filter(it =>
-    carDistance(it) > maxDriveM && it.duration < best));
+    longestCarLegM(it) > maxDriveM && it.duration < best));
   if (!hidden.length){ hint.hidden = true; delete hint.dataset.km; return; }
-  const km = Math.ceil(Math.min(...hidden.map(carDistance)) / 1000);
+  const km = Math.ceil(Math.min(...hidden.map(longestCarLegM)) / 1000);
   const mins = Math.round(Math.min(...hidden.map(it => it.duration)) / 60);
   hint.querySelector(".sh-txt").textContent = hidden.length > 1
     ? `Hiding ${hidden.length} faster options, best ${mins} min at ${km} km`

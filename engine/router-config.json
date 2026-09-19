@@ -109,16 +109,33 @@
       "url": "http://rtu.york.ca/gtfsrealtime/TripUpdates" },
     { "type": "stop-time-updater", "frequency": "1m", "feedId": "MIWAY",
       "url": "https://www.miapp.ca/GTFS_RT/TripUpdate/TripUpdates.pb" },
+    // DRT comes through scripts/drt-rt-filter.py, NOT straight from Durham.
+    // Their feed sends stop_time_updates for stops that are not on the trip
+    // (seq 50-53 on a 49-stop trip), wedged in BEFORE the real tail, so the
+    // sequence also runs backwards. OTP reports INVALID_STOP_SEQUENCE and
+    // drops the whole trip: about 30 trips a cycle, ~22% of the feed, all
+    // silently back on scheduled times. The filter drops only the updates
+    // whose stop_sequence is not in the static trip, which leaves a strictly
+    // increasing sequence. run.sh starts it; GTA_ROUTER_DIR is set there.
     { "type": "stop-time-updater", "frequency": "1m", "feedId": "DRT",
-      "url": "https://drtonline.durhamregiontransit.com/gtfsrealtime/TripUpdates" },
+      "url": "file:${GTA_ROUTER_DIR}/drt-rt-filtered.pb" },
 
     // Service alerts (GTFS-RT ServiceAlerts): text disruptions such as
     // "Line 1: no service Bloor-St George". feedId must match the static
     // feed ids in build-config.json. TTC alerts work without the filter
     // above because they reference routes and stops, not trip ids. DRT has
     // no public alerts endpoint.
+    //
+    // GO alerts come through scripts/go-alerts-filter.py, NOT straight from
+    // Metrolinx. Their feed emits explicitly-present but EMPTY agency_id and
+    // route_id fields beside a good stop_id; OTP builds a FeedScopedId from
+    // the empty one, throws "Missing mandatory id on FeedScopeId", and the
+    // exception aborts the whole GO alerts batch every single cycle. Result,
+    // measured 2026-09-19: 55 GO alerts published, ZERO in the engine, while
+    // TTC and MiWay arrived fine. The filter strips only the empty strings.
+    // run.sh starts it and exports GTA_ROUTER_DIR for this path.
     { "type": "real-time-alerts", "frequency": "1m", "feedId": "GO",
-      "url": "https://api.openmetrolinx.com/OpenDataAPI/api/V1/Gtfs.proto/Feed/Alerts?key=${METROLINX_KEY}" },
+      "url": "file:${GTA_ROUTER_DIR}/go-alerts-filtered.pb" },
     { "type": "real-time-alerts", "frequency": "1m", "feedId": "TTC",
       "url": "https://bustime.ttc.ca/gtfsrt/alerts" },
     { "type": "real-time-alerts", "frequency": "1m", "feedId": "YRT",

@@ -1,0 +1,225 @@
+{
+  "_readme": [
+    "Extra trips for route-audit.py, on top of the ones in benchmarks.json.",
+    "These carry no expected answer: the audit grades the app against a much",
+    "wider search of the same engine, not against a written-down expectation,",
+    "so only where/when is needed.",
+    "Chosen for the shapes where a router is most likely to go wrong:",
+    "suburb to suburb, reverse commutes, thin evening and weekend service,",
+    "and the Halton feeds that were added last.",
+    "Coordinates for stations and terminals were read out of the GTFS feeds",
+    "themselves, not guessed. day: 'weekday' resolves to next Tuesday."
+  ],
+  "trips": [
+    {
+      "id": "stouffville_corridor_to_downtown",
+      "description": "Mount Joy GO to King and Bay, weekday 8am",
+      "from": {
+        "latitude": 43.900521,
+        "longitude": -79.26313
+      },
+      "to": {
+        "latitude": 43.6487,
+        "longitude": -79.3817
+      },
+      "day": "weekday",
+      "time": "08:00"
+    },
+    {
+      "id": "downtown_to_stouffville_corridor",
+      "description": "King and Bay to Mount Joy GO, weekday 5:30pm",
+      "from": {
+        "latitude": 43.6487,
+        "longitude": -79.3817
+      },
+      "to": {
+        "latitude": 43.900521,
+        "longitude": -79.26313
+      },
+      "day": "weekday",
+      "time": "17:30"
+    },
+    {
+      "id": "stouffville_corridor_evening",
+      "description": "Mount Joy GO to King and Bay, weekday 10pm, thin service",
+      "from": {
+        "latitude": 43.900521,
+        "longitude": -79.26313
+      },
+      "to": {
+        "latitude": 43.6487,
+        "longitude": -79.3817
+      },
+      "day": "weekday",
+      "time": "22:00"
+    },
+    {
+      "id": "stouffville_corridor_saturday",
+      "description": "Mount Joy GO to King and Bay, Saturday 11am",
+      "from": {
+        "latitude": 43.900521,
+        "longitude": -79.26313
+      },
+      "to": {
+        "latitude": 43.6487,
+        "longitude": -79.3817
+      },
+      "day": "saturday",
+      "time": "11:00"
+    },
+    {
+      "id": "oakville_to_downtown",
+      "description": "Oakville GO to King and Bay, weekday 8am (Halton feed)",
+      "from": {
+        "latitude": 43.455594,
+        "longitude": -79.682242
+      },
+      "to": {
+        "latitude": 43.6487,
+        "longitude": -79.3817
+      },
+      "day": "weekday",
+      "time": "08:00"
+    },
+    {
+      "id": "burlington_to_union",
+      "description": "Burlington GO to Union Station, weekday 7am (Halton feed)",
+      "from": {
+        "latitude": 43.341265,
+        "longitude": -79.809141
+      },
+      "to": {
+        "latitude": 43.645195,
+        "longitude": -79.3806
+      },
+      "day": "weekday",
+      "time": "07:00"
+    },
+    {
+      "id": "milton_to_union",
+      "description": "Milton GO to Union Station, weekday 7am (peak-only rail line)",
+      "from": {
+        "latitude": 43.52364,
+        "longitude": -79.867172
+      },
+      "to": {
+        "latitude": 43.645195,
+        "longitude": -79.3806
+      },
+      "day": "weekday",
+      "time": "07:00"
+    },
+    {
+      "id": "milton_to_union_midday",
+      "description": "Milton GO to Union Station, weekday 1pm, when the train does not run",
+      "from": {
+        "latitude": 43.52364,
+        "longitude": -79.867172
+      },
+      "to": {
+        "latitude": 43.645195,
+        "longitude": -79.3806
+      },
+      "day": "weekday",
+      "time": "13:00"
+    },
+    {
+      "id": "ajax_to_markham",
+      "description": "Ajax GO to Unionville area, weekday 8am, suburb to suburb across regions",
+      "from": {
+        "latitude": 43.847766,
+        "longitude": -79.041372
+      },
+      "to": {
+        "latitude": 43.8563,
+        "longitude": -79.3105
+      },
+      "day": "weekday",
+      "time": "08:00"
+    },
+    {
+      "id": "scarborough_to_vaughan",
+      "description": "Scarborough Centre to Vaughan Metropolitan Centre, weekday 8am",
+      "from": {
+        "latitude": 43.774257,
+        "longitude": -79.258185
+      },
+      "to": {
+        "latitude": 43.794021,
+        "longitude": -79.527906
+      },
+      "day": "weekday",
+      "time": "08:00"
+    },
+    {
+      "id": "bramalea_to_pearson",
+      "description": "Bramalea Terminal to Pearson Terminal 1, weekday 8am",
+      "from": {
+        "latitude": 43.719117,
+        "longitude": -79.720436
+      },
+      "to": {
+        "latitude": 43.6777,
+        "longitude": -79.6248
+      },
+      "day": "weekday",
+      "time": "08:00"
+    },
+    {
+      "id": "mississauga_to_north_york",
+      "description": "Square One area to North York Centre, weekday 8am",
+      "from": {
+        "latitude": 43.593731,
+        "longitude": -79.647476
+      },
+      "to": {
+        "latitude": 43.7679,
+        "longitude": -79.4128
+      },
+      "day": "weekday",
+      "time": "08:00"
+    },
+    {
+      "id": "downtown_to_oakville_evening",
+      "description": "King and Bay to Oakville GO, weekday 6pm reverse commute",
+      "from": {
+        "latitude": 43.6487,
+        "longitude": -79.3817
+      },
+      "to": {
+        "latitude": 43.455594,
+        "longitude": -79.682242
+      },
+      "day": "weekday",
+      "time": "18:00"
+    },
+    {
+      "id": "kipling_to_scarborough_centre",
+      "description": "Kipling Station to Scarborough Centre, weekday 8am, the full Line 2 crosstown",
+      "from": {
+        "latitude": 43.637354,
+        "longitude": -79.535939
+      },
+      "to": {
+        "latitude": 43.774257,
+        "longitude": -79.258185
+      },
+      "day": "weekday",
+      "time": "08:00"
+    },
+    {
+      "id": "pickering_to_markham",
+      "description": "Pickering GO to Unionville area, weekday 8am, no direct rail link",
+      "from": {
+        "latitude": 43.831576,
+        "longitude": -79.084594
+      },
+      "to": {
+        "latitude": 43.8563,
+        "longitude": -79.3105
+      },
+      "day": "weekday",
+      "time": "08:00"
+    }
+  ]
+}
