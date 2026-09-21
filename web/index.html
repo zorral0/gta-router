@@ -2618,6 +2618,15 @@ const COMBOS = [
   // uncapped 3-hour walk would pin itself to the top of every long trip.
   // Past these limits nobody is choosing to walk or ride anyway.
   { key: "Bike the whole way", pure: "BICYCLE", need: ["bike"], maxMin: 60 },
+  // Bike Share the whole way: walk to a dock, ride, walk from a dock. The
+  // engine refuses a rental on its own ("needs to be combined with WALK"),
+  // and with walking at normal cost it just returns the plain walk on short
+  // trips, so walking is made expensive here as in the other Bike Share
+  // combos. A result with no rented bike in it is that plain walk, which
+  // "Walk the whole way" already covers, so the filter drops it.
+  { key: "Bike Share the whole way", pure: "BICYCLE_RENTAL",
+    direct: ["WALK", "BICYCLE_RENTAL"], need: ["share"],
+    walkReluctance: 6.0, maxMin: 60 },
   { key: "Walk the whole way", pure: "WALK",    need: [],       maxMin: 45 },
 ];
 
@@ -2778,13 +2787,14 @@ async function fetchCombo(combo, date, time, carReluctance, signal){
         : { earliestDeparture: new Date(date + "T" + time).toISOString() },
       first: 8,
       modes: combo.pure
-        ? { directOnly: true, direct: [combo.pure] }
+        ? { directOnly: true, direct: combo.direct || [combo.pure] }
         : { transit: { access: combo.access, egress: combo.egress } },
       prefs: (() => {
         // per-request bike optimization only matters when this mode mix
         // actually rides a bike (own bike to a station, Bike Share, or the
         // whole way)
         const usesBike = combo.pure === "BICYCLE"
+          || combo.pure === "BICYCLE_RENTAL"
           || (combo.access || []).includes("BICYCLE_PARKING")
           || (combo.access || []).includes("BICYCLE_RENTAL")
           || (combo.egress || []).includes("BICYCLE_RENTAL");
@@ -2803,6 +2813,12 @@ async function fetchCombo(combo, date, time, carReluctance, signal){
   // a pure ride is a single mode end to end and has no departure choices to
   // spread, so keep just the best one - and only if it's inside the effort
   // cap. Everything below this point is transit-combo bookkeeping.
+  if (combo.pure === "BICYCLE_RENTAL")
+    return its.filter(it =>
+      it.legs.some(l => l.mode === "BICYCLE" && l.rentedBike)
+      && it.legs.every(l => l.mode === "WALK"
+                            || (l.mode === "BICYCLE" && l.rentedBike))
+      && it.duration <= combo.maxMin * 60).slice(0, 1);
   if (combo.pure)
     return its.filter(it => it.legs.length
       && it.legs.every(l => l.mode === combo.pure)
