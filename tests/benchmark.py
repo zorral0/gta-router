@@ -18,7 +18,10 @@ import json
 import os
 import sys
 import urllib.request
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
+
+TORONTO = ZoneInfo("America/Toronto")
 
 OTP_URL = "http://localhost:8080/otp/gtfs/v1"
 
@@ -59,7 +62,7 @@ def next_service_date(day_kind):
     """Turn 'weekday'/'saturday' into a real upcoming date (feeds go stale,
     so benchmarks.json stores the kind of day, not a fixed date)."""
     target = {"weekday": 1, "saturday": 5, "sunday": 6}[day_kind]  # Tue/Sat/Sun
-    today = date.today()
+    today = datetime.now(TORONTO).date()   # Toronto's today, not the machine's
     delta = (target - today.weekday()) % 7 or 7
     return (today + timedelta(days=delta)).isoformat()
 
@@ -73,9 +76,9 @@ def to_location(point):
 
 def to_datetime(day_kind, hhmm):
     """Local Toronto date+time -> ISO OffsetDateTime for earliestDeparture."""
-    from datetime import datetime
+    # pinned to Toronto: the machine's own zone is UTC on a cloud server
     return (datetime.fromisoformat(next_service_date(day_kind) + "T" + hhmm)
-            .astimezone().isoformat())
+            .replace(tzinfo=TORONTO).isoformat())
 
 
 TRANSIT_MODES = {"BUS", "RAIL", "SUBWAY", "TRAM", "FERRY"}
@@ -224,6 +227,11 @@ def main():
         print(f"Miss rate: {tally['MISS']}/{graded}"
               f" ({tally['MISS'] / graded:.0%})"
               + (f", of which {unfair_misses} known-unfair" if unfair_misses else ""))
+
+    # a non-zero exit is how a script or CI job tells a failed run from a good
+    # one; known-unfair misses (feeds we don't have) don't count against it
+    if tally["ERROR"] or tally["MISS"] - unfair_misses:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@ benchmark.py asks "is the answer sane?". This asks a harder question:
 
 Two searches run for every trip.
 
-  APP     - a faithful mirror of what web/index.html fires: the nine mode
+  APP     - a faithful mirror of what web/index.html fires: the twelve mode
             mixes in COMBOS, the three DRIVE_RELUCTANCE values on every
             drive combo, first:8, the same result filters, pooled and
             reduced to the same Pareto lead set.
@@ -46,6 +46,9 @@ import sys
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
+
+TORONTO = ZoneInfo("America/Toronto")
 
 OTP_URL = "http://localhost:8080/otp/gtfs/v1"
 
@@ -94,6 +97,8 @@ APP_COMBOS = [
      "egress": ["WALK", "CAR_PICKUP"], "drive": True, "needsLeg": "BICYCLE",
      "carAfter": True},
     {"key": "Bike the whole way", "pure": "BICYCLE", "maxMin": 60},
+    {"key": "Bike Share the whole way", "pure": "BICYCLE_RENTAL",
+     "direct": ["WALK", "BICYCLE_RENTAL"], "walkReluctance": 6.0, "maxMin": 60},
     {"key": "Walk the whole way", "pure": "WALK", "maxMin": 45},
 ]
 DRIVE_RELUCTANCE = [30.0, 2.0, 1.0]        # mirror of index.html
@@ -155,14 +160,15 @@ def next_service_date(day_kind):
     """Same rule as benchmark.py: feeds go stale, so trips store the KIND of
     day and resolve to the next real one."""
     target = {"weekday": 1, "saturday": 5, "sunday": 6}[day_kind]
-    today = date.today()
+    today = datetime.now(TORONTO).date()   # Toronto's today, not the machine's
     delta = (target - today.weekday()) % 7 or 7
     return (today + timedelta(days=delta)).isoformat()
 
 
 def to_datetime(day_kind, hhmm):
+    # pinned to Toronto: the machine's own zone is UTC on a cloud server
     return (datetime.fromisoformat(next_service_date(day_kind) + "T" + hhmm)
-            .astimezone().isoformat())
+            .replace(tzinfo=TORONTO).isoformat())
 
 
 def ask(trip, modes, first, prefs=None, debug=False, window=None):
@@ -194,7 +200,7 @@ def ask(trip, modes, first, prefs=None, debug=False, window=None):
 
 def modes_for(combo):
     if combo.get("pure"):
-        return {"directOnly": True, "direct": [combo["pure"]]}
+        return {"directOnly": True, "direct": combo.get("direct") or [combo["pure"]]}
     transit = {"access": combo["access"], "egress": combo["egress"]}
     if combo.get("transfer"):
         transit["transfer"] = combo["transfer"]
@@ -218,6 +224,16 @@ def keep(combo, itins):
     for it in itins:
         legs = it["legs"]
         if not legs:
+            continue
+        if combo.get("pure") == "BICYCLE_RENTAL":
+            # a rental with at most walking around it; with no rented bike
+            # it is the plain walk "Walk the whole way" already covers
+            if any(l["mode"] == "BICYCLE" and l.get("rentedBike") for l in legs) \
+                    and all(l["mode"] == "WALK"
+                            or (l["mode"] == "BICYCLE" and l.get("rentedBike"))
+                            for l in legs) \
+                    and it["duration"] <= combo["maxMin"] * 60:
+                out.append(it)
             continue
         if combo.get("pure"):
             if all(l["mode"] == combo["pure"] for l in legs) \
