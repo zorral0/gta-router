@@ -828,6 +828,53 @@ function loadStored(key, fallback){
         return (v && typeof v === "object") ? v : fallback; }
   catch (e){ return fallback; }
 }
+/* With storage blocked (Safari "block all cookies" and the like) merely
+   touching localStorage throws, and one unguarded read at startup used to
+   kill the whole script. Every plain read and write goes through these. */
+const store = {
+  get(key){ try { return localStorage.getItem(key); } catch (e){ return null; } },
+  set(key, v){ try { localStorage.setItem(key, v); } catch (e){} },
+  remove(key){ try { localStorage.removeItem(key); } catch (e){} }
+};
+
+/* ---- Toronto time ----
+   Every timetable here runs on Toronto's clock, but a bare Date reads the
+   clock of whatever computer the page is on: a visitor in Vancouver asking
+   for 8:00 AM got Toronto's 11:00 AM, and the 407 rate band and Burlington's
+   free evening rides were judged on the wrong hour. All date maths goes
+   through these instead. */
+const TZ = "America/Toronto";
+const tzFmt = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, hourCycle: "h23",
+  year: "numeric", month: "2-digit", day: "2-digit",
+  hour: "2-digit", minute: "2-digit", second: "2-digit" });
+/* A "wall clock" Date: a local Date whose fields (getHours, getDay,
+   getDate...) read what a Toronto clock reads at instant `ms`. Fine for
+   reading fields and for calendar arithmetic; never send it to the engine. */
+function torontoParts(ms){
+  const p = {};
+  for (const x of tzFmt.formatToParts(new Date(ms))) p[x.type] = +x.value;
+  p.hour %= 24;
+  return p;
+}
+function torontoWall(ms){
+  const p = torontoParts(ms);
+  return new Date(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
+}
+/* the real instant at which Toronto's clock reads `date` ("YYYY-MM-DD") and
+   `time` ("HH:MM"), as an ISO string for the engine */
+function torontoISO(date, time){
+  const [y, mo, d] = date.split("-").map(Number), [h, mi] = time.split(":").map(Number);
+  const want = Date.UTC(y, mo - 1, d, h, mi);
+  const offsetAt = ms => {          // Toronto minus UTC at instant ms, in ms
+    const p = torontoParts(ms);     // parts, not a wall Date: the browser's own
+                                    // DST gap must not shift the answer
+    return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second)
+      - Math.floor(ms / 1000) * 1000;
+  };
+  let ms = want - offsetAt(want);
+  ms = want - offsetAt(ms);         // second pass settles the DST changeover days
+  return new Date(ms).toISOString();
+}
 
 /* ---- inline icons (Lucide, ISC license, lucide.dev) ---- */
 const ICONS = {
@@ -861,7 +908,8 @@ const modeIcon = m => ({ WALK:"walk", BICYCLE:"bike", CAR:"car", BUS:"bus",
 
 /* ---- fare model ---- */
 // [name-match, adult fare, youth fare (null = not modelled), verified?]
-// verified July 2026 against each agency's official fare page
+// verified against each agency's official fare page (July 2026, Halton
+// 2026-09-19)
 // (PRESTO-level; unverified fares would say so in the UI via the flag)
 /* [match key, adult, youth (null = no youth rate modelled), verified,
     transfer program]. The key is matched as a SUBSTRING of the uppercased
@@ -908,11 +956,11 @@ let maxDriveM = 15000;  // hide drive-to-station options with a longer drive
 /* hide options that drive on a toll road. The engine can't route around
    one (OTP has no toll support at all), so this filters rather than
    re-routes - see the toll-roads block further down. */
-let avoidTolls = localStorage.getItem("avoidTolls") === "1";
+let avoidTolls = store.get("avoidTolls") === "1";
 /* bike routing trade-off: the ENGINE default is safest-streets
    (router-config.json); "balanced"/"fastest" override it per request so
    busier roads are allowed when they save time */
-let bikePref = localStorage.getItem("bikePref") || "safest";
+let bikePref = store.get("bikePref") || "safest";
 if (!["safest", "balanced", "fastest"].includes(bikePref)) bikePref = "safest";
 const BIKE_OPT = { balanced: "SAFE_STREETS", fastest: "SHORTEST_DURATION" };
 /* "Leave at" (false) vs "Arrive by" (true) - which end of the trip the
@@ -1002,7 +1050,7 @@ function prettyAgency(a){
    qualifies, and the rider is the one standing at the stop. */
 function burlingtonYouthFree(ms){
   if (!ms) return false;             // unknown time: charge the fare
-  const d = new Date(ms), day = d.getDay();   // 0 Sunday ... 6 Saturday
+  const d = torontoWall(ms), day = d.getDay();   // 0 Sunday ... 6 Saturday
   return day === 0 || day === 6 || d.getHours() >= 18;
 }
 
@@ -1431,10 +1479,10 @@ function saveLook(){
    are left alone, and the flag means this only ever runs once. */
 (function(){
   try {
-    if (localStorage.getItem("sawAppleLook")) return;
+    if (store.get("sawAppleLook")) return;
     if (mapLook.dark === "midnight") mapLook.dark = "applenight";
     if (mapLook.light === "daylight") mapLook.light = "appleday";
-    localStorage.setItem("sawAppleLook", "1");
+    store.set("sawAppleLook", "1");
     saveLook();
   } catch (e){}   // private browsing / storage off: just use the defaults
 })();
@@ -2356,7 +2404,6 @@ function setPoint(which, lngLat, label){
     const p = m.getLngLat();
     if (which === "from") fromPt = p; else toPt = p;
     document.getElementById(which + "Box").value = fmt(p);
-    savePts();
     refreshPick();
     fillLabel(which, p);   // turn the new spot into a place name
     plan();
@@ -2364,7 +2411,6 @@ function setPoint(which, lngLat, label){
   if (which === "from"){ fromMarker = m; fromPt = lngLat; }
   else { toMarker = m; toPt = lngLat; }
   document.getElementById(which + "Box").value = label || fmt(lngLat);
-  savePts();
   refreshPick();
   if (!label) fillLabel(which, lngLat);   // clicked a bare spot: name it
 }
@@ -2400,17 +2446,10 @@ async function fillLabel(which, lngLat){
   const box = document.getElementById(which + "Box");
   if (box === document.activeElement) return;   // don't fight the user's typing
   box.value = name;
-  savePts();
 }
-/* remember the trip ends, so tomorrow's commute is one click, not a re-type */
-function savePts(){
-  const j = {};
-  if (fromPt) j.from = { lng: fromPt.lng, lat: fromPt.lat,
-    label: document.getElementById("fromBox").value };
-  if (toPt) j.to = { lng: toPt.lng, lat: toPt.lat,
-    label: document.getElementById("toBox").value };
-  localStorage.setItem("pts", JSON.stringify(j));
-}
+/* Older versions saved both trip ends here on every change, long after the
+   restore that read them was dropped. Wipe what they left behind. */
+store.remove("pts");
 const fmt = p => p.lat.toFixed(4) + ", " + p.lng.toFixed(4);
 map.on("click", e => {
   // (dock dots are hover-only now - a click on one still drops a pin)
@@ -2671,7 +2710,7 @@ if (storedHave.car !== undefined){
 }
 let have = Object.assign({ bike: true, carStart: true, carEnd: true, share: true },
   storedHave);
-localStorage.setItem("have", JSON.stringify(have));
+store.set("have", JSON.stringify(have));
 
 /* true when the itinerary uses transit and every leg matching `match`
    comes AFTER the last transit leg (i.e. it really is an "at the end" leg) */
@@ -2748,7 +2787,9 @@ function cleanAlerts(raw){
           || (desc.length > head.length && desc.slice(0, head.length) === head));
     out.push({ id: key, header: cut ? desc : (head || desc),
       desc: cut ? "" : (desc && desc !== head ? desc : ""),
-      url: a.alertUrl || "", severity: a.alertSeverityLevel || "",
+      // feed text becomes a clickable href: only plain web links, never
+      // javascript: or data: (escaping alone does not stop those)
+      url: /^https?:\/\//i.test(a.alertUrl || "") ? a.alertUrl : "", severity: a.alertSeverityLevel || "",
       feed: a.feed || "" });   // present on the global query, absent on legs
   }
   return out;
@@ -2783,8 +2824,8 @@ async function fetchCombo(combo, date, time, carReluctance, signal){
       // returns the best (latest-departing) trips for latestArrival too;
       // "last" pads in pointlessly-early departures - don't use it.
       dateTime: arriveBy
-        ? { latestArrival: new Date(date + "T" + time).toISOString() }
-        : { earliestDeparture: new Date(date + "T" + time).toISOString() },
+        ? { latestArrival: torontoISO(date, time) }
+        : { earliestDeparture: torontoISO(date, time) },
       first: 8,
       modes: combo.pure
         ? { directOnly: true, direct: combo.direct || [combo.pure] }
@@ -2806,6 +2847,9 @@ async function fetchCombo(combo, date, time, carReluctance, signal){
           bikeOpt);
         return Object.keys(street).length ? { street } : null;
       })() } }) });
+  // an error page is HTML, and r.json() on it used to surface as a raw
+  // "Unexpected token <" under the search box
+  if (!r.ok) throw new Error(`The trip engine answered with an error (${r.status}). Try again in a moment.`);
   const js = await r.json();
   if (js.errors) throw new Error(js.errors.map(e => e.message).join("; "));
   let its = (((js.data || {}).planConnection || {}).edges || [])
@@ -2884,7 +2928,7 @@ function legRow(it){
 }
 const esc = s => String(s).replace(/[&<>"']/g, c =>
   ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
-const hhmm = t => new Date(t).toLocaleTimeString([], { hour:"numeric", minute:"2-digit" });
+const hhmm = t => new Date(t).toLocaleTimeString([], { hour:"numeric", minute:"2-digit", timeZone: TZ });
 /* GO/TTC trip headsigns carry 24-hour clock times baked into the text
    ("Union Station GO 18:00 - Unionville GO 18:50"). Everything else in the app
    is 12-hour, so the raw headsign put both formats three lines apart in one
@@ -3164,7 +3208,7 @@ function legTollCost(l){
   const g = legTollGeom(l);
   if (!g || !TOLLRATE || g.m < TOLL_MIN_M) return 0;
   // billed on the time you got ON, not when the drive started
-  const enter = new Date(l.startTime + (g.legM
+  const enter = torontoWall(l.startTime + (g.legM
     ? (g.enteredAt / g.legM) * (l.duration * 1000) : 0));
   const band = tollBandAt(enter);
   const rates = TOLLRATE.rates[g.dir][band.kind][band.idx];
@@ -3206,18 +3250,28 @@ function driveHint(pool, raw){
    Rule: an option that is slower AND not cheaper than
    another visible option must never headline - it stays reachable under
    "more options", but can't pose as a recommendation. */
+/* Where each ride boards is part of the pattern. Without it, two
+   park-and-rides to DIFFERENT stations that happened to take the same number
+   of minutes collapsed into one card, and "also 8:10" named a departure from
+   somewhere else entirely. */
 const itinSig = it => Math.round(it.duration/60) + "|" + it.legs.map(l =>
-  l.mode + ((l.route||{}).shortName || "")).join(",");
+  l.mode + ((l.route||{}).shortName || "")
+  + (TRANSIT.has(l.mode)
+      ? "@" + ((((l.from || {}).stop || {}).gtfsId) || (l.from || {}).name || "")
+      : "")).join(",");
 
 /* the same trip pattern often comes back several times (other query, later
    departure). Keep ONE card, but remember the other departure times so
-   "when's the next one?" isn't silently erased. */
+   "when's the next one?" isn't silently erased.
+   Returns copies and never writes to the input: the results are re-rendered
+   from the same stored trips whenever a filter changes, and merging into
+   those used to leave a hidden trip's time stuck on a visible card. */
 function dedupeAlts(list){
   const kept = new Map();
   for (const it of list){
     const sig = itinSig(it);
     const k = kept.get(sig);
-    if (!k){ it.altTimes = it.altTimes || []; kept.set(sig, it); continue; }
+    if (!k){ kept.set(sig, { ...it, altTimes: (it.altTimes || []).slice() }); continue; }
     for (const t of [it.startTime, ...(it.altTimes || [])])
       if (t !== k.startTime && !k.altTimes.includes(t)) k.altTimes.push(t);
   }
@@ -3549,7 +3603,7 @@ function renderDetail(cid){
     <div class="fares"><h3>Cost breakdown${rider === "youth" ? " &middot; youth fare" : ""}</h3>
       ${fares}
       <div class="fitem total"><span>Total</span><span>$${total.toFixed(2)}</span></div>
-      <div class="fnote">PRESTO-level fares, verified July 2026. One Fare makes local
+      <div class="fnote">PRESTO-level fares, checked against each agency in 2026. One Fare makes local
         transit free when a GO trip is part of the journey. ${rider === "youth"
           ? "Youth rates applied for every system."
           : "Adult rates applied for every system."}
@@ -3581,7 +3635,7 @@ document.getElementById("go").onclick = plan;
         out = document.getElementById("driveVal"),
         hint = document.getElementById("driveHint");
   const STEP = +rng.step, MIN = +rng.min, ANY = +rng.max;  // top of track = no limit
-  const stored = parseInt(localStorage.getItem("driveKm"), 10);
+  const stored = parseInt(store.get("driveKm"), 10);
   if (stored >= MIN && stored <= ANY) rng.value = stored;
   const paint = () => {
     const km = +rng.value, any = km >= ANY;
@@ -3598,13 +3652,13 @@ document.getElementById("go").onclick = plan;
     renderResults(lastParts, { selectSig: keepSig, noFit: true, noSweep: true });
   };
   rng.addEventListener("input", () => { paint(); rerender(); });
-  rng.addEventListener("change", () => localStorage.setItem("driveKm", rng.value));
+  rng.addEventListener("change", () => store.set("driveKm", rng.value));
   // one tap on the hint raises the cap exactly far enough to reveal them
   const takeHint = () => {
     const km = +hint.dataset.km;
     if (!km) return;
     rng.value = Math.min(ANY, Math.ceil(km / STEP) * STEP);
-    localStorage.setItem("driveKm", rng.value);
+    store.set("driveKm", rng.value);
     paint(); rerender();
   };
   hint.addEventListener("click", takeHint);   // a real <button>: Enter/Space free
@@ -3622,7 +3676,7 @@ document.getElementById("go").onclick = plan;
   paint();
   b.onclick = () => {
     avoidTolls = !avoidTolls;
-    localStorage.setItem("avoidTolls", avoidTolls ? "1" : "");
+    store.set("avoidTolls", avoidTolls ? "1" : "");
     paint();
     if (!lastParts) return;
     const keepSig = selId && itinsById[selId] ? itinSig(itinsById[selId]) : null;
@@ -3635,7 +3689,7 @@ const bikeSel = document.getElementById("bikeSel");
 bikeSel.value = bikePref;
 bikeSel.addEventListener("change", e => {
   bikePref = e.target.value;
-  localStorage.setItem("bikePref", bikePref);
+  store.set("bikePref", bikePref);
   paintOptsRow();
   plan();   // routing changes, not just filtering - re-query
 });
@@ -3780,7 +3834,7 @@ for (const id of ["haveBike", "haveCarStart", "haveCarEnd", "haveShare"]){
   b.setAttribute("aria-pressed", have[k] ? "true" : "false");
   b.onclick = () => {
     have[k] = !have[k];
-    localStorage.setItem("have", JSON.stringify(have));
+    store.set("have", JSON.stringify(have));
     b.classList.toggle("on", have[k]);
     b.setAttribute("aria-pressed", have[k] ? "true" : "false");
     paintOptsRow();
@@ -3901,13 +3955,16 @@ document.querySelectorAll(".pt.pick").forEach(d => {
 });
 refreshPick();
 document.getElementById("clear").onclick = () => {
+  // a search still in flight would otherwise finish and paint its results
+  // and route back onto the empty form
+  if (planCtrl) planCtrl.abort();
+  planSeq++;
   if (fromMarker) fromMarker.remove(); if (toMarker) toMarker.remove();
   fromPt = toPt = fromMarker = toMarker = null;
   pickOverride = null; refreshPick();
   lastParts = null; lastRouteFC = null;
   syncTransitEmphasis();   // no trip on screen: the lines come back up
   clearTripDocks();
-  localStorage.removeItem("pts");
   closeDetail();
   document.getElementById("fromBox").value = "";
   document.getElementById("toBox").value = "";
@@ -3933,7 +3990,7 @@ const isoDay = d => d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate(
 function addDayOptions(days){
   const daySel = document.getElementById("daySel");
   const have = new Set([...daySel.options].map(o => o.value));
-  const today = new Date(); today.setHours(12, 0, 0, 0);   // noon: DST-proof
+  const today = torontoWall(Date.now()); today.setHours(12, 0, 0, 0);   // noon: DST-proof
   for (let i = 0; i < days; i++){
     const d = new Date(today.getTime() + i*86400000);
     const val = isoDay(d);
@@ -3955,7 +4012,7 @@ function addDayOptions(days){
   // the day over, then move the day picker with it (else the default was
   // "today at 12:00 AM", i.e. almost a full day in the PAST)
   const daySel = document.getElementById("daySel");
-  const now = new Date(Date.now() + 5*60000);
+  const now = torontoWall(Date.now() + 5*60000);
   now.setMinutes(Math.ceil(now.getMinutes()/15)*15, 0, 0);
   const dval = isoDay(now);
   if ([...daySel.options].some(o => o.value === dval)) daySel.value = dval;
@@ -4061,7 +4118,7 @@ function skinSelect(sel, opts){
     [...sel.options].forEach((o, i) => byDay.set(o.value, i));
     const sel1 = sel.value ? new Date(sel.value + "T12:00:00") : new Date();
     if (!calMonth) calMonth = new Date(sel1.getFullYear(), sel1.getMonth(), 1);
-    const today = isoDay(new Date());
+    const today = isoDay(torontoWall(Date.now()));
     const head = document.createElement("div");
     head.className = "cal-head";
     head.innerHTML = `<button type="button" class="cal-nav" data-d="-1"
@@ -4105,7 +4162,7 @@ function skinSelect(sel, opts){
     if (scheduleEnd){
       const f = document.createElement("div");
       f.className = "cal-foot";
-      const e = new Date(scheduleEnd);
+      const e = torontoWall(scheduleEnd);
       f.textContent = `Schedules loaded through ${MON[e.getMonth()]} ${e.getDate()}`;
       menu.appendChild(f);
     }
@@ -4232,8 +4289,7 @@ function tripFromURL(){
 }
 
 /* The app opens with empty search boxes; the previous trip is not restored.
-   A shared link still fills both ends and plans itself straight away.
-   savePts() still writes "pts"; nothing reads it on load. */
+   A shared link still fills both ends and plans itself straight away. */
 (function(){
   const shared = tripFromURL();
   const j = shared ? { from: { ...shared.from }, to: { ...shared.to } } : {};
@@ -4266,7 +4322,10 @@ function tripFromURL(){
 const FEED_END_CACHE = "feedEnds";
 (async function(){
   const DAY = 86400000;
-  const iso = ms => new Date(ms).toISOString().slice(0, 10);
+  // ms values below are Toronto wall-clock noons (see torontoWall), so the
+  // date is read off the local fields; noon keeps a DST hour from tipping
+  // it into the next or previous day
+  const iso = ms => isoDay(new Date(ms));
   const ask = async q => {
     const r = await fetch(OTP, { method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -4297,7 +4356,7 @@ const FEED_END_CACHE = "feedEnds";
     // and end is never included. serviceTimeRange.end happens to be
     // one-past-the-last-day too, but don't lean on two bounds agreeing:
     // push the window out a day so it covers the real last day either way.
-    const LAST = iso(end + DAY);
+    const LAST = isoDay(torontoWall(end + DAY));
     const key = FEED_END_CACHE + ":" + LAST + ":" + feeds.join(",");
     let ends = loadStored(key, null);
 
@@ -4311,8 +4370,7 @@ const FEED_END_CACHE = "feedEnds";
         ).join(" ") + "}");
         return jobs.map((j, i) => ((d["f" + i] || []).length > 0));
       };
-      const day0 = start ? new Date(start).setHours(0, 0, 0, 0)
-                         : new Date().setHours(0, 0, 0, 0);
+      const day0 = torontoWall(start || Date.now()).setHours(12, 0, 0, 0);
       const span = Math.max(1, Math.round((end - day0) / DAY));
       const lo = {}, hi = {};
       ends = {};
@@ -4342,7 +4400,7 @@ const FEED_END_CACHE = "feedEnds";
     // FEED_LABEL is declared further down, but this function has already
     // awaited a fetch by now, so the rest of the script has finished running
     const label = f => (typeof FEED_LABEL === "object" && FEED_LABEL[f]) || f;
-    const midnight = new Date().setHours(0, 0, 0, 0);
+    const midnight = torontoWall(Date.now()).setHours(0, 0, 0, 0);
     const worst = Object.keys(ends)
       .map(f => ({ f, days: ends[f] === null
         ? -1 : Math.round((Date.parse(ends[f] + "T00:00:00") - midnight) / DAY) }))
@@ -4433,7 +4491,7 @@ const FEED_LABEL = { TTC:"TTC", YRT:"York/Viva", MIWAY:"MiWay",
     B: { name:"Viridis", ramp:{ "900":"#fde725","1800":"#b5de2b","2700":"#6ece58","3600":"#35b779","4500":"#1f9e89","5400":"#26828e","6300":"#31688e","7200":"#3e4989","8100":"#482878","9000":"#440154" } },
     C: { name:"Ocean", ramp:{ "900":"#afe0ff","1800":"#8fd3ff","2700":"#6ab8f5","3600":"#4aa9f0","4500":"#3d82db","5400":"#2f66c9","6300":"#2b5cba","7200":"#1e4aa5","8100":"#16388a","9000":"#0d2668" } }
   };
-  let scheme = localStorage.getItem("reachScheme") || "B";
+  let scheme = store.get("reachScheme") || "B";
   if (!SCHEMES[scheme]) scheme = "B";
 
   // Transit reach depends on WHEN you travel (schedules), so we can't truly
@@ -4441,11 +4499,11 @@ const FEED_LABEL = { TTC:"TTC", YRT:"York/Viva", MIWAY:"MiWay",
   // when service (incl. GO) runs fullest - so the map is stable and shows
   // the best-case reach no matter when the user is looking.
   function weekdayMorning(){
-    const d = new Date(); d.setHours(8,0,0,0);
+    const d = torontoWall(Date.now()); d.setHours(12,0,0,0);  // Toronto's today
     const wd = d.getDay();                    // 0 Sun .. 6 Sat
     if (wd === 0) d.setDate(d.getDate() + 1); // Sun -> Mon
     if (wd === 6) d.setDate(d.getDate() + 2); // Sat -> Mon
-    return d.toISOString();
+    return torontoISO(isoDay(d), "08:00");
   }
 
   const colorExpr = () => {
@@ -4569,7 +4627,7 @@ const FEED_LABEL = { TTC:"TTC", YRT:"York/Viva", MIWAY:"MiWay",
       const bar = CUTS.map(c => `<i style="background:${SCHEMES[k].ramp[c]}"></i>`).join("");
       b.innerHTML = `<div class="sw-bar">${bar}</div><div class="sw-name">${SCHEMES[k].name}</div>`;
       b.onclick = () => {
-        scheme = k; localStorage.setItem("reachScheme", k);
+        scheme = k; store.set("reachScheme", k);
         paintSchemes(); paintLegend();
         if (map.getLayer("reach-fill")) map.setPaintProperty("reach-fill","fill-color", colorExpr());
       };
@@ -4613,19 +4671,19 @@ const FEED_LABEL = { TTC:"TTC", YRT:"York/Viva", MIWAY:"MiWay",
     card.style.display = "";
     launcher.classList.add("on");
     labelLauncher(true);
-    if (persist) localStorage.setItem("reachHidden", "0");
+    if (persist) store.set("reachHidden", "0");
   }
   function hideReach(persist){
     setMode(false);                 // stop tap-to-bloom + clear any bloom
     card.style.display = "none";
     launcher.classList.remove("on");
     labelLauncher(false);
-    if (persist) localStorage.setItem("reachHidden", "1");
+    if (persist) store.set("reachHidden", "1");
   }
   window.__closeReachCard = () => hideReach(false);
   launcher.onclick = () =>
     (card.style.display === "none" ? showReach : hideReach)(true);
-  if (localStorage.getItem("reachHidden") === "1") hideReach(false);
+  if (store.get("reachHidden") === "1") hideReach(false);
   else { launcher.classList.add("on"); labelLauncher(true); }
 
   paintSchemes(); paintLegend();
