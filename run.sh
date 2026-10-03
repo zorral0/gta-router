@@ -23,7 +23,8 @@ set -a; . ./metrolinx.env; set +a
 export GTA_ROUTER_DIR="$(pwd)"
 python3 scripts/go-alerts-filter.py --once >/dev/null 2>&1 \
   || echo "Note: GO service alerts could not be fetched. Everything else still works."
-python3 scripts/go-alerts-filter.py >/dev/null 2>&1 &
+# Its log (one line a minute, errors included) is engine/go-alerts.log.
+python3 -u scripts/go-alerts-filter.py >engine/go-alerts.log 2>&1 &
 ALERTS_PID=$!
 
 # 0c) Durham's trip updates list stops that are not on the trip, which makes
@@ -31,11 +32,12 @@ ALERTS_PID=$!
 #     0b: rewrite a clean copy and let router-config.json read that.
 python3 scripts/drt-rt-filter.py --once >/dev/null 2>&1 \
   || echo "Note: Durham live delays could not be fetched. Everything else still works."
-python3 scripts/drt-rt-filter.py >/dev/null 2>&1 &
+python3 -u scripts/drt-rt-filter.py >engine/drt-rt.log 2>&1 &
 DRT_PID=$!
 
-# 1) The app page (the pretty UI in web/), served at :8081
-python3 -m http.server 8081 --directory web >/dev/null 2>&1 &
+# 1) The app page (the pretty UI in web/), served at :8081. Bound to this
+#    computer only: by default http.server answers anyone on the same Wi-Fi.
+python3 -m http.server 8081 --bind 127.0.0.1 --directory web >/dev/null 2>&1 &
 WEB_PID=$!
 
 # 2) The routing engine at :8080 (the app talks to it behind the scenes;

@@ -91,7 +91,7 @@ and the published rate chart.
 ## Getting started
 
 Requirements: macOS with [Homebrew](https://brew.sh), Python 3, about 8 GB of
-free memory and 5 GB of disk space.
+free memory (a few more with the Reach map running) and 5 GB of disk space.
 
 ```bash
 git clone https://github.com/zorral0/gta-router.git
