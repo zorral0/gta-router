@@ -209,7 +209,8 @@ def modes_for(combo):
 
 
 def prefs_for(combo, car_reluctance=None):
-    """Mirror of the per-request preferences fetchCombo() builds."""
+    """Mirror of comboPrefs() in core.js (with the default "safest" bike
+    setting, which sends nothing)."""
     street = {}
     if car_reluctance is not None:
         street["car"] = {"reluctance": car_reluctance}
@@ -218,9 +219,13 @@ def prefs_for(combo, car_reluctance=None):
     return {"street": street} if street else None
 
 
+def rented(leg):
+    return leg["mode"] == "BICYCLE" and bool(leg.get("rentedBike"))
+
+
 def keep(combo, itins):
-    """The same result filters fetchCombo() applies. Without these the app
-    would appear to find routes it actually discards."""
+    """Mirror of filterCombo() in core.js. Without these the app would
+    appear to find routes it actually discards."""
     out = []
     for it in itins:
         legs = it["legs"]
@@ -249,9 +254,9 @@ def keep(combo, itins):
             continue
         if combo.get("carAfter") and not end_leg_only(it, lambda l: l["mode"] == "CAR"):
             continue
-        if combo.get("rentEnd") and not end_leg_only(it, lambda l: l.get("rentedBike")):
+        if combo.get("rentEnd") and not end_leg_only(it, rented):
             continue
-        if combo.get("rentStart") and not start_leg_only(it, lambda l: l.get("rentedBike")):
+        if combo.get("rentStart") and not start_leg_only(it, rented):
             continue
         out.append(it)
     if combo.get("pure"):

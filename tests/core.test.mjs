@@ -184,6 +184,16 @@ test("407: no toll off the toll grid, and nothing before the grid loads", () => 
   assert.equal(load({ toll: null, tollRate: rates })("legTollCost")(l), 0);
 });
 
+test("407: a rate chart goes stale on January 1st of the next year, Toronto time", () => {
+  const core = load();
+  const stale = core("tollRatesStale");
+  const chart = { _effective: "2026-01-01" };
+  assert.equal(stale(chart, Date.parse("2026-12-31T12:00:00Z")), false);
+  assert.equal(stale(chart, Date.parse("2027-01-01T04:30:00Z")), false);  // 11:30 PM Dec 31 in Toronto
+  assert.equal(stale(chart, Date.parse("2027-01-01T06:00:00Z")), true);   // 1 AM Jan 1 in Toronto
+  assert.equal(stale({}, Date.parse("2030-01-01T12:00:00Z")), false);     // no date: don't cry wolf
+});
+
 /* ===================== dedupe and ranking ===================== */
 
 const rideFrom = (stop, start) => trip(leg("CAR", start, start + 10), leg("RAIL", start + 12, start + 50,
@@ -288,4 +298,65 @@ test("tests/route-audit.py mirrors COMBOS and DRIVE_RELUCTANCE exactly", () => {
   assert.deepEqual(audit, app);
   const rel = py.match(/^DRIVE_RELUCTANCE = (\[[^\]]*\])/m)[1];
   assert.deepEqual(JSON.parse(rel), JSON.parse(core("JSON.stringify(DRIVE_RELUCTANCE)")));
+});
+
+/* ===================== the audit's copy of the filters ===================== */
+
+/* route-audit.py re-implements comboModes / comboPrefs / filterCombo in
+   Python. Run BOTH on the same made-up engine answers for every mode mix and
+   insist they agree, so the audit can never grade a filter the app doesn't
+   have. */
+import { spawnSync } from "node:child_process";
+
+test("tests/route-audit.py filters, modes and preferences match core.js", () => {
+  const core = load();
+  const L = (mode, mins, rented = false) => ({ mode, rentedBike: rented, duration: mins * 60 });
+  const I = (...legs) => ({ legs, duration: legs.reduce((s, l) => s + l.duration, 0) });
+  const fixtures = [
+    I(L("WALK", 5), L("RAIL", 30), L("WALK", 5)),                       // plain transit
+    I(L("CAR", 10), L("WALK", 3), L("RAIL", 30), L("WALK", 5)),          // drive to station
+    I(L("WALK", 5), L("SUBWAY", 20), L("CAR", 12)),                      // pickup at the end
+    I(L("CAR", 25), L("WALK", 2)),                                       // no transit at all
+    I(L("BICYCLE", 12), L("RAIL", 30), L("WALK", 4)),                    // own bike to station
+    I(L("WALK", 4), L("RAIL", 30), L("BICYCLE", 8, true), L("WALK", 1)), // Bike Share at the end
+    I(L("WALK", 2), L("BICYCLE", 8, true), L("BUS", 25), L("WALK", 3)),  // Bike Share at the start
+    I(L("WALK", 3), L("BICYCLE", 24, true), L("WALK", 2)),               // Bike Share the whole way
+    I(L("BICYCLE", 50)), I(L("BICYCLE", 70)), I(L("BICYCLE", 30)),       // bike whole way, one over cap
+    I(L("WALK", 40)), I(L("WALK", 50)),                                  // walk whole way, one over cap
+    I(L("CAR", 10), L("RAIL", 30), L("CAR", 12)),                        // drive both ends
+    I(L("WALK", 3), L("RAIL", 10), L("CAR", 5), L("RAIL", 10)),          // car in the middle
+    I(L("BICYCLE", 10, true), L("RAIL", 30), L("BICYCLE", 8, true)),     // rented both ends
+    I(L("CAR", 10), L("RAIL", 30), L("BICYCLE", 8, true)),               // drive + Bike Share
+    I(L("BICYCLE", 10), L("RAIL", 30), L("BICYCLE", 8, true)),           // bike + Bike Share
+    I(L("BICYCLE", 10), L("RAIL", 30), L("CAR", 8)),                     // bike + pickup
+  ];
+  const combos = JSON.parse(core("JSON.stringify(COMBOS)"));
+  const rels = [null, 30, 2];
+  const js = {
+    keep: combos.map(c => [...core("filterCombo")(c, fixtures)].map(it => fixtures.indexOf(it))),
+    modes: combos.map(c => JSON.parse(JSON.stringify(core("comboModes")(c)))),
+    prefs: combos.map(c => rels.map(r => JSON.parse(JSON.stringify(core("comboPrefs")(c, r, "safest"))))),
+  };
+  const py = spawnSync("python3", ["-c", `
+import importlib.util, json, sys
+spec = importlib.util.spec_from_file_location("audit", "tests/route-audit.py")
+audit = importlib.util.module_from_spec(spec); spec.loader.exec_module(audit)
+d = json.load(sys.stdin)
+fx = d["fixtures"]
+for i, f in enumerate(fx): f["_i"] = i
+print(json.dumps({
+  "keep": [[it["_i"] for it in audit.keep(c, fx)] for c in d["combos"]],
+  "modes": [audit.modes_for(c) for c in d["combos"]],
+  "prefs": [[audit.prefs_for(c, r) for r in d["rels"]] for c in d["combos"]],
+}))`], { cwd: new URL(".", root).pathname, input: JSON.stringify({ fixtures, combos, rels }), encoding: "utf8" });
+  assert.equal(py.status, 0, py.stderr);
+  const got = JSON.parse(py.stdout);
+  combos.forEach((c, i) => {
+    assert.deepEqual(got.keep[i], js.keep[i], `filter differs for "${c.key}"`);
+    assert.deepEqual(got.modes[i], js.modes[i], `modes differ for "${c.key}"`);
+    assert.deepEqual(got.prefs[i], js.prefs[i], `preferences differ for "${c.key}"`);
+  });
+  // and the fixtures really exercise the filters: every mix keeps something
+  // and drops something
+  js.keep.forEach((k, i) => assert.ok(k.length > 0 && k.length < fixtures.length, combos[i].key));
 });

@@ -52,7 +52,6 @@ SCALARS = {
     "UP_EXPRESS_CITY": "UP_CITY",
     "GAS_PER_KM": "GAS_PER_KM",
     "WEAR_PER_KM": "WEAR_PER_KM",
-    "DOWNTOWN_PARKING": "DOWNTOWN_PARKING",
     "GO_STATION_PARKING": "GO_PARKING",
     "BIKESHARE_UNLOCK": "BIKESHARE_UNLOCK",
     "BIKESHARE_PER_MIN": "BIKESHARE_PER_MIN",
@@ -106,10 +105,52 @@ def check_feeds(js_rows, problems):
         # GO and UP are priced by their own rules, not by LOCAL_FARES
         if "GO" in upper or "UP" in upper:
             continue
-        if not any(row[0] in upper for row in js_rows):
+        hits = [row[0] for row in js_rows if row[0] in upper]
+        if not hits:
             problems.append(f"{name}: loaded in the graph but has no fare "
                             f"row, so its legs price as $0")
+        elif len(hits) > 1:
+            problems.append(f"{name}: matches several fare rows ({', '.join(hits)}); "
+                            f"the app silently takes the first")
     print(f"feeds: {len(agencies)} agencies in the graph checked")
+
+
+# Agency names that must NOT pick up any fare row: the trap with substring
+# matching is a short key landing inside a longer, unrelated name.
+NOT_MODELLED = ["HAMILTON STREET RAILWAY", "GRAND RIVER TRANSIT",
+                "GUELPH TRANSIT", "BARRIE TRANSIT"]
+PROGRAMMES = {"onefare", "gocofare"}
+
+
+def check_rows(js_rows, problems):
+    """Sanity checks on the fare table itself. Unlike the two-copy diff these
+    need nothing local, so they run everywhere, GitHub included."""
+    keys = [r[0] for r in js_rows]
+    for r in js_rows:
+        if len(r) != 5:
+            problems.append(f"{r[0]}: expected 5 columns, found {len(r)}")
+            continue
+        key, adult, youth, verified, prog = r
+        if not (isinstance(adult, (int, float)) and adult > 0):
+            problems.append(f"{key}: adult fare {adult!r} is not a positive number")
+        if youth is not None and not (0 <= youth <= adult):
+            problems.append(f"{key}: youth fare {youth!r} is not between 0 and the adult fare")
+        if not isinstance(verified, bool):
+            problems.append(f"{key}: verified flag {verified!r} is not true/false")
+        if prog not in PROGRAMMES:
+            problems.append(f"{key}: transfer programme {prog!r} is not one of {sorted(PROGRAMMES)}")
+        if keys.count(key) > 1:
+            problems.append(f"{key}: appears more than once")
+    for a in keys:
+        for b in keys:
+            if a != b and a in b:
+                problems.append(f"{a}: is inside {b}, so the first one listed "
+                                f"would catch the other agency's legs")
+    for name in NOT_MODELLED:
+        hit = [k for k in keys if k in name]
+        if hit:
+            problems.append(f"{name}: would be priced as {hit[0]}")
+    print(f"LOCAL_FARES: {len(js_rows)} rows sanity-checked")
 
 
 def report(problems):
@@ -126,6 +167,7 @@ def main():
     src = js_source()
     problems = []
     js_rows = js_local_fares(src)
+    check_rows(js_rows, problems)
 
     if costs is None:
         print("costs.py is not here (it is a local-only file), so the "

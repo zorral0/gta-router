@@ -89,9 +89,10 @@ const LOCAL_FARES = [["TTC",3.30,2.35,true,"onefare"],["TORONTO",3.30,2.35,true,
 // UP PRESTO fares: any trip to or from Pearson pays the airport fare;
 // city-only trips (Union, Bloor, Weston) are 4.71-5.02, top modelled.
 const GO_BASE = 3.70, GO_PER_KM = 0.11, UP_FARE = 9.25, UP_PEARSON_YOUTH = 7.41,
-      UP_CITY = 5.02, UP_YOUTH = 3.39, ONE_FARE = true;
+      UP_CITY = 5.02, UP_YOUTH = 3.39;
 const GO_YOUTH_FACTOR = 0.60;  // 40% off, gotransit.com youth discount
-const GAS_PER_KM = 0.14, WEAR_PER_KM = 0.10, DOWNTOWN_PARKING = 25.0, GO_PARKING = 0.0;
+// GO station parking is free today; the knob is here for the day it isn't
+const GAS_PER_KM = 0.14, WEAR_PER_KM = 0.10, GO_PARKING = 0.0;
 // Bike Share Toronto pay-as-you-go, classic bike: $1 unlock + 12 cents/min
 // (verified Jul 2026, bikesharetoronto.com/pricing; e-bikes 20 cents/min
 // not modelled - OTP doesn't tell us which kind we'd get)
@@ -182,7 +183,7 @@ function itineraryCostDetail(it){
   ridden.forEach(r => {
     let free = false, why = "";
     if (r.prog === "gocofare"){ free = usedGo; why = "GO co-fare"; }
-    else if (ONE_FARE && (usedGo || paidOneFare)){ free = true; why = "One Fare transfer"; }
+    else if (usedGo || paidOneFare){ free = true; why = "One Fare transfer"; }
     else paidOneFare = true;
     // a free ride for another reason still beats paying, whatever programme
     if (!free && rider === "youth" && r.key === "BURLINGTON"
@@ -201,7 +202,6 @@ function itineraryCostDetail(it){
     }
     if (l.mode === "CAR"){
       const later = legs.slice(i+1).some(x => TRANSIT.has(x.mode));
-      const earlier = legs.slice(0,i).some(x => TRANSIT.has(x.mode));
       const km = (l.distance||0)/1000;
       items.push({ label: `Driving (${km.toFixed(1)} km, gas + wear)`,
                    amount: km * (GAS_PER_KM + WEAR_PER_KM) });
@@ -212,12 +212,10 @@ function itineraryCostDetail(it){
       if (toll > 0)
         items.push({ label: `Highway 407 toll (estimated, `
           + `${(legTollM(l)/1000).toFixed(1)} km)`, amount: toll });
-      if (later){ if (GO_PARKING > 0) items.push({ label: "Station parking", amount: GO_PARKING }); }
-      // car AFTER transit = a pickup or your car already waiting - no
-      // parking fee; only a start-of-trip drive to the destination pays it.
-      // (Unreachable today: trips without transit are filtered out before
-      // pricing. Kept so pure-car trips price correctly if they are added.)
-      else if (!earlier) items.push({ label: "Downtown parking", amount: DOWNTOWN_PARKING });
+      // a drive BEFORE transit parks at the station; a car AFTER transit is
+      // a pickup or your car already waiting, which pays nothing. Every trip
+      // the app prices has transit in it, so there is no third case.
+      if (later && GO_PARKING > 0) items.push({ label: "Station parking", amount: GO_PARKING });
     }
   });
   return { total: items.reduce((s,x) => s + x.amount, 0), items };
@@ -360,6 +358,14 @@ function legTollCost(l){
   return total + TOLLRATE.fees.trip_charge;
 }
 const tollCost = it => it.legs.reduce((s, l) => s + legTollCost(l), 0);
+/* 407 ETR changes its rates every January 1st, so a chart from an earlier
+   year prices every toll at last year's rates. True once Toronto's calendar
+   has moved past the chart's year (re-run make_toll_rates.py then). */
+function tollRatesStale(rate, nowMs){
+  const eff = rate && rate._effective;
+  if (!eff) return false;
+  return torontoWall(nowMs).getFullYear() > +String(eff).slice(0, 4);
+}
 function decodePolyline(str){ // Google encoded polyline, precision 5
   let i = 0, lat = 0, lng = 0; const out = [];
   while (i < str.length){
@@ -616,6 +622,63 @@ function dedupeAlts(list){
       if (t !== k.startTime && !k.altTimes.includes(t)) k.altTimes.push(t);
   }
   return [...kept.values()];
+}
+
+/* ---- what each mode mix asks the engine for, and what it keeps ----
+   tests/route-audit.py mirrors these three, and tests/core.test.mjs fails
+   if the mirror ever answers differently. */
+/* the bike routing trade-off picked in Trip options. "safest" is the
+   engine's own default (router-config.json), so it sends nothing. */
+const BIKE_OPT = { balanced: "SAFE_STREETS", fastest: "SHORTEST_DURATION" };
+function comboModes(combo){
+  return combo.pure
+    ? { directOnly: true, direct: combo.direct || [combo.pure] }
+    : { transit: { access: combo.access, egress: combo.egress } };
+}
+function comboPrefs(combo, carReluctance, bikePref){
+  // per-request bike optimization only matters when this mode mix
+  // actually rides a bike (own bike to a station, Bike Share, or the
+  // whole way)
+  const usesBike = combo.pure === "BICYCLE"
+    || combo.pure === "BICYCLE_RENTAL"
+    || (combo.access || []).includes("BICYCLE_PARKING")
+    || (combo.access || []).includes("BICYCLE_RENTAL")
+    || (combo.egress || []).includes("BICYCLE_RENTAL");
+  const bikeOpt = usesBike && BIKE_OPT[bikePref]
+    ? { bicycle: { optimization: { type: BIKE_OPT[bikePref] } } } : {};
+  const street = Object.assign({},
+    carReluctance ? { car: { reluctance: carReluctance } } : {},
+    combo.walkReluctance ? { walk: { reluctance: combo.walkReluctance } } : {},
+    bikeOpt);
+  return Object.keys(street).length ? { street } : null;
+}
+/* Which of the engine's answers really belong to this mode mix. */
+function filterCombo(combo, its){
+  const rented = l => l.mode === "BICYCLE" && l.rentedBike;
+  // a pure ride is a single mode end to end and has no departure choices to
+  // spread, so keep just the fastest one - and only if it's inside the
+  // effort cap
+  if (combo.pure){
+    const ok = combo.pure === "BICYCLE_RENTAL"
+      ? it => it.legs.some(rented)
+              && it.legs.every(l => l.mode === "WALK" || rented(l))
+      : it => it.legs.length && it.legs.every(l => l.mode === combo.pure);
+    return its.filter(it => ok(it) && it.duration <= combo.maxMin * 60)
+      .sort((a, b) => a.duration - b.duration).slice(0, 1);
+  }
+  // results must actually contain transit and the advertised access leg -
+  // OTP pads with plain walk+transit trips that belong to Transit only
+  its = its.filter(it => it.legs.some(l => TRANSIT.has(l.mode)));
+  if (combo.needsLeg)
+    its = its.filter(it =>
+      it.legs.some(l => l.mode === combo.needsLeg && !l.rentedBike));
+  if (combo.carAfter)
+    its = its.filter(it => endLegOnly(it, l => l.mode === "CAR"));
+  if (combo.rentEnd)
+    its = its.filter(it => endLegOnly(it, rented));
+  if (combo.rentStart)
+    its = its.filter(it => startLegOnly(it, rented));
+  return its;
 }
 
 /* ---- ranking ----

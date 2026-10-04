@@ -210,10 +210,8 @@
      piece flips to white-on-blue */
   .card.sel { background: var(--accent); box-shadow: none; }
   .card.sel, .card.sel .mins, .card.sel .cost { color: #fff; }
-  .card.sel .times, .card.sel .via, .card.sel .badge,
-  .card.sel .livechip, .card.sel .alertchip, .card.sel .sep
+  .card.sel .times, .card.sel .badge, .card.sel .livechip, .card.sel .alertchip
     { color: rgba(255,255,255,.85); }
-  .card.sel .gchip { background: rgba(255,255,255,.22); color: #fff; }
   @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
   .head { display: flex; align-items: baseline; gap: 8px; }
   /* one big number per card; everything else stays small and quiet */
@@ -265,14 +263,8 @@
     white-space: pre-line; }
   .legalert .al { display: inline-block; margin: 5px 0 0 17px; color: var(--accent);
     font-weight: 600; text-decoration: none; }
-  .legs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
-    margin-top: 8px; }
   .rt { color: #fff; font-weight: 700; font-size: 11.5px; padding: 2.5px 8px;
     border-radius: 6px; box-shadow: inset 0 -1px 0 rgba(0,0,0,.18); }
-  .gchip { display: inline-flex; align-items: center; gap: 4px;
-    color: var(--muted); font-size: 11.5px; font-weight: 550;
-    background: var(--chip); border-radius: 6px; padding: 2.5px 7px; }
-  .sep { color: var(--muted); opacity: .5; font-size: 9px; }
   /* Apple-style leg row: mode glyphs + colored route badges joined by
      chevrons. Exact distances now live in the trip detail view. */
   .legrow { display: flex; flex-wrap: wrap; align-items: center; gap: 7px;
@@ -384,9 +376,6 @@
   .slhint .sh-txt { flex: 1; min-width: 0; }
   .slhint .sh-act { color: var(--accent); font-weight: 650; flex: none; }
   .slhint[hidden] { display: none; }
-
-  /* one-line mode summary on mixed-mode cards */
-  .via { font-size: 11px; font-weight: 600; color: var(--muted); margin-top: 4px; }
 
   .hint { color: var(--muted); font-size: 12.5px; text-align: center;
     padding: 22px 10px; }
@@ -748,9 +737,6 @@
         <div class="mm-noalerts" id="mmNoAlerts" hidden>No current service alerts</div>
       </div>
     </span>
-    <button class="ibtn" id="share" hidden aria-hidden="true"
-      title="Copy a link to this trip"></button>
-    <button class="ibtn" id="clear" hidden aria-hidden="true" title="Clear"></button>
     <button id="go">Plan trip</button>
   </div>
   <button class="optsrow" id="optsBtn" aria-expanded="false"
@@ -881,7 +867,6 @@ let avoidTolls = store.get("avoidTolls") === "1";
    busier roads are allowed when they save time */
 let bikePref = store.get("bikePref") || "safest";
 if (!["safest", "balanced", "fastest"].includes(bikePref)) bikePref = "safest";
-const BIKE_OPT = { balanced: "SAFE_STREETS", fastest: "SHORTEST_DURATION" };
 /* "Leave at" (false) vs "Arrive by" (true) - which end of the trip the
    picked time pins down. Not persisted: each visit starts on Leave at. */
 let arriveBy = false;
@@ -2438,58 +2423,16 @@ async function fetchCombo(combo, date, time, carReluctance, signal){
         ? { latestArrival: torontoISO(date, time) }
         : { earliestDeparture: torontoISO(date, time) },
       first: 8,
-      modes: combo.pure
-        ? { directOnly: true, direct: combo.direct || [combo.pure] }
-        : { transit: { access: combo.access, egress: combo.egress } },
-      prefs: (() => {
-        // per-request bike optimization only matters when this mode mix
-        // actually rides a bike (own bike to a station, Bike Share, or the
-        // whole way)
-        const usesBike = combo.pure === "BICYCLE"
-          || combo.pure === "BICYCLE_RENTAL"
-          || (combo.access || []).includes("BICYCLE_PARKING")
-          || (combo.access || []).includes("BICYCLE_RENTAL")
-          || (combo.egress || []).includes("BICYCLE_RENTAL");
-        const bikeOpt = usesBike && BIKE_OPT[bikePref]
-          ? { bicycle: { optimization: { type: BIKE_OPT[bikePref] } } } : {};
-        const street = Object.assign({},
-          carReluctance ? { car: { reluctance: carReluctance } } : {},
-          combo.walkReluctance ? { walk: { reluctance: combo.walkReluctance } } : {},
-          bikeOpt);
-        return Object.keys(street).length ? { street } : null;
-      })() } }) });
+      modes: comboModes(combo),
+      prefs: comboPrefs(combo, carReluctance, bikePref) } }) });
   // an error page is HTML, and r.json() on it used to surface as a raw
   // "Unexpected token <" under the search box
   if (!r.ok) throw new Error(`The trip engine answered with an error (${r.status}). Try again in a moment.`);
   const js = await r.json();
   if (js.errors) throw new Error(js.errors.map(e => e.message).join("; "));
-  let its = (((js.data || {}).planConnection || {}).edges || [])
-    .map(e => normalizeItin(e.node));
-  // a pure ride is a single mode end to end and has no departure choices to
-  // spread, so keep just the best one - and only if it's inside the effort
-  // cap. Everything below this point is transit-combo bookkeeping.
-  if (combo.pure === "BICYCLE_RENTAL")
-    return its.filter(it =>
-      it.legs.some(l => l.mode === "BICYCLE" && l.rentedBike)
-      && it.legs.every(l => l.mode === "WALK"
-                            || (l.mode === "BICYCLE" && l.rentedBike))
-      && it.duration <= combo.maxMin * 60).slice(0, 1);
-  if (combo.pure)
-    return its.filter(it => it.legs.length
-      && it.legs.every(l => l.mode === combo.pure)
-      && it.duration <= combo.maxMin * 60).slice(0, 1);
-  // results must actually contain transit and the advertised access leg -
-  // OTP pads with plain walk+transit trips that belong to Transit only
-  its = its.filter(it => it.legs.some(l => TRANSIT.has(l.mode)));
-  if (combo.needsLeg)
-    its = its.filter(it =>
-      it.legs.some(l => l.mode === combo.needsLeg && !l.rentedBike));
-  if (combo.carAfter)
-    its = its.filter(it => endLegOnly(it, l => l.mode === "CAR"));
-  if (combo.rentEnd)
-    its = its.filter(it => endLegOnly(it, l => l.mode === "BICYCLE" && l.rentedBike));
-  if (combo.rentStart)
-    its = its.filter(it => startLegOnly(it, l => l.mode === "BICYCLE" && l.rentedBike));
+  const its = filterCombo(combo, (((js.data || {}).planConnection || {}).edges || [])
+    .map(e => normalizeItin(e.node)));
+  if (combo.pure) return its;     // already the single best ride, or nothing
   // drive queries keep more: at reluctance 1.0 the engine returns six real
   // park-and-ride answers spread from 2 km to 39 km, and a keep of 4 cut
   // exactly the middle ones this combo was already bad at finding
@@ -2606,8 +2549,6 @@ async function plan(){
   renderResults(parts);
 }
 
-/* one plain-words line for mixed-mode trips: "Drive → transit → Bike Share" */
-
 function cardHTML(it, cid, fastestIt, cheapestIt, latestIt){
   const cost = itineraryCost(it);
   // badge the single winning card (ties go to the first), not every tie
@@ -2638,7 +2579,7 @@ function cardHTML(it, cid, fastestIt, cheapestIt, latestIt){
         isTolled(it) ? `<span class="tollchip" title="${
           (tollM(it)/1000).toFixed(1)} km of this drive is on Highway 407${
           tollCost(it) > 0
-            ? `, about $${tollCost(it).toFixed(2)} in tolls at the 2026 rates for the time you set. That is an estimate, and it IS included in the price shown.`
+            ? `, about $${tollCost(it).toFixed(2)} in tolls at the ${String(TOLLRATE._effective || "").slice(0, 4)} rates for the time you set. That is an estimate, and it IS included in the price shown.`
             : `. The toll is NOT included in the price shown.`}">toll${
           tollCost(it) > 0 ? " $" + tollCost(it).toFixed(2) : ""}</span>` : ""}</span>
       <span class="cost">$${cost.toFixed(2)}</span></div>
@@ -2658,6 +2599,13 @@ fetch("toll-roads.json").then(r => r.ok ? r.json() : null).then(j => {
 fetch("toll-rates.json").then(r => r.ok ? r.json() : null).then(j => {
   if (!j) return;
   TOLLRATE = j;
+  if (tollRatesStale(j, Date.now())){
+    const div = document.createElement("div");
+    div.className = "warnbar";
+    div.textContent = `Highway 407 toll prices use the ${String(j._effective).slice(0, 4)} rates, `
+      + "and 407 ETR changes them every January. Treat toll amounts as low.";
+    document.querySelector(".wordmark").after(div);
+  }
   if (lastParts) renderResults(lastParts, { noFit: true, noSweep: true });
 }).catch(() => {});   // no file, no dollar figure - the km still show
 
@@ -3075,8 +3023,6 @@ document.querySelectorAll("#whenSeg button").forEach(b => {
   };
 });
 document.getElementById("swap").innerHTML = icn("swap", 14);
-document.getElementById("clear").innerHTML = icn("x", 13);
-document.getElementById("share").innerHTML = icn("link", 14);
 
 /* ---- the "More" menu: Share / Clear / Service alerts ---- */
 (function(){
@@ -3096,11 +3042,8 @@ document.getElementById("share").innerHTML = icn("link", 14);
   document.addEventListener("click", e => {
     if (menu.classList.contains("open") && !menu.contains(e.target) && e.target !== btn) close();
   });
-  // Share / Clear just fire the (hidden) originals so their logic stays put
-  document.getElementById("mmShare").onclick = () => {
-    close(); document.getElementById("share").click(); };
-  document.getElementById("mmClear").onclick = () => {
-    close(); document.getElementById("clear").click(); };
+  document.getElementById("mmShare").onclick = () => { close(); shareTrip(); };
+  document.getElementById("mmClear").onclick = () => { close(); clearTrip(); };
   // alerts sub-list expand/collapse
   const tog = document.getElementById("mmAlertsToggle");
   const list = document.getElementById("moreAlerts");
@@ -3142,15 +3085,11 @@ function buildShareURL(){
   return location.origin + location.pathname + "?" + q.toString();
 }
 
-document.getElementById("share").onclick = async () => {
+// hoisted: the More menu (set up above) calls it
+async function shareTrip(){
   if (!fromPt || !toPt){ toast("Pick a start and an end first"); return; }
   const url = buildShareURL();
-  const done = () => {
-    toast("Link copied");
-    const b = document.getElementById("share");
-    b.innerHTML = icn("check", 14);
-    setTimeout(() => b.innerHTML = icn("link", 14), 1600);
-  };
+  const done = () => toast("Link copied");
   try {
     await navigator.clipboard.writeText(url);
     done();
@@ -3166,7 +3105,7 @@ document.getElementById("share").onclick = async () => {
       ok ? done() : prompt("Copy this link to your trip:", url);
     } catch (e2){ prompt("Copy this link to your trip:", url); }
   }
-};
+}
 /* animate a dollar figure rolling from its current value to a new one */
 function countTo(el, to){
   const final = "$" + to.toFixed(2);
@@ -3323,7 +3262,8 @@ document.querySelectorAll(".pt.pick").forEach(d => {
   d.onkeydown = e => { if (e.key === "Enter" || e.key === " "){ e.preventDefault(); arm(); } };
 });
 refreshPick();
-document.getElementById("clear").onclick = () => {
+// hoisted: the More menu (set up above) calls it
+function clearTrip(){
   // a search still in flight would otherwise finish and paint its results
   // and route back onto the empty form
   if (planCtrl) planCtrl.abort();
@@ -3341,7 +3281,7 @@ document.getElementById("clear").onclick = () => {
     '<div class="hint">Pick a start and an end to compare every mix of transit, driving, your bike and Bike Share, with real fares.</div>';
   if (map.getSource("route"))
     map.getSource("route").setData({ type:"FeatureCollection", features: [] });
-};
+}
 
 /* populate the day + time pickers (default: today, next quarter hour).
    #daySel is still the source of truth for the date - it just wears a

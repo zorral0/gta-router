@@ -146,8 +146,10 @@ setup.sh, run.sh, refresh.sh
 - The Reach map runs on a separate OpenTripPlanner 2.5 instance. To enable
   it, save the OpenTripPlanner 2.5 jar as `engine/otp25.jar` and run
   `bash refresh.sh`. The rest of the app works without it.
-- Search uses the public Photon geocoder, so it needs an internet
-  connection. Routing itself runs locally.
+- Search uses the public [Photon](https://photon.komoot.io) geocoder, so it
+  needs an internet connection: what you type in the search boxes, and the
+  spot where you drop a pin (to name it), are sent to Photon. Map tiles come
+  from OpenFreeMap. Routing itself runs locally.
 
 ## Data and credits
 
