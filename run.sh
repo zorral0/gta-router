@@ -42,8 +42,9 @@ WEB_PID=$!
 
 # 2) The routing engine at :8080 (the app talks to it behind the scenes;
 #    you never need to visit :8080 yourself - that's the engine's own
-#    built-in debug page, not our app)
-java -Xmx6G -jar engine/otp.jar --load engine &
+#    built-in debug page, not our app. Like the page server, both engines
+#    answer this computer only; OTP's default is every network interface.)
+java -Xmx6G -jar engine/otp.jar --load engine --bindAddress 127.0.0.1 &
 OTP_PID=$!
 
 # 2b) The "Reach map" engine at :8090. This is the older engine (kept as a
@@ -51,7 +52,7 @@ OTP_PID=$!
 #     blooms. It's read-only and uses about 1.7 GB while running. If it
 #     ever fails to start, the Reach button just says so and the rest of
 #     the app works exactly as before. Its log goes to engine/reach-engine/reach.log
-java -Xmx3G -jar engine/otp25.jar --load engine/reach-engine --port 8090 >engine/reach-engine/reach.log 2>&1 &
+java -Xmx3G -jar engine/otp25.jar --load engine/reach-engine --port 8090 --bindAddress 127.0.0.1 >engine/reach-engine/reach.log 2>&1 &
 REACH_PID=$!
 
 # Ctrl+C (or the engine dying) stops all three, plus the two feed filters

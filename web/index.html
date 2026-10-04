@@ -4545,9 +4545,24 @@ const FEED_LABEL = { TTC:"TTC", YRT:"York/Viva", MIWAY:"MiWay",
     })(performance.now());
   }
   function clearReach(){
+    lastReachFC = null;
     ["reach-fill"].forEach(l => map.getLayer(l) && map.removeLayer(l));
     map.getSource("reach") && map.removeSource("reach");
   }
+  /* A theme or map-look change swaps the whole style, which takes our layer
+     with it; the bloom used to vanish until you tapped again. Same pattern
+     as ensureRoute: put it back, fully revealed, whenever it is missing. */
+  let lastReachFC = null, reachRetry = 0;
+  function restoreReach(){
+    if (!lastReachFC || map.getSource("reach")) return;
+    try {
+      ensureLayers(lastReachFC);
+      setProgress(NBANDS + 0.6);
+      reachRetry = 0;
+    } catch (e){ if (reachRetry++ < 40) setTimeout(restoreReach, 250); }
+  }
+  map.on("style.load", restoreReach);
+  map.on("styledata", restoreReach);
 
   // ---- pulsing "computing" dot at the tapped point ----
   let pulseMarker = null;
@@ -4577,6 +4592,7 @@ const FEED_LABEL = { TTC:"TTC", YRT:"York/Viva", MIWAY:"MiWay",
       const fc = await r.json();
       hidePulse();
       ensureLayers(fc);
+      lastReachFC = fc;
       ripple();
       setStatus("Weekday-morning reach. Tap elsewhere to move it.");
     } catch (err) {
