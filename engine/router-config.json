@@ -13,8 +13,8 @@
     // How far the router will let you bike or drive to reach transit.
     // Defaults are timid; these values reflect real GTA behaviour
     // (people drive 10-15 min to a GO station).
-    // NOTE: this is the OTP 2.5.0 spelling. The earlier
-    // "maxAccessEgressDuration" block was silently ignored (2.9-era name).
+    // NOTE: "accessEgress" is the spelling OTP 2.5 onward reads, 2.9
+    // included. An older "maxAccessEgressDuration" block was silently ignored.
     "accessEgress": {
       "maxDuration": "45m",
       "maxStopCount": 4000,
@@ -31,7 +31,7 @@
     // transit one is 30 min faster on the clock (car minutes cost 3x,
     // walk 2x internally). Our app hides non-transit results in the
     // drive/bike-to-station cards, so that filter only starves them.
-    // (OTP 2.5 wants a "limit function" here, not true/false: keep transit
+    // (OTP wants a "limit function" here, not true/false: keep transit
     // itineraries unless they cost more than 9h + 9x the street-only cost,
     // i.e. effectively never drop them.)
     "itineraryFilters": {

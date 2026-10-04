@@ -27,7 +27,7 @@ point a stop-time-updater at it with a file: URL. With --once, a single pass.
 --probe reports what it would drop and changes nothing.
 
 Standard library only. The protobuf wire format is walked by hand, the same
-way go-alerts-filter.py and ttc-rt-filter.py do it.
+way go-alerts-filter.py does it.
 """
 import collections
 import csv

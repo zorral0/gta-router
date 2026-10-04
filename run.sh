@@ -23,7 +23,8 @@ set -a; . ./metrolinx.env; set +a
 export GTA_ROUTER_DIR="$(pwd)"
 python3 scripts/go-alerts-filter.py --once >/dev/null 2>&1 \
   || echo "Note: GO service alerts could not be fetched. Everything else still works."
-python3 scripts/go-alerts-filter.py >/dev/null 2>&1 &
+# Its log (one line a minute, errors included) is engine/go-alerts.log.
+python3 -u scripts/go-alerts-filter.py >engine/go-alerts.log 2>&1 &
 ALERTS_PID=$!
 
 # 0c) Durham's trip updates list stops that are not on the trip, which makes
@@ -31,17 +32,19 @@ ALERTS_PID=$!
 #     0b: rewrite a clean copy and let router-config.json read that.
 python3 scripts/drt-rt-filter.py --once >/dev/null 2>&1 \
   || echo "Note: Durham live delays could not be fetched. Everything else still works."
-python3 scripts/drt-rt-filter.py >/dev/null 2>&1 &
+python3 -u scripts/drt-rt-filter.py >engine/drt-rt.log 2>&1 &
 DRT_PID=$!
 
-# 1) The app page (the pretty UI in web/), served at :8081
-python3 -m http.server 8081 --directory web >/dev/null 2>&1 &
+# 1) The app page (the pretty UI in web/), served at :8081. Bound to this
+#    computer only: by default http.server answers anyone on the same Wi-Fi.
+python3 -m http.server 8081 --bind 127.0.0.1 --directory web >/dev/null 2>&1 &
 WEB_PID=$!
 
 # 2) The routing engine at :8080 (the app talks to it behind the scenes;
 #    you never need to visit :8080 yourself - that's the engine's own
-#    built-in debug page, not our app)
-java -Xmx6G -jar engine/otp.jar --load engine &
+#    built-in debug page, not our app. Like the page server, both engines
+#    answer this computer only; OTP's default is every network interface.)
+java -Xmx6G -jar engine/otp.jar --load engine --bindAddress 127.0.0.1 &
 OTP_PID=$!
 
 # 2b) The "Reach map" engine at :8090. This is the older engine (kept as a
@@ -49,7 +52,7 @@ OTP_PID=$!
 #     blooms. It's read-only and uses about 1.7 GB while running. If it
 #     ever fails to start, the Reach button just says so and the rest of
 #     the app works exactly as before. Its log goes to engine/reach-engine/reach.log
-java -Xmx3G -jar engine/otp25.jar --load engine/reach-engine --port 8090 >engine/reach-engine/reach.log 2>&1 &
+java -Xmx3G -jar engine/otp25.jar --load engine/reach-engine --port 8090 --bindAddress 127.0.0.1 >engine/reach-engine/reach.log 2>&1 &
 REACH_PID=$!
 
 # Ctrl+C (or the engine dying) stops all three, plus the two feed filters

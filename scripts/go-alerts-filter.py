@@ -23,8 +23,8 @@ With no arguments, loops forever, rewriting the output every 50 seconds;
 point an alerts updater at it with a file: URL. With --once, runs a single
 fetch and exits. --probe reports what it would strip and changes nothing.
 
-Standard library only: the protobuf wire format is walked by hand, the same
-way ttc-rt-filter.py does, because this project has no pip packages.
+Standard library only: the protobuf wire format is walked by hand, because
+this project has no pip packages.
 """
 import os
 import sys
