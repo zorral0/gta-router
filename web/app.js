@@ -1,0 +1,3250 @@
+/* GTA Router - the app: map, search, planning, results and the trip view.
+   Loaded by index.html after the MapLibre library (the global maplibregl)
+   and core.js (fares, tolls, ranking, Toronto time).
+   A classic script on purpose: its top-level let/const (rider, GO_FARES...)
+   are globals core.js reads. */
+"use strict";
+/* if the vendored map library is missing, say so instead of a blank page */
+if (typeof maplibregl === "undefined"){
+  document.body.innerHTML = '<div style="display:flex;height:100%;align-items:center;justify-content:center;font:15px/1.5 -apple-system,sans-serif;color:#6e6e73;text-align:center;padding:30px">The map library didn&#39;t load. The web/vendor/ files are missing or unreadable.<br>Restore them, then reload this page.</div>';
+  throw new Error("maplibre-gl missing");
+}
+/* Run locally, the page talks straight to the engines. A hosted copy uses
+   its own address and expects /otp/... to be proxied to the engine. */
+const LOCAL = ["localhost", "127.0.0.1", ""].includes(location.hostname);
+const OTP = LOCAL ? "http://localhost:8080/otp/gtfs/v1" : "/otp/gtfs/v1";
+
+/* localStorage can hold junk (old versions, other tabs, a bad write) -
+   never let one broken value kill the whole script */
+function loadStored(key, fallback){
+  try { const v = JSON.parse(localStorage.getItem(key) || "null");
+        return (v && typeof v === "object") ? v : fallback; }
+  catch (e){ return fallback; }
+}
+/* With storage blocked (Safari "block all cookies" and the like) merely
+   touching localStorage throws, and one unguarded read at startup used to
+   kill the whole script. Every plain read and write goes through these. */
+const store = {
+  get(key){ try { return localStorage.getItem(key); } catch (e){ return null; } },
+  set(key, v){ try { localStorage.setItem(key, v); } catch (e){} },
+  remove(key){ try { localStorage.removeItem(key); } catch (e){} }
+};
+
+/* ---- inline icons (Lucide, ISC license, lucide.dev) ---- */
+const ICONS = {
+  walk: '<circle cx="12" cy="5" r="1"/><path d="m9 20 3-6 3 6"/><path d="m6 8 6 2 6-2"/><path d="M12 10v4"/>',
+  bike: '<circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/>',
+  car: '<path d="m21 8-2 2-1.5-3.7A2 2 0 0 0 15.646 5H8.4a2 2 0 0 0-1.903 1.257L5 10 3 8"/><path d="M7 14h.01"/><path d="M17 14h.01"/><rect width="18" height="8" x="3" y="10" rx="2"/><path d="M5 18v2"/><path d="M19 18v2"/>',
+  bus: '<path d="M4 6 2 7"/><path d="M10 6h4"/><path d="m22 7-2-1"/><rect width="16" height="16" x="4" y="3" rx="2"/><path d="M4 11h16"/><path d="M8 15h.01"/><path d="M16 15h.01"/><path d="M6 19v2"/><path d="M18 21v-2"/>',
+  // GO / regional rail: tall train-front (Lucide train-front)
+  rail: '<path d="M8 3.1V7a4 4 0 0 0 8 0V3.1"/><path d="m9 15-1-1"/><path d="m15 15 1-1"/><path d="M9 19c-2.8 0-5-2.2-5-5v-4a8 8 0 0 1 16 0v4c0 2.8-2.2 5-5 5Z"/><path d="m8 19-2 3"/><path d="m16 19 2 3"/>',
+  // subway / streetcar: boxy windowed car (Lucide tram-front) - deliberately
+  // a different silhouette from the GO train so the two never read alike
+  subway: '<rect width="16" height="16" x="4" y="3" rx="2"/><path d="M4 11h16"/><path d="M12 3v8"/><path d="m8 19-2 3"/><path d="m18 22-2-3"/><path d="M8 15h.01"/><path d="M16 15h.01"/>',
+  back: '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
+  swap: '<path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  chev: '<path d="m6 9 6 6 6-6"/>',
+  more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+  arrow: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+  // Lucide sliders-horizontal - the drawer's front door
+  sliders: '<line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/>',
+  link: '<path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" x2="16" y1="12" y2="12"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  warn: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  layers: '<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>'
+};
+function icn(name, size){
+  return `<svg class="icn" ${size ? `style="font-size:${size}px"` : ""} viewBox="0 0 24 24">${ICONS[name] || ""}</svg>`;
+}
+const modeIcon = m => ({ WALK:"walk", BICYCLE:"bike", CAR:"car", BUS:"bus",
+  RAIL:"rail", SUBWAY:"subway", TRAM:"subway" }[m] || "bus");
+
+let rider = "adult";
+let maxDriveM = 15000;  // hide drive-to-station options with a longer drive
+/* hide options that drive on a toll road. The engine can't route around
+   one (OTP has no toll support at all), so this filters rather than
+   re-routes - see the toll-roads block further down. */
+let avoidTolls = store.get("avoidTolls") === "1";
+/* bike routing trade-off: the ENGINE default is safest-streets
+   (router-config.json); "balanced"/"fastest" override it per request so
+   busier roads are allowed when they save time */
+let bikePref = store.get("bikePref") || "safest";
+if (!["safest", "balanced", "fastest"].includes(bikePref)) bikePref = "safest";
+/* "Leave at" (false) vs "Arrive by" (true) - which end of the trip the
+   picked time pins down. Not persisted: each visit starts on Leave at. */
+let arriveBy = false;
+
+/* GO's real station-to-station fare table (made by make_go_fares.py). */
+let GO_FARES = null;
+fetch("go-fares.json").then(r => r.json()).then(j => { GO_FARES = j; })
+  .catch(() => {});
+
+/* Which subway car to ride, per station + direction (see the file's _about
+   for the source and its limits). Missing station = no diagram, no harm. */
+let BOARDING = null;
+fetch("subway-boarding.json").then(r => r.json()).then(j => { BOARDING = j; })
+  .catch(() => {});
+
+const normStation = n =>
+  (n || "").split(" Station")[0].toLowerCase().replace(/['.’]/g, "").trim();
+function subwayDirToken(l){
+  const hs = (l.headsign || "").toLowerCase();
+  for (const t of ["vaughan","finch","kipling","kennedy","don mills","sheppard-yonge"])
+    if (hs.includes(t)) return t.replace(/[ -]/g, "");
+  return null;
+}
+/* best car for subway leg i: the exit position at the station you get OFF
+   at - or the transfer position if the next ride is another subway line */
+function boardingInfo(legs, i){
+  const l = legs[i];
+  if (!BOARDING || l.mode !== "SUBWAY") return null;
+  const st = BOARDING.stations[normStation(l.to.name)];
+  const tok = subwayDirToken(l);
+  const e = st && tok ? st[tok] : null;
+  if (!e) return null;
+  let pick = { car: e.car, of: e.of || 6, why: e.why };
+  const nxt = legs.slice(i + 1).find(x => x.mode !== "WALK");
+  if (e.transfer && nxt && nxt.mode === "SUBWAY"){
+    const tr = e.transfer[((nxt.route || {}).shortName || "") + ":" + subwayDirToken(nxt)]
+            || e.transfer[(nxt.route || {}).shortName || ""];
+    if (tr) pick = { car: tr.car, of: tr.of || e.of || 6, why: tr.why };
+  }
+  return pick;
+}
+function trainDiagram(p, stationName){
+  let cars = "";
+  for (let c = p.of; c >= 1; c--)  // front of the train is drawn on the right
+    cars += `<span class="bcar${c === p.car ? " hot" : ""}${c === 1 ? " nose" : ""}">${c === p.car ? p.car : ""}</span>`;
+  const ord = ["", "1st", "2nd", "3rd"][p.car] || p.car + "th";
+  return `<div class="btrain">${cars}<span class="bdir">${icn("arrow", 11)}</span></div>
+    <div class="bnote">Get on the <b>${ord} car from the front</b> (of ${p.of})
+      so at ${esc(stationName)} it lines up with ${esc(p.why)}.</div>`;
+}
+
+/* ---- map (vector, light/dark follows the system) ----
+   Map looks: OpenFreeMap's "liberty" style recolored in the browser, so
+   there is no API key or extra host. "classic" is the untouched hosted
+   styles (fiord / liberty), picked from the layers button. The liberty style JSON
+   (~43 KB) is cached in localStorage so later visits start straight in
+   the chosen look; the first visit (or a cleared cache) briefly shows
+   classic, then swaps once the JSON arrives. Offline = classic. */
+const darkMql = matchMedia("(prefers-color-scheme: dark)");
+const HOSTED = { dark: "https://tiles.openfreemap.org/styles/fiord",
+                 light: "https://tiles.openfreemap.org/styles/liberty" };
+const LOOKS = { dark: ["applenight", "midnight", "graphite", "classic"],
+                light: ["appleday", "daylight", "quiet", "classic"] };
+// two keys, one name: the picker shows "Apple" in either theme and lands on
+// whichever of the pair matches the mode you are in
+const LOOK_NAME = { appleday: "Apple", applenight: "Apple",
+                    midnight: "Midnight", graphite: "Graphite",
+                    daylight: "Daylight", quiet: "Quiet", classic: "Classic" };
+const PALETTES = {
+  /* "Apple": two palettes that approximate Apple Maps. Using Apple's own map
+     on the web needs a paid developer account, so these chase the look on
+     our own tiles instead. The colours were matched over downtown Toronto
+     by laying candidate swatches over Apple's map and keeping the ones with
+     no visible seam. The tells are the water (much bluer than the other
+     looks, near-navy at night) and plain white roads with a warm grey casing.
+
+     applenight's road greys are a couple of steps lighter than a straight
+     match, because appleGeometry thins the roads and a thin road needs more
+     contrast. `building` sits within a hair of `land` on both palettes,
+     which keeps buildings quiet looking straight down without fading the
+     layer (fading breaks the tilted view). See appleGeometry. */
+  appleday: { dark: false, dropPois: false, apple: true,
+    land: "#f5f3ee", residential: "#f0ede6", civic: "#ece9e1",
+    water: "#8fcfee", wood: "#bcdfa9", park: "#c6e2b4", grass: "#cfe7be",
+    sand: "#f0e8d4", building: "#eeebe4", aeroway: "#e9e6df",
+    casing1: "#e2ded4", road1: "#ffffff", casing15: "#dcd7cc", road15: "#ffffff",
+    casing2: "#d6d0c4", road2: "#ffffff", casing3: "#d9d2c2", road3: "#fdfbf4",
+    rail: "#dad5cb", path: "#e8e2d6", boundary: "#c3bcae",
+    label: "#46464b", strong: "#1f1f24", roadLabel: "#6c6c73",
+    waterLabel: "#5b9dc4", poiLabel: "#6a6a70", halo: "#f7f5f0" },
+  applenight: { dark: true, dropPois: false, apple: true,
+    land: "#2c2c30", residential: "#303034", civic: "#333338",
+    water: "#2c3d78", wood: "#24382a", park: "#2a4531", grass: "#28402e",
+    sand: "#38352c", building: "#2f2f33", aeroway: "#313136",
+    casing1: "#232327", road1: "#4c4c54", casing15: "#232327", road15: "#57575f",
+    casing2: "#26262b", road2: "#62626b", casing3: "#2a2a30", road3: "#6d6d76",
+    rail: "#3a3a41", path: "#35353b", boundary: "#4a4a55",
+    label: "#b6b6bd", strong: "#e4e4e8", roadLabel: "#9a9aa2",
+    waterLabel: "#7f93c8", poiLabel: "#8c8c94", halo: "#1c1c1f" },
+  midnight: { dark: true, dropPois: false,
+    land: "#1b1b1d", residential: "#1f1f22", civic: "#222226",
+    water: "#12181f", wood: "#1a211c", park: "#1d2620", grass: "#1c221e",
+    sand: "#202020", building: "#242428", aeroway: "#26262a",
+    casing1: "#141416", road1: "#2e2e33", casing15: "#141416", road15: "#38383f",
+    casing2: "#17171a", road2: "#43434b", casing3: "#1a1a1e", road3: "#514d3e",
+    rail: "#2b2b31", path: "#2a2a2e", boundary: "#3d3d47",
+    label: "#a8a8af", strong: "#d8d8dd", roadLabel: "#8e8e96",
+    waterLabel: "#51708a", poiLabel: "#7c7c85", halo: "#111113" },
+  graphite: { dark: true, dropPois: false,
+    land: "#1c1c1e", residential: "#202023", civic: "#232327",
+    water: "#101014", wood: "#202422", park: "#212623", grass: "#1f2321",
+    sand: "#202020", building: "#252529", aeroway: "#27272b",
+    casing1: "#151517", road1: "#303036", casing15: "#151517", road15: "#3a3a41",
+    casing2: "#18181b", road2: "#46464f", casing3: "#1b1b1f", road3: "#5c5c66",
+    rail: "#2c2c32", path: "#2b2b30", boundary: "#40404a",
+    label: "#a2a2aa", strong: "#dcdce0", roadLabel: "#90909a",
+    waterLabel: "#4a5a6a", poiLabel: "#7a7a84", halo: "#101012" },
+  daylight: { dark: false, dropPois: false,
+    land: "#f4f1ea", residential: "#efece4", civic: "#eae6dc",
+    water: "#9ec7e8", wood: "#c9dfc0", park: "#cfe6c2", grass: "#d6e6c8",
+    sand: "#efe8d0", building: "#e6e2d8", aeroway: "#e4e0d6",
+    casing1: "#dedad0", road1: "#ffffff", casing15: "#d8d4ca", road15: "#ffffff",
+    casing2: "#d5d0c5", road2: "#ffffff", casing3: "#e2b458", road3: "#f6cf6e",
+    rail: "#d8d2c8", path: "#e6e0d4", boundary: "#b9b2a6",
+    label: "#4b4b52", strong: "#26262b", roadLabel: "#6f6f76",
+    waterLabel: "#4877a3", poiLabel: "#6f6f66", halo: "#f7f5ef" },
+  quiet: { dark: false, dropPois: false,
+    land: "#f2f2f0", residential: "#ececea", civic: "#e8e8e4",
+    water: "#b8d4e8", wood: "#d2e2ca", park: "#d6e6ce", grass: "#dbe8d2",
+    sand: "#eee9dc", building: "#e4e4e0", aeroway: "#e2e2de",
+    casing1: "#dcdcda", road1: "#ffffff", casing15: "#d6d6d4", road15: "#ffffff",
+    casing2: "#cfcfcd", road2: "#ffffff", casing3: "#c4c4c8", road3: "#fdfdfd",
+    rail: "#d6d2cc", path: "#e4e0d8", boundary: "#b8b8b2",
+    label: "#50505a", strong: "#28282e", roadLabel: "#74747c",
+    waterLabel: "#5a7d9e", poiLabel: "#74746c", halo: "#f4f4f2" }
+};
+
+/* Nudge a hex toward white on a dark map, toward black on a light one, so a
+   "stronger" building colour always means more contrast against the land. */
+function shadeHex(hex, amt, dark){
+  const n = parseInt(hex.slice(1), 16);
+  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v =>
+    Math.max(0, Math.min(255, Math.round(dark ? v + (255 - v) * amt : v * (1 - amt)))));
+  return "#" + ch.map(v => v.toString(16).padStart(2, "0")).join("");
+}
+/* 3D buildings. Left as the base style ships them, downtown in 3D reads as
+   one grey mass. Three fixes:
+   1. the base style ships fill-extrusion-opacity 0.8, and ~2000 translucent
+      boxes in view show THROUGH each other and smear into one lump. Opaque
+      is the single biggest win.
+   2. every building was one flat colour, a 125 m tower painted the same as a
+      3 m shed. The tiles carry render_height, so grade the colour by it and
+      the towers separate themselves from the low-rise.
+   3. no vertical gradient, so walls and roofs read as one surface. */
+function buildingPaint(p){
+  /* Kept gentle on purpose. Flat at pitch 0 you are looking straight down at
+     ROOFS, so the whole footprint takes the graded colour and a strong ramp
+     turns downtown into dark patches on a light map. The tilted view gets
+     most of its separation from the directional light anyway, so the grade
+     only has to do the rest. */
+  const tall = shadeHex(p.building, 0.13, p.dark);
+  const mid  = shadeHex(p.building, 0.05, p.dark);
+  return {
+    "fill-extrusion-color": ["interpolate", ["linear"], ["get", "render_height"],
+                             0, p.building, 25, p.building, 60, mid, 150, tall],
+    "fill-extrusion-opacity": 1,
+    "fill-extrusion-vertical-gradient": true,
+  };
+}
+
+/* ---- Apple geometry ---------------------------------------------------
+   Colour alone doesn't make the map read like Apple Maps. Side by side, the
+   remaining differences are shape and type:
+
+     1. our roads were far too fat, and the gap between a laneway and an
+        arterial was far too dramatic. Apple draws a compressed hierarchy -
+        a main street is maybe 1.5x a side street, not 3x - so downtown
+        stays legible instead of matting over into one grey slab.
+     2. liberty puts a casing on everything. Apple's night map has
+        essentially NO casing; its day map has a hairline one.
+     3. street labels: Apple sets them ALL CAPS, letter-spaced, and small
+        (~10px). Ours were mixed-case Noto at 13px. This is the single
+        loudest tell, and the cheapest to fix.
+     4. liberty labels POIs in ITALIC. Apple is upright throughout.
+     5. minor roads and footpaths appeared several zooms too early.
+     6. buildings sat too bright, so downtown was a field of pale blobs.
+
+   None of this touches the other looks - it only runs when the palette is
+   flagged apple:true, so Midnight / Graphite / Daylight / Quiet / Classic
+   are unchanged. We cannot match Apple's ABBREVIATIONS
+   ("RICHMOND ST W"): the vector tiles only carry the full name, and
+   MapLibre expressions have no string-replace to shorten it with. */
+
+/* rebuild a liberty width ramp at Apple's proportions. Stops are
+   [zoom, px, zoom, px, ...] and keep liberty's exponential base so the
+   growth between stops still feels the same while you pinch-zoom. */
+const aw = (...stops) => ["interpolate", ["exponential", 1.2], ["zoom"], ...stops];
+/* a casing is the fill plus a fixed number of pixels, so the outline stays
+   a constant hairline instead of ballooning with the road. */
+function acase(fill, delta){
+  const out = fill.slice();
+  for (let i = 4; i < out.length; i += 2) out[i] = Math.round((out[i] + delta) * 100) / 100;
+  return out;
+}
+const APPLE_W = {
+  motorway:  aw(5, 0, 7, 0.8, 11, 2.2, 14, 4.2, 17, 10, 20, 20),
+  trunk:     aw(5, 0, 7, 0.6, 11, 1.6, 14, 3.4, 17, 9, 20, 18),
+  secondary: aw(8, 0.4, 12, 1.1, 14, 2.4, 17, 7, 20, 15),
+  minor:     aw(13.5, 0, 14, 1.8, 16, 3.4, 17, 5.5, 20, 14),
+  link:      aw(12.5, 0, 13, 1, 14, 1.8, 17, 5, 20, 10),
+  service:   aw(15.5, 0, 16, 1.2, 17, 2.4, 20, 7),
+  path:      aw(14, 0.6, 17, 1.6, 20, 6),
+};
+// which ramp a given liberty layer id belongs to. Order matters: "link" and
+// "service_track" have to be tested before the broader motorway/minor tests.
+function appleRamp(id){
+  if (/_link/.test(id)) return APPLE_W.link;
+  if (/service_track/.test(id)) return APPLE_W.service;
+  if (/path|pedestrian/.test(id)) return APPLE_W.path;
+  if (/motorway/.test(id)) return APPLE_W.motorway;
+  if (/trunk|primary/.test(id)) return APPLE_W.trunk;
+  if (/secondary|tertiary/.test(id)) return APPLE_W.secondary;
+  if (/minor|street/.test(id)) return APPLE_W.minor;
+  return null;
+}
+// how much later than liberty each class earns its first pixel
+const APPLE_MINZOOM = { service_track: 15.5, path_pedestrian: 15 };
+
+function appleGeometry(s, p){
+  // Apple's night map has no visible casing; its day map has a hairline.
+  const casingDelta = p.dark ? 0.5 : 1.5;
+  for (const l of s.layers){
+    const id = l.id, sl = l["source-layer"] || "";
+
+    if (sl === "transportation" && l.type === "line"){
+      const ramp = appleRamp(id);
+      if (ramp){
+        l.paint = l.paint || {};
+        l.paint["line-width"] = /casing/.test(id) ? acase(ramp, casingDelta) : ramp.slice();
+      }
+      // rounded ends and corners everywhere - liberty only sets them on some
+      l.layout = Object.assign({}, l.layout, { "line-cap": "round", "line-join": "round" });
+      for (const k in APPLE_MINZOOM)
+        if (id.includes(k)) l.minzoom = Math.max(l.minzoom || 0, APPLE_MINZOOM[k]);
+      continue;
+    }
+
+    if (l.type === "symbol"){
+      l.layout = Object.assign({}, l.layout);
+      if (sl === "transportation_name" && !/shield/.test(id)){
+        // the loudest tell: small, upright, ALL CAPS, generously tracked
+        l.layout["text-transform"] = "uppercase";
+        l.layout["text-letter-spacing"] = 0.09;
+        l.layout["text-font"] = ["Noto Sans Regular"];
+        l.layout["text-size"] = ["interpolate", ["linear"], ["zoom"], 13, 9, 16, 10.5, 20, 12];
+        // and far fewer of them, far later
+        if (/minor/.test(id)) l.minzoom = Math.max(l.minzoom || 0, 15.5);
+        if (/path/.test(id))  l.minzoom = Math.max(l.minzoom || 0, 16.5);
+        if (/major/.test(id)) l.minzoom = Math.max(l.minzoom || 0, 13);
+      } else if (sl === "poi" || sl === "aerodrome_label"){
+        // liberty ships these italic; Apple is upright
+        l.layout["text-font"] = ["Noto Sans Regular"];
+        l.layout["text-size"] = 11;
+      } else if (sl === "place" && /label_other|label_village|label_town/.test(id)){
+        // neighbourhood and suburb names: Apple's small tracked caps
+        l.layout["text-transform"] = "uppercase";
+        l.layout["text-letter-spacing"] = 0.14;
+        l.layout["text-font"] = ["Noto Sans Regular"];
+        l.layout["text-size"] = ["interpolate", ["linear"], ["zoom"], 10, 9.5, 14, 11];
+      }
+      continue;
+    }
+
+    /* The FLAT footprint layer, which is what you see when the map is not
+       tilted (see syncAppleBuildings). Apple's footprints are visible but
+       barely - a half-step off the land, no more - so this is set here
+       rather than taken from p.building, which also feeds the extrusions
+       and wants to stay closer to land than this. */
+    if (l.type === "fill" && sl === "building"){
+      l.paint = l.paint || {};
+      l.paint["fill-color"] = p.dark ? "#333338" : "#e8e4db";
+      l.paint["fill-opacity"] = 1;
+      continue;
+    }
+
+    /* The EXTRUSIONS need no work here: on Apple's map they are a whisper, and
+       the two Apple palettes get that by setting `building` almost to the
+       land colour rather than by fading the layer out. Turning the opacity
+       down would be the obvious fix and is the wrong one: it brings back
+       the smearing where translucent boxes show through each other in the
+       tilted view. Opaque + a quiet
+       colour is subtle when flat and still separates towers when pitched. */
+  }
+  return s;
+}
+
+/* repaint every layer of the liberty style with one palette. Grouping is
+   by source-layer + layer-id substrings, so it survives minor upstream
+   style updates; anything unrecognized keeps its original color. */
+function recolorStyle(base, p){
+  const s = JSON.parse(JSON.stringify(base));
+  s.layers = s.layers.filter(l => {
+    if (l.id === "natural_earth" && p.dark) return false; // photo backdrop
+    if (p.dropPois && /^poi_r/.test(l.id)) return false;  // POI icon clutter
+    return true;
+  });
+  // Keep only important landmark classes (drop shops, parking, bins).
+  // Applies to every look.
+  const POI_KEEP = ["hospital","university","college","museum","aquarium",
+    "stadium","monument","attraction","theatre","cinema","library","town_hall",
+    "police","fire_station","place_of_worship","park","railway","ferry_terminal"];
+  const poiClassFilter = ["match", ["get","class"], POI_KEEP, true, false];
+  for (const l of s.layers){
+    if (l["source-layer"] === "poi" && /^poi_r/.test(l.id)){
+      l.filter = (Array.isArray(l.filter) && l.filter[0] === "all")
+        ? [...l.filter, poiClassFilter] : ["all", poiClassFilter];
+    } else if (l.id === "poi_transit"){
+      l.filter = ["match", ["get","class"], ["airport","rail"], true, false];
+    }
+  }
+  for (const l of s.layers){
+    l.paint = l.paint || {};
+    const id = l.id, sl = l["source-layer"] || "";
+    if (l.type === "background"){ l.paint["background-color"] = p.land; continue; }
+    if (l.type === "fill"){
+      let c = null;
+      if (sl === "water") c = p.water;
+      else if (sl === "landcover")
+        c = /wood|wetland/.test(id) ? p.wood : /sand/.test(id) ? p.sand
+          : /ice/.test(id) ? p.land : p.grass;
+      else if (sl === "park") c = p.park;
+      else if (sl === "landuse")
+        c = /residential/.test(id) ? p.residential
+          : /cemetery|pitch|track/.test(id) ? p.grass : p.civic;
+      else if (sl === "building") c = p.building;
+      else if (sl === "aeroway") c = p.aeroway;
+      else if (sl === "transportation") c = p.road1;
+      if (c){ l.paint["fill-color"] = c; delete l.paint["fill-pattern"];
+              delete l.paint["fill-outline-color"]; }
+      if (id === "building-3d") Object.assign(l.paint, buildingPaint(p));
+      continue;
+    }
+    if (l.type === "fill-extrusion"){ Object.assign(l.paint, buildingPaint(p)); continue; }
+    if (l.type === "line"){
+      let c = null;
+      if (sl === "waterway") c = p.water;
+      else if (sl === "boundary") c = p.boundary;
+      else if (sl === "park") c = p.park;
+      else if (sl === "aeroway") c = p.road1;
+      else if (sl === "transportation"){
+        const casing = /casing/.test(id);
+        if (/rail|transit/.test(id)) c = p.rail;
+        else if (/motorway/.test(id)) c = casing ? p.casing3 : p.road3;
+        else if (/trunk|primary/.test(id)) c = casing ? p.casing2 : p.road2;
+        else if (/secondary|tertiary/.test(id)) c = casing ? p.casing15 : p.road15;
+        else if (/path|pedestrian|pier|bridleway/.test(id)) c = p.path;
+        else c = casing ? p.casing1 : p.road1;
+      }
+      if (c) l.paint["line-color"] = c;
+      continue;
+    }
+    if (l.type === "symbol"){
+      let c = p.label, halo = 1.2;
+      if (sl === "place") c = /city|capital|state/.test(id) ? p.strong : p.label;
+      else if (sl === "transportation_name"){ c = p.roadLabel; halo = 1.3; }
+      else if (sl === "water_name" || sl === "waterway") c = p.waterLabel;
+      else if (sl === "poi" || sl === "aerodrome_label") c = p.poiLabel;
+      l.paint["text-color"] = c;
+      l.paint["text-halo-color"] = p.halo;
+      l.paint["text-halo-width"] = halo;
+    }
+  }
+  // shape and type pass - Apple looks only, every other look untouched
+  return p.apple ? appleGeometry(s, p) : s;
+}
+
+// Apple is the default look.
+const mapLook = Object.assign({ dark: "applenight", light: "appleday" },
+                              loadStored("mapLook", {}));
+function saveLook(){
+  try { localStorage.setItem("mapLook", JSON.stringify(mapLook)); } catch (e){}
+}
+/* One-time migration to the Apple default. A saved look normally wins over
+   the default, so a returning browser would never see the change. If the
+   saved look is still one of the old defaults, treat it as never chosen and
+   move it to Apple once. Looks picked on purpose (Graphite, Quiet, Classic)
+   are left alone, and the flag means this only ever runs once. */
+(function(){
+  try {
+    if (store.get("sawAppleLook")) return;
+    if (mapLook.dark === "midnight") mapLook.dark = "applenight";
+    if (mapLook.light === "daylight") mapLook.light = "appleday";
+    store.set("sawAppleLook", "1");
+    saveLook();
+  } catch (e){}   // private browsing / storage off: just use the defaults
+})();
+const themeMode = () => darkMql.matches ? "dark" : "light";
+let libertyBase = loadStored("libertyStyle", null);
+async function fetchLibertyBase(){
+  if (libertyBase) return libertyBase;
+  libertyBase = await (await fetch(HOSTED.light)).json();
+  try { localStorage.setItem("libertyStyle", JSON.stringify(libertyBase)); }
+  catch (e){}
+  return libertyBase;
+}
+function initialMapStyle(){
+  const look = mapLook[themeMode()];
+  if (look !== "classic" && libertyBase)
+    return recolorStyle(libertyBase, PALETTES[look]);
+  return HOSTED[themeMode()];
+}
+// which shield artwork is installed right now
+let shieldFor = null;
+async function applyLook(){
+  const look = mapLook[themeMode()];
+  // Shields first. Images added with addImage survive setStyle's diff, so
+  // the previous look's shields would stay painted on the new map until the
+  // swap finished. Decoding them before the style changes (and
+  // installing them into the outgoing style, which is about to be replaced
+  // anyway) means the new map's first painted frame already has the right
+  // artwork. Cached after the first time, so a repeat switch is instant.
+  shieldFor = null;
+  await prepareShields(shieldKey());
+  ensureShields();          // latched; installs into the outgoing style
+  if (look === "classic") map.setStyle(HOSTED[themeMode()]);
+  else {
+    try { map.setStyle(recolorStyle(await fetchLibertyBase(), PALETTES[look])); }
+    catch (e){ map.setStyle(HOSTED[themeMode()]); }
+  }
+  // "styledata" (not "idle") re-points the layers: it fires as soon as the
+  // new layers exist, before the default sprite boxes can show through.
+  ensureShields();
+  // Same reason this cannot rely on "style.load" alone: setStyle DIFFS when
+  // it can, and a diffed swap never fires that event, so switching looks
+  // from the layers menu left the buildings in the previous look's state.
+  syncAppleBuildings();
+}
+const map = new maplibregl.Map({
+  container: "map", style: initialMapStyle(),
+  center: [-79.5, 43.75], zoom: 9.2, attributionControl: { compact: true }
+});
+map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
+/* Directional light on the extrusions. Without this the style's default sits
+   the sun almost overhead, every wall gets the same tone, and neighbouring
+   towers merge into one grey lump. Anchored to the VIEWPORT rather than the
+   map so the shading holds still while you spin the compass, instead of the
+   sun swinging around the city as you turn. */
+function applyBuildingLight(){
+  try { map.setLight({ anchor: "viewport", position: [1.5, 205, 24],
+                       color: "#ffffff", intensity: 0.32 }); } catch (e){}
+}
+map.on("style.load", applyBuildingLight);
+
+/* Apple looks only: extruded buildings appear when you tilt, not before.
+   Looking straight down, Apple's map draws buildings as flat footprints;
+   even at pitch 0 a perspective camera shows the walls of anything away from
+   the centre of the screen, which fills the map with little grey boxes.
+   Every other look keeps always-on extrusions. */
+function syncAppleBuildings(){
+  if (!map.getLayer("building-3d")) return;
+  // hands off every other look - they keep liberty's always-on buildings
+  if (!(PALETTES[mapLook[themeMode()]] || {}).apple) return;
+  const extruded = map.getPitch() > 5;
+  try {
+    map.setLayoutProperty("building-3d", "visibility", extruded ? "visible" : "none");
+    if (map.getLayer("building"))
+      map.setLayoutProperty("building", "visibility", extruded ? "none" : "visible");
+  } catch (e){}   // layer can vanish mid style-swap; the next call fixes it
+}
+map.on("style.load", syncAppleBuildings);
+map.on("pitch", syncAppleBuildings);
+map.on("pitchend", syncAppleBuildings);
+darkMql.addEventListener("change", applyLook);
+
+/* Ontario King's Highway crown shields. The liberty
+   style draws plain sprite boxes for the 400-series; we swap in the real
+   public-domain crown shield artwork (web/highway-shield.svg), recolored per
+   theme, drawn small and low-opacity so it blends into the map. Re-runs on
+   every style load (theme flips reset added images + layer props). */
+const SHIELD_REFS = ["400","401","403","404","407","409","410","412","418","420","427"];
+const SHIELD_LAYERS = ["highway-shield-non-us","highway-shield-us-interstate","road_shield_us"];
+let shieldSvgBase = null;
+async function shieldBase(){
+  if (shieldSvgBase) return shieldSvgBase;
+  const raw = await (await fetch("highway-shield.svg")).text();
+  const open = raw.match(/<svg[^>]*>/)[0];
+  const nOpen = open.replace(/width="[^"]*"/, 'width="46"').replace(/height="[^"]*"/, 'height="73"');
+  shieldSvgBase = raw.replace(open, nOpen);
+  return shieldSvgBase;
+}
+function shieldRecolor(s, accent, body){
+  if (accent) s = s.split("fill:#000000").join("fill:" + accent).split("fill:#231f20").join("fill:" + accent)
+                   .split('fill="#000000"').join('fill="' + accent + '"').split('fill="#231f20"').join('fill="' + accent + '"');
+  if (body) s = s.split("fill:#ffffff").join("fill:" + body).split('fill="#ffffff"').join('fill="' + body + '"');
+  return s;
+}
+const SHIELD_VARIANT = {
+  dark:  { accent: "#d3a441", body: "#2b2f36", num: "#f4f4f8", op: 0.5 },
+  light: { accent: "#1a1a1a", body: "#ffffff", num: "#1a1a1a", op: 0.72 }
+};
+/* decoded <img>s per theme, built once and kept. They must exist BEFORE a
+   style swap (see applyLook) and the install has to be one synchronous
+   pass - awaiting decode() inside the install loop used to leave the map
+   with half its shields missing for a frame. */
+const shieldCache = {};
+async function prepareShields(key){
+  if (shieldCache[key]) return shieldCache[key];
+  let base;
+  try { base = await shieldBase(); } catch (e){ return null; }  // asset missing: keep default boxes
+  const v = SHIELD_VARIANT[key];
+  const imgs = [];
+  for (const num of SHIELD_REFS){
+    const svg = shieldRecolor(base, v.accent, v.body).replace("</svg>",
+      '<text x="113.7" y="250" text-anchor="middle" font-family="Arial,Helvetica,sans-serif"'
+      + ' font-weight="700" font-size="118" fill="' + v.num + '">' + num + "</text></svg>");
+    const img = new Image();
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+    try { await (img.decode ? img.decode() : new Promise((res, rej) => { img.onload = res; img.onerror = rej; })); }
+    catch (e){ continue; }
+    imgs.push(["onsh_" + num, img]);
+  }
+  return imgs.length ? (shieldCache[key] = imgs) : null;
+}
+function installShields(key){
+  const imgs = shieldCache[key];
+  if (!imgs) return false;
+  for (const [id, img] of imgs){
+    if (map.hasImage(id)) map.removeImage(id);
+    map.addImage(id, img, { pixelRatio: 2 });
+  }
+  const v = SHIELD_VARIANT[key];
+  const iconExpr = ["coalesce", ["image", ["concat", "onsh_", ["get", "ref"]]],
+                    ["image", ["concat", "road_", ["get", "ref_length"]]]];
+  for (const id of SHIELD_LAYERS){
+    if (!map.getLayer(id)) continue;
+    map.setLayoutProperty(id, "icon-image", iconExpr);
+    map.setLayoutProperty(id, "icon-size", 0.54);
+    map.setLayoutProperty(id, "icon-text-fit", "none");
+    map.setPaintProperty(id, "icon-opacity", v.op);
+    map.setPaintProperty(id, "text-opacity", 0);
+  }
+  return true;
+}
+function shieldKey(){
+  const look = mapLook[themeMode()];
+  const dark = look === "classic" ? darkMql.matches : (PALETTES[look] || {}).dark;
+  return dark ? "dark" : "light";
+}
+/* a full style reload (as opposed to a diff) drops both the added images
+   and our layer overrides - check for both rather than trusting a flag */
+function shieldsLive(key){
+  return shieldFor === key
+    && map.hasImage("onsh_" + SHIELD_REFS[0])
+    && SHIELD_LAYERS.some(id => map.getLayer(id)
+         && map.getLayoutProperty(id, "icon-size") === 0.54);
+}
+// addImage and setLayoutProperty each fire "styledata" SYNCHRONOUSLY, so
+// without this latch the listener below re-enters installShields from
+// inside itself and blows the stack on the first shield it installs
+let shieldBusy = false;
+function ensureShields(){
+  if (shieldBusy) return;
+  const key = shieldKey();
+  if (shieldsLive(key)) return;
+  if (!shieldCache[key]){
+    prepareShields(key).then(ok => { if (ok) ensureShields(); });
+    return;
+  }
+  shieldBusy = true;
+  try { if (installShields(key)) shieldFor = key; }
+  finally { shieldBusy = false; }
+}
+// styledata fires as soon as the new style's layers exist - far earlier than
+// idle, where the plain sprite boxes used to show through first
+map.on("styledata", ensureShields);
+// First visit with a non-classic look: upgrade as soon as the JSON arrives.
+// This has to come after the shield block, because applyLook reaches its
+// const/let declarations before its first await.
+if (!libertyBase && mapLook[themeMode()] !== "classic") applyLook();
+
+/* POI badges. Apple's icons are Apple's artwork, but their visual
+   LANGUAGE is simple and reproducible: a small rounded badge in a
+   category colour with a white glyph. So the generic OSM sprite icons are
+   replaced with our own badges, drawn from the same Lucide-style glyph set
+   the rest of the app already uses (ISC licensed), grouped into Apple-ish
+   categories with Apple-ish category colours.
+
+   Same install machinery as the shields above, including the same trap:
+   addImage and setLayoutProperty both fire "styledata" SYNCHRONOUSLY, so
+   without the latch this re-enters itself and blows the stack. */
+/* Every glyph is a solid filled shape, never a stroke. That is most of the
+   difference from stock icons: a thin
+   2px stroke reads as wiry and technical at 20px, a filled silhouette reads
+   as drawn. Cut-outs use fill-rule="evenodd" rather than a second colour, so
+   the badge colour shows through the holes. */
+const POI_BADGE = {
+  medical:   { color: "#e8544f",
+    glyph: '<path d="M9.9 4.6h4.2v5.3h5.3v4.2h-5.3v5.3H9.9v-5.3H4.6V9.9h5.3z"/>' },
+  transit:   { color: "#4a8fd4",
+    glyph: '<path fill-rule="evenodd" d="M7.5 2.8h9a3.2 3.2 0 0 1 3.2 3.2v8.6a3.2 3.2 0 0 1-3.2 3.2h-9a3.2 3.2 0 0 1-3.2-3.2V6a3.2 3.2 0 0 1 3.2-3.2zm-.7 3.1v3.6h10.4V5.9zm1.1 6.4a1.35 1.35 0 1 0 0 2.7 1.35 1.35 0 0 0 0-2.7zm8.2 0a1.35 1.35 0 1 0 0 2.7 1.35 1.35 0 0 0 0-2.7z"/><path d="M7.4 18.4h2.2l-2 3.1H5.1zm9.2 0h-2.2l2 3.1h2.5z"/>' },
+  air:       { color: "#4a8fd4",
+    glyph: '<path d="M12 2.2c.95 0 1.45.95 1.45 2.3v4.2l7.35 4.25v2.2l-7.35-2.1v4l2.4 1.85v1.65L12 19.2l-3.85 1.35v-1.65l2.4-1.85v-4l-7.35 2.1v-2.2l7.35-4.25V4.5c0-1.35.5-2.3 1.45-2.3z"/>' },
+  education: { color: "#b08a63",
+    glyph: '<path d="M12 3.4 1.4 8.6 12 13.8l10.6-5.2z"/><path d="M6.1 12.1V16c0 1.8 2.6 3.2 5.9 3.2s5.9-1.4 5.9-3.2v-3.9l-5.9 2.9z"/>' },
+  culture:   { color: "#9b6fc4",
+    glyph: '<path d="M12 2.9 2.2 8.1v1.6h19.6V8.1z"/><path d="M4.6 11.2h2.5v6.9H4.6zm6.2 0h2.5v6.9h-2.5zm6.2 0h2.5v6.9h-2.5z"/><path d="M2 19.6h20v1.6H2z"/>' },
+  // theatre + cinema get their own pin: Apple gives the arts a pink of their
+  // own and it is the single most recognisable POI glyph on the map
+  arts:      { color: "#d4569e",
+    glyph: '<path fill-rule="evenodd" d="M3.8 4.2h16.4v6.6c0 4.7-3.7 8.7-8.2 8.7s-8.2-4-8.2-8.7zM9 9.3a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4zm6 0a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4zm-6.6 4.9c1 1.5 2.4 2.3 3.6 2.3s2.6-.8 3.6-2.3c-1.1.6-2.3.9-3.6.9s-2.5-.3-3.6-.9z"/>' },
+  sport:     { color: "#4f9e6a",
+    glyph: '<path fill-rule="evenodd" d="M12 5.2c5.3 0 9.6 3.1 9.6 6.8s-4.3 6.8-9.6 6.8-9.6-3.1-9.6-6.8S6.7 5.2 12 5.2zm0 3.4c-2.8 0-5 1.5-5 3.4s2.2 3.4 5 3.4 5-1.5 5-3.4-2.2-3.4-5-3.4z"/>' },
+  park:      { color: "#4d9d5a",
+    glyph: '<path d="M12 2.6 7.2 10h9.6z"/><path d="M12 7.6 4.9 17.4h14.2z"/><path d="M10.7 16.8h2.6v4.6h-2.6z"/>' },
+  civic:     { color: "#78889a",
+    glyph: '<path d="M12 2.6 4.4 5.7v5.6c0 4.7 3.2 8.2 7.6 10 4.4-1.8 7.6-5.3 7.6-10V5.7z"/>' },
+};
+// OSM class -> badge. "rail" and "railway" both appear depending on the layer.
+const POI_CLASS_BADGE = {
+  hospital: "medical",
+  university: "education", college: "education", library: "education",
+  museum: "culture", aquarium: "culture", monument: "culture",
+  attraction: "culture",
+  theatre: "arts", cinema: "arts",
+  stadium: "sport",
+  town_hall: "civic", police: "civic", fire_station: "civic",
+  place_of_worship: "civic",
+  park: "park",
+  rail: "transit", railway: "transit", ferry_terminal: "transit",
+  airport: "air",
+};
+const POI_LAYERS = ["poi_r1", "poi_r7", "poi_r20", "poi_transit"];
+/* A circle, not a rounded square, like Apple's POI pins. The 1px white ring is not decoration either, it is what keeps a
+   dark-purple or slate badge from disappearing into the dark map, and it is
+   what Apple's have. Drawn on a 24 box with 2px of padding so the ring is
+   never clipped. */
+function badgeSvg(b){
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"'
+       + ' viewBox="0 0 24 24">'
+       + '<circle cx="12" cy="12" r="10.4" fill="#ffffff" opacity=".92"/>'
+       + '<circle cx="12" cy="12" r="9.4" fill="' + b.color + '"/>'
+       // glyphs are authored on a 24 box; 0.62 sits them inside the disc
+       + '<g transform="translate(4.56,4.56) scale(.62)" fill="#fff">'
+       + b.glyph + "</g></svg>";
+}
+let badgeCache = null;
+async function prepareBadges(){
+  if (badgeCache) return badgeCache;
+  const out = [];
+  for (const [name, b] of Object.entries(POI_BADGE)){
+    const img = new Image();
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(badgeSvg(b));
+    try { await (img.decode ? img.decode()
+                : new Promise((res, rej) => { img.onload = res; img.onerror = rej; })); }
+    catch (e){ continue; }
+    out.push(["poib_" + name, img]);
+  }
+  return out.length ? (badgeCache = out) : null;
+}
+function badgeIconExpr(){
+  const m = ["match", ["get", "class"]];
+  for (const [cls, badge] of Object.entries(POI_CLASS_BADGE)) m.push(cls, "poib_" + badge);
+  m.push("");   // anything not in our keep-list draws no icon at all
+  return m;
+}
+/* Apple tints the POI's LABEL to its category colour too, which is a lot of
+   why their map reads as designed rather than plotted. Same match, but the
+   colours are lightened on a dark map so pink-on-near-black stays legible. */
+function badgeTextExpr(dark){
+  const m = ["match", ["get", "class"]];
+  for (const [cls, badge] of Object.entries(POI_CLASS_BADGE)){
+    const c = POI_BADGE[badge].color;
+    m.push(cls, dark ? shadeHex(c, 0.34, true) : shadeHex(c, 0.18, false));
+  }
+  m.push(dark ? "#a8a8af" : "#6a6a70");   // the keep-list's own fallback
+  return m;
+}
+function badgesLive(){
+  return map.hasImage("poib_medical")
+    && POI_LAYERS.some(id => map.getLayer(id)
+         && map.getLayoutProperty(id, "icon-size") === 0.9);
+}
+let badgeBusy = false;
+function ensurePoiBadges(){
+  if (badgeBusy || badgesLive()) return;
+  if (!badgeCache){ prepareBadges().then(ok => { if (ok) ensurePoiBadges(); }); return; }
+  badgeBusy = true;
+  try {
+    for (const [id, img] of badgeCache){
+      if (!map.hasImage(id)) map.addImage(id, img, { pixelRatio: 2 });
+    }
+    const expr = badgeIconExpr();
+    const dark = (PALETTES[mapLook[themeMode()]] || {}).dark ?? darkMql.matches;
+    const tint = badgeTextExpr(dark);
+    for (const id of POI_LAYERS){
+      if (!map.getLayer(id)) continue;
+      map.setLayoutProperty(id, "icon-image", expr);
+      map.setLayoutProperty(id, "icon-size", 0.9);
+      // the stock sprite icons were wider than tall; our badges are round,
+      // so the label needs re-centring under them
+      map.setLayoutProperty(id, "text-offset", [0, 1.1]);
+      map.setLayoutProperty(id, "text-anchor", "top");
+      map.setPaintProperty(id, "text-color", tint);
+    }
+  } finally { badgeBusy = false; }
+}
+map.on("styledata", ensurePoiBadges);
+
+/* standalone map look button, top-right like Apple Maps' map type control.
+   Opens a small menu of the current theme's looks. */
+(function(){
+  const btn = document.createElement("button");
+  btn.id = "lookBtn"; btn.title = "Map look";
+  btn.setAttribute("aria-label", "Choose the map's look");
+  btn.innerHTML = icn("layers", 18);
+  const pop = document.createElement("div"); pop.id = "lookPop";
+  document.body.append(btn, pop);
+  function renderPop(){
+    const mode = themeMode();
+    pop.innerHTML = '<div class="lp-h">MAP LOOK</div>' + LOOKS[mode].map(k =>
+      `<button data-look="${k}" class="${k === mapLook[mode] ? "on" : ""}">${
+        LOOK_NAME[k]}${k === "classic" ? " (the old map)" : ""}</button>`).join("")
+      // the lines live here too: this button is already "what the map shows"
+      + '<div class="lp-sep"></div><div class="lp-h">ON THE MAP</div>'
+      + `<button data-toggle="transit" class="${transitOn ? "on" : ""}">Transit lines</button>`;
+  }
+  window.__closeLookPop = () => pop.classList.remove("open");
+  btn.onclick = e => {
+    e.stopPropagation(); renderPop();
+    // the reach panel hangs at the same spot, so only one can be open
+    window.__closeReachCard && window.__closeReachCard();
+    pop.classList.toggle("open");
+  };
+  pop.onclick = e => {
+    // the lines toggle stays open: you want to see it happen behind the menu
+    const t = e.target.closest("[data-toggle]");
+    if (t){ setTransitLines(!transitOn); renderPop(); return; }
+    const b = e.target.closest("[data-look]"); if (!b) return;
+    mapLook[themeMode()] = b.dataset.look; saveLook(); applyLook();
+    pop.classList.remove("open");
+  };
+  document.addEventListener("click", e => {
+    if (!pop.contains(e.target) && !btn.contains(e.target))
+      pop.classList.remove("open");
+  });
+})();
+
+/* 3D button: tilt the camera so the map's building extrusions stand up,
+   like Apple/Google Maps' 3D. Toggles between flat (pitch 0) and tilted.
+   You can also tilt by hand any time - right-drag, or two-finger drag on a
+   trackpad; this button is the one-tap way. */
+(function(){
+  const btn = document.createElement("button");
+  btn.id = "d3Btn"; btn.textContent = "3D";
+  btn.title = "Tilt the map into 3D. Hold Option and drag two fingers to "
+            + "spin and tilt, or drag the compass that appears below.";
+  btn.setAttribute("aria-label", "Tilt the map into 3D");
+  btn.setAttribute("aria-pressed", "false");
+  document.body.append(btn);
+  function sync(){
+    const on = map.getPitch() > 5;
+    btn.classList.toggle("on", on);
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+    btn.textContent = on ? "2D" : "3D";
+  }
+  btn.onclick = () => {
+    const on = map.getPitch() > 5;
+    map.easeTo({ pitch: on ? 0 : 60,
+                 zoom: on ? map.getZoom() : Math.max(map.getZoom(), 15),
+                 duration: 700 });
+  };
+  // keep the label in step if the user tilts by hand
+  map.on("pitchend", sync);
+  map.on("pitch", sync);
+})();
+
+/* Trackpad rotate. On a laptop the built-in ways to spin the
+   map are all bad: MapLibre only rotates on a RIGHT-button drag or a
+   ctrl-drag, and a plain two-finger trackpad drag is already spoken for (it
+   zooms), so there was nothing for a trackpad. Two additions:
+
+   - Hold OPTION and drag two fingers. Sideways spins, up and down tilts.
+     Works in every browser. Option was picked over shift and ctrl on purpose:
+     ctrl+wheel is how browsers signal a pinch, and shift+wheel gets rewritten
+     into horizontal scroll by the browser, which would swap the two axes and
+     make up/down do the spinning.
+   - An actual two-finger TWIST, in Safari only. macOS reports a twist to the
+     page as a GestureEvent, which Chrome does not implement at all, so this is
+     a bonus for Safari rather than the main path. It is deliberately narrow:
+     it only acts on a real rotation and never touches the zoom, so pinch to
+     zoom keeps behaving exactly as it did.
+
+   Both work tilted or flat. Rotating while flat is normal map behaviour and
+   the compass turns up to show you which way is north either way. */
+(function(){
+  const el = map.getContainer();
+  // capture on the CONTAINER, which is an ancestor of the canvas MapLibre
+  // binds to, so this runs first and stopPropagation keeps the map from
+  // also zooming on the same gesture
+  el.addEventListener("wheel", e => {
+    if (!e.altKey) return;
+    e.preventDefault(); e.stopPropagation();
+    map.stop();
+    if (Math.abs(e.deltaX) > 0.4) map.setBearing(map.getBearing() + e.deltaX * 0.4);
+    // fingers UP tilts INTO 3D, matching Maps on the iPhone. With macOS
+    // natural scrolling, fingers-up is a POSITIVE deltaY, hence the sign.
+    if (Math.abs(e.deltaY) > 0.4){
+      // the map's own ceiling, not a number of our own: MapLibre caps pitch
+      // at 60 by default and silently clamps anything higher
+      const cap = map.getMaxPitch ? map.getMaxPitch() : 60;
+      map.setPitch(Math.min(cap, Math.max(0, map.getPitch() + e.deltaY * 0.25)));
+    }
+  }, { capture: true, passive: false });
+
+  /* The real two-finger twist. It is Safari only, and that can't be coded
+     around: macOS reports a trackpad twist to a web page through Safari's
+     non-standard GestureEvent, which Chrome does not implement (there,
+     `typeof GestureEvent` is "undefined"). That is why the Option gesture
+     above stays: it is the one that works in Chrome.
+
+     Once we take the gesture we own all of it, so pinch has to be handled
+     here too or Safari would fall back to zooming the whole PAGE. Zoom is
+     anchored on the fingers rather than the map centre, the way a pinch
+     should behave.
+
+     Chromium never fires these events, so this path only runs in Safari. */
+  const cc = map.getCanvasContainer();
+  let gOn = false, gBearing = 0, gZoom = 0;
+  cc.addEventListener("gesturestart", e => {
+    e.preventDefault();
+    gOn = true; gBearing = map.getBearing(); gZoom = map.getZoom();
+    map.stop();
+  });
+  cc.addEventListener("gesturechange", e => {
+    if (!gOn) return;
+    e.preventDefault();
+    const r = cc.getBoundingClientRect();
+    const opts = { duration: 0,
+                   around: map.unproject([e.clientX - r.left, e.clientY - r.top]) };
+    // a deadzone, so the small incidental turn that rides along with a pinch
+    // does not leave the map sitting a few degrees off north
+    if (Math.abs(e.rotation) > 2) opts.bearing = gBearing - e.rotation;
+    if (e.scale > 0) opts.zoom = gZoom + Math.log2(e.scale);
+    map.easeTo(opts);
+  });
+  cc.addEventListener("gestureend", e => { e.preventDefault(); gOn = false; });
+})();
+
+/* Compass: turn the map while you're in 3D. The map could
+   always be spun - right-drag, or shift + arrow keys - but nothing on screen
+   said so, so in practice 3D was stuck facing north. This adds a real compass
+   under the 3D button that only appears once the map is tilted or off north:
+   drag it to spin the map (the needle follows your pointer), tap it to face
+   north again, or nudge it with the arrow keys when it has focus. */
+(function(){
+  const btn = document.createElement("button");
+  btn.id = "compassBtn";
+  btn.title = "Drag to turn the map, tap to face north";
+  btn.setAttribute("aria-label", "Turn the map. Press to face north, arrow keys to turn");
+  // classic two-tone needle: red half points north, grey half points south.
+  // Each half is two triangles so it reads as a folded pointer, not a lozenge.
+  btn.innerHTML =
+    '<svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">' +
+      '<g class="cneedle">' +
+        '<path d="M13 2.5 L17.6 14.6 L13 12.4 Z" fill="var(--bad)"/>' +
+        '<path d="M13 2.5 L8.4 14.6 L13 12.4 Z" fill="var(--bad)" opacity=".68"/>' +
+        '<path d="M13 23.5 L8.4 11.4 L13 13.6 Z" fill="currentColor" opacity=".5"/>' +
+        '<path d="M13 23.5 L17.6 11.4 L13 13.6 Z" fill="currentColor" opacity=".26"/>' +
+      '</g></svg>';
+  document.body.append(btn);
+  const needle = btn.querySelector(".cneedle");
+
+  let turning = false, startAngle = 0, startBearing = 0, swung = 0;
+  function render(){
+    const b = map.getBearing();
+    needle.setAttribute("transform", "rotate(" + (-b) + " 13 13)");
+    // off north by more than a hair, or tilted: worth showing
+    btn.classList.toggle("show", turning || map.getPitch() > 5 || Math.abs(b) > 0.5);
+  }
+  // angle from the button's centre out to the pointer, in degrees
+  function angleTo(e){
+    const r = btn.getBoundingClientRect();
+    return Math.atan2(e.clientY - (r.top + r.height / 2),
+                      e.clientX - (r.left + r.width / 2)) * 180 / Math.PI;
+  }
+  btn.addEventListener("pointerdown", e => {
+    turning = true; swung = 0;
+    startAngle = angleTo(e); startBearing = map.getBearing();
+    btn.classList.add("turning");
+    try { btn.setPointerCapture(e.pointerId); } catch (_){}
+    map.stop();            // drop any easeTo still running, else it fights us
+    e.preventDefault();    // no text selection / no page scroll on touch
+  });
+  btn.addEventListener("pointermove", e => {
+    if (!turning) return;
+    const d = angleTo(e) - startAngle;
+    swung = Math.max(swung, Math.abs(d));
+    // screen angle of the needle is -bearing, so turning the needle by +d
+    // means the map's bearing goes down by d - the needle tracks the pointer
+    map.setBearing(startBearing - d);
+  });
+  function letGo(e){
+    if (!turning) return;
+    turning = false;
+    btn.classList.remove("turning");
+    try { btn.releasePointerCapture(e.pointerId); } catch (_){}
+    if (swung < 4) map.easeTo({ bearing: 0, duration: 400 });  // that was a tap
+    render();
+  }
+  btn.addEventListener("pointerup", letGo);
+  btn.addEventListener("pointercancel", letGo);
+  // keyboard: Enter/Space faces north, left/right nudge the map around
+  btn.addEventListener("keydown", e => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault(); map.easeTo({ bearing: 0, duration: 400 });
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      e.preventDefault();
+      map.easeTo({ bearing: map.getBearing() + (e.key === "ArrowLeft" ? -15 : 15),
+                   duration: 200 });
+    }
+  });
+  ["rotate","rotateend","pitch","pitchend","move"].forEach(ev => map.on(ev, render));
+  render();
+})();
+
+/* route layers survive style swaps: whenever the style (re)loads and our
+   source is gone, put it back. styledata fires many times; the re-add is
+   idempotent and wrapped so a mid-load call just retries shortly after. */
+let lastRouteFC = null, routeRetry = 0;
+function ensureRoute(){
+  if (!lastRouteFC || map.getSource("route")) return;
+  try { addRouteLayers(lastRouteFC); routeRetry = 0; }
+  // give up after ~10s - a style that never loads must not retry forever
+  catch (e){ if (routeRetry++ < 40) setTimeout(ensureRoute, 250); }
+}
+map.on("styledata", ensureRoute);
+map.on("style.load", ensureRoute);
+function addRouteLayers(fc){
+  if (map.getSource("route")){ map.getSource("route").setData(fc); return; }
+  map.addSource("route", { type: "geojson", data: fc });
+  /* Apple-style line: the outline is a darker
+     shade of the line's own color (not a white sticker edge), and widths
+     grow with zoom so the route feels drawn on the map, not pasted on. */
+  const previewOpacity = ["case", ["==", ["get","preview"], 1], 0.55, 1];
+  const zw = (a, b, c) =>
+    ["interpolate", ["linear"], ["zoom"], 10, a, 13, b, 16, c];
+  map.addLayer({ id: "route-casing", type: "line", source: "route",
+    filter: ["!=", ["get","dash"], 1],
+    layout: { "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": ["get","ccolor"], "line-width": zw(5.5, 8, 11.5),
+             "line-opacity": previewOpacity } });
+  map.addLayer({ id: "route-solid", type: "line", source: "route",
+    filter: ["!=", ["get","dash"], 1],
+    layout: { "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": ["get","color"], "line-width": zw(3.5, 5.5, 8.5),
+             "line-opacity": previewOpacity } });
+  map.addLayer({ id: "route-walk", type: "line", source: "route",
+    filter: ["==", ["get","dash"], 1],
+    layout: { "line-cap": "round" },
+    paint: { "line-color": ["get","color"], "line-width": zw(3, 4.5, 6),
+             "line-dasharray": [0.2, 1.6],
+             "line-opacity": previewOpacity } });
+  orderRouteForPitch();
+}
+/* In 3D a flat route line painted on top of the building extrusions looks
+   like it climbs into the buildings. When the
+   map is tilted, slide the route BELOW the 3D buildings so they hide it where
+   it passes behind them - it reads as running under/between the buildings.
+   Flat (2D) keeps the route on top so it's always visible from above. */
+function orderRouteForPitch(){
+  if (!map.getLayer("route-casing")) return;
+  const in3d = map.getPitch() > 5 && map.getLayer("building-3d");
+  const before = in3d ? "building-3d" : undefined;
+  ["route-casing","route-solid","route-walk"].forEach(id => {
+    if (map.getLayer(id)) map.moveLayer(id, before);
+  });
+  // keep the dock dots just beneath the route casing wherever it ends up
+  if (map.getLayer("docks") && map.getLayer("route-casing"))
+    map.moveLayer("docks", "route-casing");
+}
+map.on("pitchend", orderRouteForPitch);
+function drawRoute(fc){
+  lastRouteFC = fc;
+  syncTransitEmphasis();
+  if (map.isStyleLoaded()) addRouteLayers(fc);
+  // if the style is mid-load, the style.load handler above draws it
+}
+
+/* ---- Transit lines, always drawn on the map.
+   Built by scripts/make_transit_lines.py from the GTFS feeds, in each
+   line's own official colour, so the
+   Yonge line is Yonge-yellow and Stouffville is GO brown without us hard
+   coding a single hex. Re-run that script when the feeds are refreshed.
+   Buses are deliberately not in the file: 210 grey squiggles is not a map. */
+let transitFC = null, transitRetry = 0;
+// not loadStored(): that one only hands back objects, so a stored "off"
+// would come out as the default "on" and the toggle would never stick
+let transitOn = true;
+try { transitOn = localStorage.getItem("transitLines") !== "false"; } catch (e){}
+(async function loadTransit(){
+  try {
+    transitFC = await (await fetch("transit-lines.json")).json();
+    ensureTransit();
+  } catch (e){ /* file not built yet: the map is simply as it was before */ }
+})();
+function ensureTransit(){
+  if (!transitFC || map.getSource("transit")) return;
+  try {
+    map.addSource("transit", { type: "geojson", data: transitFC });
+    /* Where to slot the lines in. Two traps:
+       1. "building-3d" sits ABOVE most of the style, so anchoring to the first
+          symbol layer buried the lines under the extrusions and they vanished
+          the moment you tilted and zoomed in.
+       2. the first symbol layer in this style is "road_one_way_arrow", a road
+          decoration rather than a label, so it is not the label boundary
+          either.
+       So: sit just under the first symbol layer that comes AFTER the
+       buildings. Above the extrusions, still below the place and street
+       labels. If the style has no 3D buildings, the first symbol will do. */
+    const layers = map.getStyle().layers || [];
+    const b3d = layers.findIndex(l => l.id === "building-3d");
+    const anchor = layers.findIndex((l, i) => l.type === "symbol" && i > b3d);
+    const under = anchor >= 0 ? layers[anchor].id
+                : (layers.find(l => l.type === "symbol") || {}).id;
+    const vis = transitOn ? "visible" : "none";
+    /* A thin dark casing under every line, the way a printed transit map
+       outlines them. Not decoration: Line 1's official yellow (#d5c82b) is
+       nearly invisible against the light map's near-white land without it.
+       On the dark map it reads as a soft shadow and costs nothing. */
+    const casing = "rgba(0,0,0,0.28)";
+    map.addLayer({ id: "transit-major-casing", type: "line", source: "transit",
+      filter: ["match", ["get","mode"], ["subway","rail","lrt"], true, false],
+      layout: { "line-cap": "round", "line-join": "round", visibility: vis },
+      paint: { "line-color": casing,
+               "line-width": ["interpolate", ["linear"], ["zoom"],
+                              8, 2.6, 11, 3.8, 14, 5.8, 16, 8.2],
+               "line-opacity": ["interpolate", ["linear"], ["zoom"],
+                                7, 0, 8.5, 0.85] } }, under);
+    map.addLayer({ id: "transit-minor-casing", type: "line", source: "transit",
+      minzoom: 11,
+      filter: ["==", ["get","mode"], "streetcar"],
+      layout: { "line-cap": "round", "line-join": "round", visibility: vis },
+      paint: { "line-color": casing,
+               "line-width": ["interpolate", ["linear"], ["zoom"],
+                              11, 2, 14, 3.8, 16, 5.4],
+               "line-opacity": ["interpolate", ["linear"], ["zoom"],
+                                11, 0, 12, 0.7] } }, under);
+    // subway, LRT and the GO/UP rail: the backbone, visible from way out
+    map.addLayer({ id: "transit-major", type: "line", source: "transit",
+      filter: ["match", ["get","mode"], ["subway","rail","lrt"], true, false],
+      layout: { "line-cap": "round", "line-join": "round", visibility: vis },
+      paint: { "line-color": ["get","color"],
+               "line-width": ["interpolate", ["linear"], ["zoom"],
+                              8, 1.4, 11, 2.4, 14, 4, 16, 6],
+               // fade in rather than pop, and never clutter the province view
+               "line-opacity": ["interpolate", ["linear"], ["zoom"],
+                                7, 0, 8.5, 0.85] } }, under);
+    // streetcars are dense downtown, so they only turn up once you are close
+    map.addLayer({ id: "transit-minor", type: "line", source: "transit",
+      minzoom: 11,
+      filter: ["==", ["get","mode"], "streetcar"],
+      layout: { "line-cap": "round", "line-join": "round", visibility: vis },
+      paint: { "line-color": ["get","color"],
+               "line-width": ["interpolate", ["linear"], ["zoom"],
+                              11, 1, 14, 2.4, 16, 3.6],
+               "line-opacity": ["interpolate", ["linear"], ["zoom"],
+                                11, 0, 12, 0.7] } }, "transit-major");
+    transitRetry = 0;
+    syncTransitEmphasis();   // a trip already on screen keeps the lines quiet
+    orderRouteForPitch();
+  } catch (e){ if (transitRetry++ < 40) setTimeout(ensureTransit, 250); }
+}
+map.on("style.load", ensureTransit);
+map.on("styledata", ensureTransit);
+// follow the tilt live, not just when it settles, so the lines fade smoothly
+// as the 3D button's 700ms ease runs rather than snapping at the end
+map.on("pitch", syncTransitEmphasis);
+map.on("pitchend", syncTransitEmphasis);
+/* How loud the lines are. With a trip on screen they step back so the route
+   stays the brightest thing on the map. This matters most in 3D: the route
+   deliberately runs behind the building extrusions (so it reads as
+   passing between them), and once the lines moved in front of the
+   buildings a full-strength background line painted straight over the top of
+   the route, leaving the actual trip as the faintest thing on screen. */
+const transitFade = peak => ({
+  major: ["interpolate", ["linear"], ["zoom"], 7, 0, 8.5, peak],
+  minor: ["interpolate", ["linear"], ["zoom"], 11, 0, 12, peak * 0.82],
+});
+/* The lines belong to the flat map, so they get out of the way as you tilt.
+   Drawn over the rooftops they cut across the towers like
+   pen on glass; drawn under them they simply vanish behind the buildings.
+   There is no third option for a street-level line in a tilted city, so
+   rather than pick the least-bad occlusion we fade them out: full strength
+   flat, gone by the time the 3D button's 60 degrees is reached. */
+function tiltFade(){
+  const p = map.getPitch();
+  return p <= 20 ? 1 : p >= 48 ? 0 : (48 - p) / 28;
+}
+function syncTransitEmphasis(){
+  const o = transitFade((lastRouteFC ? 0.3 : 0.85) * tiltFade());
+  const set = (id, v) => {
+    if (map.getLayer(id)) map.setPaintProperty(id, "line-opacity", v);
+  };
+  set("transit-major", o.major); set("transit-major-casing", o.major);
+  set("transit-minor", o.minor); set("transit-minor-casing", o.minor);
+}
+function setTransitLines(on){
+  transitOn = on;
+  try { localStorage.setItem("transitLines", on ? "true" : "false"); } catch (e){}
+  ["transit-major-casing","transit-minor-casing","transit-minor","transit-major"]
+    .forEach(id => {
+      if (map.getLayer(id))
+        map.setLayoutProperty(id, "visibility", on ? "visible" : "none");
+    });
+}
+
+/* ---- Bike Share docks on the map (small green dots, zoom in to see).
+   Loaded once from the router; if the server hasn't been restarted since
+   the GBFS updater was added, the list is empty and no dots appear. ---- */
+let dockFC = null, dockRetry = 0;
+async function loadDocks(){
+  try {
+    // ask for live bike/dock counts too; fall back to names-only if the
+    // schema doesn't have them
+    let r = await fetch(OTP, { method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query:
+        "{vehicleRentalStations{name lat lon availableVehicles{total} availableSpaces{total}}}" }) });
+    let js = await r.json();
+    if (js.errors){
+      r = await fetch(OTP, { method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: "{vehicleRentalStations{name lat lon}}" }) });
+      js = await r.json();
+    }
+    const st = ((js.data || {}).vehicleRentalStations) || [];
+    if (!st.length) return;
+    dockFC = { type: "FeatureCollection", features: st.map(s => ({
+      type: "Feature", properties: { name: s.name,
+        bikes: s.availableVehicles ? s.availableVehicles.total : null,
+        spaces: s.availableSpaces ? s.availableSpaces.total : null },
+      geometry: { type: "Point", coordinates: [s.lon, s.lat] } })) };
+    if (map.getSource("docks")) map.getSource("docks").setData(dockFC);
+    else ensureDocks();
+  } catch (e){ /* engine down - the plan() error path already tells the user */ }
+}
+function ensureDocks(){
+  if (!dockFC || map.getSource("docks")) return;
+  try {
+    map.addSource("docks", { type: "geojson", data: dockFC });
+    // slide under the route lines when they exist; routes added later go on top
+    map.addLayer({ id: "docks", type: "circle", source: "docks", minzoom: 11,
+      // muted teal-blue, not the green of the Start dot. Smaller + semi-transparent
+      // so they read as background amenities, not trip points.
+      paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 11, 2, 14, 4, 16, 5.5],
+               "circle-color": "#3a9ec4",
+               "circle-opacity": 0.7,
+               "circle-stroke-color": darkMql.matches ? "#1c1c1e" : "#ffffff",
+               "circle-stroke-width": 1 } },
+      map.getLayer("route-casing") ? "route-casing" : undefined);
+    dockRetry = 0;
+  } catch (e){ if (dockRetry++ < 40) setTimeout(ensureDocks, 250); }
+}
+map.on("style.load", ensureDocks);
+map.on("styledata", ensureDocks);
+/* dock info is hover-only: downtown is dense enough that clickable docks
+   would make it impossible to drop a pin, so clicking a dot places your pin
+   like anywhere else on the map */
+let dockHover = null;
+map.on("mouseenter", "docks", e => {
+  const p = e.features[0].properties;
+  // counts refresh every 2 min below; null/"null" = engine had no counts
+  const counts = (p.bikes != null && p.bikes !== "null")
+    ? `<br>${p.bikes} bike${p.bikes == 1 ? "" : "s"} &middot; ${p.spaces} free dock${p.spaces == 1 ? "" : "s"}`
+    : "";
+  if (dockHover) dockHover.remove();
+  dockHover = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 8 })
+    .setLngLat(e.features[0].geometry.coordinates)
+    .setHTML(`<b>${esc(p.name)}</b><br>Bike Share dock${counts}`).addTo(map);
+});
+map.on("mouseleave", "docks", () => {
+  if (dockHover){ dockHover.remove(); dockHover = null; }
+});
+loadDocks();
+// the GBFS feed updates server-side every minute - keep the dots honest
+setInterval(() => { if (!document.hidden) loadDocks(); }, 120000);
+
+/* ---- the exact Bike Share dock(s) a selected trip uses ---- */
+let tripDockMarkers = [];
+function clearTripDocks(){ tripDockMarkers.forEach(m => m.remove()); tripDockMarkers = []; }
+/* label the ride's real touch point: pickup dock if the rental is at the
+   start of the trip, drop-off dock if it's at the end */
+function showTripDocks(it){
+  clearTripDocks();
+  if (!it) return;
+  const firstTransit = it.legs.findIndex(x => TRANSIT.has(x.mode));
+  it.legs.forEach((l, i) => {
+    if (!(l.mode === "BICYCLE" && l.rentedBike)) return;
+    const isStart = firstTransit < 0 || i < firstTransit;
+    const pt = isStart ? l.from : l.to;
+    if (!isFinite(pt.lon) || !isFinite(pt.lat)) return;
+    // the marker element must NOT carry the pop animation - MapLibre keeps
+    // the positioning transform on it, and a transform-animating class would
+    // override it (snapping the pin to 0,0). Animate an inner pill instead.
+    const el = document.createElement("div");
+    el.style.cursor = "pointer";
+    el.title = pt.name || "Bike Share dock";
+    el.innerHTML = `<div class="dockmk">${icn("bike")}<span>${isStart ? "Rent here" : "Dock here"}</span></div>`;
+    el.addEventListener("click", () => map.flyTo({ center: [pt.lon, pt.lat], zoom: 15.5 }));
+    tripDockMarkers.push(new maplibregl.Marker({ element: el, anchor: "bottom", offset: [0, -3] })
+      .setLngLat([pt.lon, pt.lat]).addTo(map));
+  });
+}
+/* Bike Share stations nearest a point (for the detail list) */
+function nearestDocks(lng, lat, n){
+  if (!dockFC) return [];
+  return dockFC.features.map(f => {
+    const [dl, dt] = f.geometry.coordinates;
+    const dx = (dl - lng) * Math.cos(lat * Math.PI / 180), dy = dt - lat;
+    return { f, d: dx * dx + dy * dy };
+  }).sort((a, b) => a.d - b.d).slice(0, n).map(x => x.f);
+}
+window.flyDock = function(lng, lat){ map.flyTo({ center: [lng, lat], zoom: 15.5 }); };
+
+/* sweep the route on from start to end when an option is selected */
+let sweepToken = 0;
+function animateRoute(fc){
+  lastRouteFC = fc;
+  syncTransitEmphasis();
+  if (!map.isStyleLoaded()){ ensureRoute(); return; }
+  if (!map.getSource("route")){
+    try { addRouteLayers(fc); } catch (e){ return; }
+  }
+  const src = map.getSource("route");
+  const token = ++sweepToken;
+  // animation frames don't run in hidden tabs - just draw it whole
+  if (document.hidden){ src.setData(fc); return; }
+  const feats = fc.features;
+  const total = feats.reduce((s,f) => s + f.geometry.coordinates.length, 0);
+  const t0 = performance.now(), dur = 650;
+  setTimeout(() => { if (token === sweepToken) src.setData(fc); }, dur + 200);
+  (function frame(now){
+    if (token !== sweepToken) return;        // superseded by a newer selection
+    const p = Math.min((now - t0) / dur, 1);
+    const eased = 1 - Math.pow(1 - p, 3);
+    let budget = Math.max(2, Math.round(total * eased));
+    const partial = [];
+    for (const f of feats){
+      if (budget <= 0) break;
+      const c = f.geometry.coordinates;
+      if (c.length <= budget){ partial.push(f); budget -= c.length; }
+      else {
+        partial.push({ ...f, geometry: { type: "LineString",
+          coordinates: c.slice(0, Math.max(2, budget)) } });
+        budget = 0;
+      }
+    }
+    src.setData({ type: "FeatureCollection", features: partial });
+    if (p < 1) requestAnimationFrame(frame);
+    else src.setData(fc);
+  })(performance.now());
+}
+
+let fromPt = null, toPt = null, fromMarker = null, toMarker = null;
+/* which end the NEXT map click drops. Normally it auto-points at the first
+   empty end (start, then destination); clicking a coloured dot overrides it
+   so you can re-place the start after both are set. */
+let pickOverride = null;
+function currentPick(){
+  if (pickOverride) return pickOverride;
+  if (!fromPt) return "from";
+  if (!toPt) return "to";
+  return "from";
+}
+function refreshPick(){
+  const p = currentPick();
+  const df = document.getElementById("dotFrom"), dt = document.getElementById("dotTo");
+  if (df) df.classList.toggle("active", p === "from");
+  if (dt) dt.classList.toggle("active", p === "to");
+}
+function haloDotSVG(color, id){
+  // "you are here" halo dot: soft colored halo, white ring, colored core.
+  // Flat fills (no gradient/sheen); a single soft shadow lifts the white
+  // ring + core off the map. Same mark for start and end - only the hue
+  // differs (green start / red end), matching the panel's from/to dots.
+  return `<svg width="34" height="34" viewBox="0 0 34 34"
+      xmlns="http://www.w3.org/2000/svg">
+    <defs><filter id="${id}" x="-60%" y="-60%" width="220%" height="220%">
+      <feDropShadow dx="0" dy="1.4" stdDeviation="1.4"
+        flood-color="#000" flood-opacity="0.35"/>
+    </filter></defs>
+    <circle cx="17" cy="17" r="16" fill="${color}" opacity="0.22"/>
+    <g filter="url(#${id})">
+      <circle cx="17" cy="17" r="9.5" fill="#fff"/>
+      <circle cx="17" cy="17" r="6.3" fill="${color}"/>
+    </g></svg>`;
+}
+function markerEl(which){
+  const el = document.createElement("div");
+  el.className = "mk";
+  const isFrom = which === "from";
+  el.innerHTML = '<div class="mkbody">' +
+    haloDotSVG(isFrom ? "#34c759" : "#ff453a", "mkds-" + which) + "</div>";
+  return el;
+}
+function setPoint(which, lngLat, label){
+  const old = which === "from" ? fromMarker : toMarker;
+  if (old) old.remove();
+  const m = new maplibregl.Marker({ element: markerEl(which),
+    anchor: "center", draggable: true }).setLngLat(lngLat).addTo(map);
+  m.on("dragend", () => {
+    const p = m.getLngLat();
+    if (which === "from") fromPt = p; else toPt = p;
+    document.getElementById(which + "Box").value = fmt(p);
+    refreshPick();
+    fillLabel(which, p);   // turn the new spot into a place name
+    plan();
+  });
+  if (which === "from"){ fromMarker = m; fromPt = lngLat; }
+  else { toMarker = m; toPt = lngLat; }
+  document.getElementById(which + "Box").value = label || fmt(lngLat);
+  refreshPick();
+  if (!label) fillLabel(which, lngLat);   // clicked a bare spot: name it
+}
+/* reverse-geocode a dropped/dragged pin so the box shows a place name
+   instead of "43.74, -79.35". Photon (same service the search box uses)
+   answers /reverse; we fall back silently to the coordinates on any miss. */
+async function reverseLabel(lngLat){
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const r = await fetch("https://photon.komoot.io/reverse?lang=en&lon="
+      + lngLat.lng + "&lat=" + lngLat.lat, { signal: ctrl.signal });
+    if (!r.ok) return null;
+    const f = ((await r.json()).features || [])[0];
+    if (!f) return null;
+    const p = f.properties || {};
+    const addr = [p.housenumber, p.street].filter(Boolean).join(" ");
+    const name = p.name || addr || p.street || p.city;
+    if (!name) return null;
+    const extra = [];
+    if (p.name && addr) extra.push(addr);
+    if (p.city && p.city !== name) extra.push(p.city);
+    return extra.length ? name + ", " + extra[0] : name;
+  } catch (e) { return null; }
+  finally { clearTimeout(t); }
+}
+async function fillLabel(which, lngLat){
+  const name = await reverseLabel(lngLat);
+  if (!name) return;
+  // only apply if this pin is still exactly where we geocoded (not moved/cleared)
+  const cur = which === "from" ? fromPt : toPt;
+  if (!cur || cur.lng !== lngLat.lng || cur.lat !== lngLat.lat) return;
+  const box = document.getElementById(which + "Box");
+  if (box === document.activeElement) return;   // don't fight the user's typing
+  box.value = name;
+}
+/* Older versions saved both trip ends here on every change, long after the
+   restore that read them was dropped. Wipe what they left behind. */
+store.remove("pts");
+const fmt = p => p.lat.toFixed(4) + ", " + p.lng.toFixed(4);
+map.on("click", e => {
+  // (dock dots are hover-only now - a click on one still drops a pin)
+  // Reach mode: a tap paints a travel-time bloom instead of dropping pins
+  if (window.__reachMode) { window.__reachTap && window.__reachTap(e.lngLat); return; }
+  // drop the ARMED end (the highlighted dot). setPoint() calls refreshPick(),
+  // which then auto-advances the highlight to the other empty end - so a fresh
+  // "click start, click end" still just works, but you can re-arm the start by
+  // clicking its green dot even after both points exist.
+  const which = currentPick();
+  pickOverride = null;
+  setPoint(which, e.lngLat);
+  if (fromPt && toPt) plan();
+});
+
+/* ---- search with live suggestions (Photon, kept to the GTA) ---- */
+const GTA_BOX = { w: -80.30, s: 43.20, e: -78.40, n: 44.35 };
+function normalizeSuggestions(features){
+  const out = [], seen = new Set();
+  for (const f of features){
+    const c = f.geometry && f.geometry.coordinates;
+    if (!c) continue;
+    const [lon, lat] = c;
+    // keep it in the GTA - Photon's location bias alone lets far places leak in
+    if (lon < GTA_BOX.w || lon > GTA_BOX.e || lat < GTA_BOX.s || lat > GTA_BOX.n) continue;
+    const p = f.properties || {};
+    const addr = [p.housenumber, p.street].filter(Boolean).join(" ");
+    const p1 = p.name || addr || p.street || p.city || "Location";
+    const rest = [];
+    if (addr && p.name) rest.push(addr);
+    else if (p.street && p.name) rest.push(p.street);
+    if (p.city && p.city !== p1) rest.push(p.city);
+    else if (p.district && p.district !== p1) rest.push(p.district);
+    if (p.state) rest.push(p.state);
+    const p2 = [...new Set(rest)].slice(0, 3).join(", ");
+    const key = p1 + "|" + p2;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    /* One real place shows up as several OSM objects, so "Union Station" used
+       to fill seven of the eight rows (the building, the plaza, the bus
+       terminal, each platform). Same name within ~250 m is the same place as
+       far as a rider is concerned: keep the first and drop the rest. Two
+       genuinely different places that share a name (a Tim Hortons in
+       Brampton and one in Ajax) are far apart, so they both survive. */
+    const n1 = tidyName(p1), n2 = tidyName(p2);
+    const dup = out.some(o => o.p1 === n1
+      && Math.abs(o.lat - lat) < 0.00225
+      && Math.abs(o.lon - lon) < 0.0031);
+    if (dup) continue;
+    out.push({ p1: n1, p2: n2, lon, lat });
+    if (out.length >= 8) break;
+  }
+  return out;
+}
+function attachSuggest(which){
+  const input = document.getElementById(which + "Box");
+  const row = input.parentElement;
+  const box = document.createElement("div");
+  box.className = "sug";
+  row.appendChild(box);
+  let items = [], hi = -1, timer = null, ctrl = null, note = null;
+
+  const hide = () => { box.classList.remove("open"); hi = -1; note = null; };
+  /* .sug is position:fixed to escape the panel's clip, so it has to be told
+     where the field is - and told again whenever the panel scrolls or the
+     window resizes underneath it. Anchored to the search card's edges (which
+     is what the old left/right:-12px inset worked out to) and capped so the
+     list always ends above the bottom of the window. */
+  const place = () => {
+    const card = input.closest(".search") || row;
+    const cr = card.getBoundingClientRect(), rr = row.getBoundingClientRect();
+    const top = rr.bottom + 1;
+    box.style.left = cr.left + "px";
+    box.style.width = cr.width + "px";
+    box.style.top = top + "px";
+    box.style.maxHeight = Math.max(120, innerHeight - top - 10) + "px";
+  };
+  const render = () => {
+    if (!items.length && !note){ hide(); return; }
+    box.innerHTML = items.map((it, i) =>
+      `<div class="item ${i === hi ? "hi" : ""}" data-i="${i}">
+        <div class="p1">${esc(it.p1)}</div>
+        ${it.p2 ? `<div class="p2">${esc(it.p2)}</div>` : ""}</div>`).join("")
+      + (note ? `<div class="sugmsg">${esc(note)}</div>` : "");
+    box.classList.add("open");
+    place();
+    // innerHTML reset scrollTop, so keep the arrow-key highlight on screen
+    const cur = box.querySelector(".item.hi");
+    if (cur) cur.scrollIntoView({ block: "nearest" });
+  };
+  const reposition = () => { if (box.classList.contains("open")) place(); };
+  document.getElementById("panelScroll").addEventListener("scroll", reposition, { passive: true });
+  addEventListener("resize", reposition);
+  const pick = i => {
+    const it = items[i];
+    if (!it) return;
+    hide();
+    setPoint(which, { lng: it.lon, lat: it.lat }, it.p1);
+    map.flyTo({ center: [it.lon, it.lat], zoom: 13 });
+    input.blur();
+    plan();
+  };
+
+  input.addEventListener("input", () => {
+    clearTimeout(timer);
+    const q = input.value.trim();
+    if (q.length < 3){ hide(); return; }
+    // debounced; Photon is built for as-you-type search (partial words)
+    timer = setTimeout(async () => {
+      if (ctrl) ctrl.abort();
+      ctrl = new AbortController();
+      try {
+        const r = await fetch("https://photon.komoot.io/api/?lang=en&limit=12"
+          + "&lat=43.72&lon=-79.42&q=" + encodeURIComponent(q),
+          { signal: ctrl.signal });
+        const js = await r.json();
+        items = normalizeSuggestions(js.features || []);
+        // silence was the old behavior - say WHY nothing showed up
+        note = items.length ? null : "No matches near Toronto. Try a street address.";
+        hi = items.length ? 0 : -1;
+        render();
+      } catch (e){
+        if (e.name === "AbortError") return;  // superseded by a newer keystroke
+        items = []; hi = -1;
+        note = "Search is offline. Check your internet, then try again.";
+        render();
+      }
+    }, 350);
+  });
+  input.addEventListener("keydown", e => {
+    if (!box.classList.contains("open")){
+      if (e.key === "Enter" && input.value.trim().length >= 3)
+        input.dispatchEvent(new Event("input"));
+      return;
+    }
+    if (e.key === "ArrowDown"){ e.preventDefault(); hi = (hi + 1) % items.length; render(); }
+    else if (e.key === "ArrowUp"){ e.preventDefault(); hi = (hi - 1 + items.length) % items.length; render(); }
+    else if (e.key === "Enter"){ e.preventDefault(); pick(Math.max(hi, 0)); }
+    else if (e.key === "Escape") hide();
+  });
+  input.addEventListener("blur", () => setTimeout(hide, 180));
+  box.addEventListener("mousedown", e => {
+    const el = e.target.closest(".item");
+    if (el){ e.preventDefault(); pick(+el.dataset.i); }
+  });
+}
+attachSuggest("from");
+attachSuggest("to");
+
+/* which mode mixes the user has switched on (persisted; loadStored so a
+   corrupt value can't brick the whole script) */
+const storedHave = loadStored("have", {});
+// migrate the old single "car" toggle -> separate start/end toggles
+if (storedHave.car !== undefined){
+  if (storedHave.carStart === undefined) storedHave.carStart = storedHave.car;
+  if (storedHave.carEnd === undefined) storedHave.carEnd = storedHave.car;
+  delete storedHave.car;
+}
+let have = Object.assign({ bike: true, carStart: true, carEnd: true, share: true },
+  storedHave);
+store.set("have", JSON.stringify(have));
+
+/* OTP 2.9: the old "plan" query is GONE - this is planConnection.
+   Coordinates are latitude/longitude here (the old API wanted lat/lon!),
+   times are ISO strings, legs carry start/end objects and stopCalls. */
+const PC_QUERY = `query PC($origin:PlanLabeledLocationInput!,
+    $destination:PlanLabeledLocationInput!,$dateTime:PlanDateTimeInput!,
+    $modes:PlanModesInput!,$first:Int,$prefs:PlanPreferencesInput){
+  planConnection(origin:$origin,destination:$destination,dateTime:$dateTime,
+                 modes:$modes,first:$first,preferences:$prefs){
+    edges{node{ duration start end
+      legs{ mode distance duration headsign rentedBike
+            start{scheduledTime estimated{time}}
+            end{scheduledTime estimated{time}}
+            agency{gtfsId name} route{shortName longName color}
+            from{name lat lon stop{gtfsId}} to{name lat lon stop{gtfsId}}
+            stopCalls{stopLocation{... on Stop {name}}}
+            alerts{ id alertHeaderText alertDescriptionText alertUrl
+                    alertSeverityLevel effectiveStartDate effectiveEndDate }
+            legGeometry{points} } } } } }`;
+
+async function fetchCombo(combo, date, time, carReluctance, signal){
+  const r = await fetch(OTP, { method: "POST", signal,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query: PC_QUERY, variables: {
+      origin: { location: { coordinate:
+        { latitude: fromPt.lat, longitude: fromPt.lng } } },
+      destination: { location: { coordinate:
+        { latitude: toPt.lat, longitude: toPt.lng } } },
+      // Arrive by pins the ARRIVAL end. Verified live: "first" already
+      // returns the best (latest-departing) trips for latestArrival too;
+      // "last" pads in pointlessly-early departures - don't use it.
+      dateTime: arriveBy
+        ? { latestArrival: torontoISO(date, time) }
+        : { earliestDeparture: torontoISO(date, time) },
+      first: 8,
+      modes: comboModes(combo),
+      prefs: comboPrefs(combo, carReluctance, bikePref) } }) });
+  // an error page is HTML, and r.json() on it used to surface as a raw
+  // "Unexpected token <" under the search box
+  if (!r.ok) throw new Error(`The trip engine answered with an error (${r.status}). Try again in a moment.`);
+  const js = await r.json();
+  if (js.errors) throw new Error(js.errors.map(e => e.message).join("; "));
+  const its = filterCombo(combo, (((js.data || {}).planConnection || {}).edges || [])
+    .map(e => normalizeItin(e.node)));
+  if (combo.pure) return its;     // already the single best ride, or nothing
+  // drive queries keep more: at reluctance 1.0 the engine returns six real
+  // park-and-ride answers spread from 2 km to 39 km, and a keep of 4 cut
+  // exactly the middle ones this combo was already bad at finding
+  return dedupeAlts(its).slice(0, combo.drive ? 8 : 4);
+}
+
+/* GTFS colors come straight from the feeds - only trust clean 6-digit hex,
+   never inject arbitrary feed text into a style attribute */
+function routeColor(r){
+  const c = ((r || {}).color || "").replace(/^#/, "");
+  return /^[0-9a-f]{6}$/i.test(c) ? "#" + c : null;
+}
+/* the agency's own colour, for routes whose feed gives none (keyed by
+   feed id, see feedOf in core.js) */
+const FEED_COLOR = { GO: "#256434", UP: "#6d4c2f", TTC: "#c8102e", YRT: "#0072bc",
+  MIWAY: "#e77817", DRT: "#00703c", BRAMPTON: "#005daa" };
+function agencyColor(l){
+  return isUP(l) ? FEED_COLOR.UP : (FEED_COLOR[feedOf(l)] || "#666");
+}
+/* the card's mode sequence, Apple-style: a glyph per real leg (transit legs
+   also carry their colored route badge), joined by chevrons, with a trailing
+   "N min walk" if the trip ends on foot. Walks between legs are implied by the
+   chevrons; every exact distance is in the detail view. */
+function legRow(it){
+  const parts = [];
+  for (const l of it.legs){
+    if (l.mode === "WALK") continue;
+    if (l.mode === "CAR")
+      parts.push(`<span class="lg" title="Drive">${icn("car")}</span>`);
+    else if (l.mode === "BICYCLE")
+      parts.push(`<span class="lg" title="${l.rentedBike ? "Bike Share" : "Your bike"}">${icn("bike")}</span>`);
+    else if (TRANSIT.has(l.mode)){
+      const r = l.route || {}, name = r.shortName || r.longName || "";
+      const bg = routeColor(r) || agencyColor(l);
+      parts.push(`<span class="lg" title="${esc(r.longName || name)}">`
+        + `<span class="rt" style="background:${bg}">${esc(name)}</span>`
+        + icn(modeIcon(l.mode)) + `</span>`);
+    }
+  }
+  const last = it.legs[it.legs.length - 1];
+  if (last && last.mode === "WALK" && last.duration >= 60)
+    parts.push(`<span class="lgwalk">${icn("walk")}${Math.round(last.duration / 60)} min</span>`);
+  return `<div class="legrow">${parts.join('<span class="csep">&rsaquo;</span>')}</div>`;
+}
+const esc = s => String(s).replace(/[&<>"']/g, c =>
+  ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const hhmm = t => new Date(t).toLocaleTimeString([], { hour:"numeric", minute:"2-digit", timeZone: TZ });
+/* GO/TTC trip headsigns carry 24-hour clock times baked into the text
+   ("Union Station GO 18:00 - Unionville GO 18:50"). Everything else in the app
+   is 12-hour, so the raw headsign put both formats three lines apart in one
+   card. Rewrite just the HH:MM runs and leave the rest of the string alone;
+   route numbers ("506") and stop codes ("L2 Gates 8-14") don't match. */
+const to12h = s => String(s).replace(/\b([01]\d|2[0-3]):([0-5]\d)\b/g, (m, h, mi) => {
+  h = +h;
+  return (h % 12 || 12) + ":" + mi + " " + (h < 12 ? "AM" : "PM");
+});
+/* OSM/GTFS names arrive with double hyphens where a range dash belongs
+   ("Union Station Bus Terminal L2 Gates 8--14"). En dashes are fine here;
+   only em dashes are off-limits. */
+const tidyName = s => String(s).replace(/\s*-{2,}\s*/g, "–");
+
+let itinsById = {}, selId = null, lastParts = null, fcCache = {};
+
+/* one plain-words line for whatever went wrong, instead of raw fetch noise */
+function friendlyErr(e){
+  if (e && (e.name === "AbortError" || e.name === "TimeoutError"))
+    return "The trip engine took too long to answer. Try again in a moment.";
+  if (e instanceof TypeError)
+    return "Can't reach the trip engine. Is the app running? (bash run.sh)";
+  return e.message || String(e);
+}
+
+let planCtrl = null, planSeq = 0;
+// the trip you opened while results were still arriving (see plan)
+let pickedSig = null;
+async function plan(){
+  if (!fromPt || !toPt) return;
+  closeDetail();
+  // a newer plan always wins: abort the old one and ignore its results.
+  // without this, the SLOWER of two overlapping plans painted the screen -
+  // results for a question the user was no longer asking.
+  if (planCtrl) planCtrl.abort();
+  const ctrl = planCtrl = new AbortController();
+  const seq = ++planSeq;
+  const timer = setTimeout(() => ctrl.abort(), 25000);  // never spin forever
+  const date = document.getElementById("daySel").value;
+  const time = document.getElementById("timeSel").value;
+  const box = document.getElementById("results");
+  const active = COMBOS.filter(c => c.need.every(k => have[k]));
+  box.innerHTML = '<div class="loading"><div class="spinner"></div><span id="loadTxt">Comparing your options&hellip;</span></div>';
+  let done = 0;
+  const tick = () => { done++;
+    const t = document.getElementById("loadTxt");
+    if (t && seq === planSeq)
+      t.innerHTML = `Comparing your options&hellip; ${done}/${active.length}`; };
+  /* Results go up as each mode mix answers instead of all at the end: the
+     21 queries take 5-12 s together, but Transit only is back in about one.
+     Each arrival re-ranks everything so far. Until you open a card the
+     highlight follows the best trip; once you do, it stays on yours. Only
+     the first paint moves the map. */
+  pickedSig = null;
+  const parts = active.map(c => ({ c, its: [], pending: true }));
+  let shown = false;
+  const paint = () => {
+    if (seq !== planSeq) return;   // superseded, or Clear was pressed
+    const settled = parts.filter(p => !p.pending);
+    const left = parts.length - settled.length;
+    // nothing to show yet: keep the spinner, rather than flash "No sensible
+    // route" (or a lone error) while most of the answers are still out
+    if (left && !settled.some(p => visibleIts(p).length)) return;
+    lastParts = settled;
+    renderResults(settled, { selectSig: pickedSig, noFit: shown, noSweep: shown,
+                             quiet: shown, pending: left });
+    shown = true;
+  };
+  await Promise.all(active.map(async (c, i) => {
+    try {
+      if (!c.drive) parts[i] = { c, its: await fetchCombo(c, date, time, null, ctrl.signal) };
+      else {
+        // Drive queries run once per DRIVE_RELUCTANCE and are merged, so the
+        // drive slider always has near, middle and far lots to choose from
+        // without re-querying.
+        const rels = DRIVE_RELUCTANCE.concat(c.extraReluctance || []);
+        const tries = await Promise.all(rels.map(r =>
+          fetchCombo(c, date, time, r, ctrl.signal)));
+        parts[i] = { c, its: spreadByDrive(dedupeAlts([].concat(...tries))) };
+      }
+    }
+    catch (e){ parts[i] = { c, err: friendlyErr(e) }; }
+    finally { tick(); paint(); }
+  }));
+  clearTimeout(timer);
+}
+
+function cardHTML(it, cid, fastestIt, cheapestIt, latestIt){
+  const cost = itineraryCost(it);
+  // badge the single winning card (ties go to the first), not every tie
+  const badges =
+    (it === fastestIt ? '<span class="badge fast">Fastest</span>' : "") +
+    (it === latestIt && it !== fastestIt
+      ? '<span class="badge late">Latest leave</span>' : "") +
+    (it === cheapestIt ? '<span class="badge cheap">Cheapest</span>' : "");
+  const alts = (it.altTimes || []).slice().sort((a,b) => a-b).slice(0, 2);
+  /* The card is the app's main control and it reached the a11y tree with no
+     name at all, so a screen reader just said "button". Spell out the same
+     things the card shows: how long, when, what it costs, why it's badged. */
+  const badgeWords = [
+    it === fastestIt ? "fastest" : "",
+    it === latestIt && it !== fastestIt ? "latest leave" : "",
+    it === cheapestIt ? "cheapest" : ""].filter(Boolean);
+  const label = `${Math.round(it.duration/60)} minute trip, `
+    + `${hhmm(it.startTime)} to ${hhmm(it.endTime)}, $${cost.toFixed(2)}`
+    + (badgeWords.length ? ", " + badgeWords.join(", ") : "");
+  return `<div class="card" id="${cid}" onclick="openIt('${cid}')"
+      tabindex="0" role="button" aria-label="${esc(label)}">
+    <div class="head"><span class="mins">${Math.round(it.duration/60)} min</span>
+      <span class="times">${hhmm(it.startTime)} &ndash; ${hhmm(it.endTime)}${
+        alts.length ? " &middot; also " + alts.map(hhmm).join(", ") : ""}${
+        it.legs.some(l => l.live) ? '<span class="livechip">live</span>' : ""}${
+        it.legs.some(l => (l.alerts || []).length)
+          ? '<span class="alertchip" title="Service alert on this trip">&#9888;</span>' : ""}${
+        isTolled(it) ? `<span class="tollchip" title="${
+          (tollM(it)/1000).toFixed(1)} km of this drive is on Highway 407${
+          tollCost(it) > 0
+            ? `, about $${tollCost(it).toFixed(2)} in tolls at the ${String(TOLLRATE._effective || "").slice(0, 4)} rates for the time you set. That is an estimate, and it IS included in the price shown.`
+            : `. The toll is NOT included in the price shown.`}">toll${
+          tollCost(it) > 0 ? " $" + tollCost(it).toFixed(2) : ""}</span>` : ""}</span>
+      <span class="cost">$${cost.toFixed(2)}</span></div>
+    ${badges ? `<div class="badges">${badges}</div>` : ""}
+    ${legRow(it)}</div>`;
+}
+
+/* The toll grid and the 407 rate chart. The maths that uses them is in
+   core.js; these just load them and re-price whatever is on screen. */
+fetch("toll-roads.json").then(r => r.ok ? r.json() : null).then(j => {
+  if (!j) return;
+  for (const k in j.cells) j.cells[k] = new Set(j.cells[k]);
+  TOLL = j;
+  if (lastParts) renderResults(lastParts, { noFit: true, noSweep: true });
+}).catch(() => {});   // no file, no toll marks - everything else still works
+
+fetch("toll-rates.json").then(r => r.ok ? r.json() : null).then(j => {
+  if (!j) return;
+  TOLLRATE = j;
+  if (tollRatesStale(j, Date.now())){
+    const div = document.createElement("div");
+    div.className = "warnbar";
+    div.textContent = `Highway 407 toll prices use the ${String(j._effective).slice(0, 4)} rates, `
+      + "and 407 ETR changes them every January. Treat toll amounts as low.";
+    document.querySelector(".wordmark").after(div);
+  }
+  if (lastParts) renderResults(lastParts, { noFit: true, noSweep: true });
+}).catch(() => {});   // no file, no dollar figure - the km still show
+
+/* itineraries a part actually shows, after the "max drive" cap
+   (applies to both drive categories - "at the end" should stay short) */
+function visibleIts(p){
+  let its = p.its || [];
+  if (p.c.drive)
+    its = its.filter(it => longestCarLegM(it) <= maxDriveM);
+  if (avoidTolls) its = its.filter(it => !isTolled(it));
+  return its;
+}
+
+/* the drive cap is allowed to hide options, but never silently: if
+   something it dropped is FASTER than everything still on screen, say so
+   under the slider and offer the exact limit that would bring it back. */
+function driveHint(pool, raw){
+  const hint = document.getElementById("driveHint");
+  if (!hint) return;
+  const best = pool.length ? pool[0].it.duration : Infinity;
+  const hidden = dedupeAlts(raw.filter(it =>
+    longestCarLegM(it) > maxDriveM && it.duration < best));
+  if (!hidden.length){ hint.hidden = true; delete hint.dataset.km; return; }
+  const km = Math.ceil(Math.min(...hidden.map(longestCarLegM)) / 1000);
+  const mins = Math.round(Math.min(...hidden.map(it => it.duration)) / 60);
+  hint.querySelector(".sh-txt").textContent = hidden.length > 1
+    ? `Hiding ${hidden.length} faster options, best ${mins} min at ${km} km`
+    : `Hiding a ${mins} min option, ${km} km drive`;
+  hint.dataset.km = km;
+  hint.hidden = false;
+}
+
+/* ---- results: ONE ranked list, every allowed mode mix pooled together.
+   Rule: an option that is slower AND not cheaper than
+   another visible option must never headline - it stays reachable under
+   "more options", but can't pose as a recommendation. */
+function renderResults(parts, opts){
+  opts = opts || {};
+  itinsById = {}; selId = null; fcCache = {};
+
+  // one pool, drive cap applied, deduped (departure alts collected), then
+  // ranked by rankPool() in core.js
+  const all = [], raw = [];
+  for (const p of parts){ all.push(...visibleIts(p)); raw.push(...(p.its || [])); }
+  const { pool, main, rest, fastestIt, cheapestIt, latestIt } = rankPool(
+    dedupeAlts(all).map(it => ({ it, cost: itineraryCost(it) })), arriveBy);
+  driveHint(pool, raw);
+
+  const errs = [...new Set(parts.filter(p => p.err).map(p => p.err))];
+  let html = errs.map(e => `<div class="err">${esc(e)}</div>`).join(""), id = 0;
+  const card = it => {
+    const cid = "it" + (id++); itinsById[cid] = it;
+    return cardHTML(it, cid, fastestIt, cheapestIt, latestIt);
+  };
+
+  if (!pool.length){
+    // a dead engine is not the user's fault - don't blame their toggles
+    html += errs.length
+      ? `<div class="none">Couldn't check your routes. See the
+          message above.</div>`
+      : `<div class="none">No sensible route found. Try switching
+      on more of the "Using" toggles or raising the drive limit.</div>`;
+  } else {
+    html += main.map(x => card(x.it)).join("");
+    if (rest.length)
+      html += `<div class="extra" id="exAll">${rest.map(x => card(x.it)).join("")}</div>
+        <button class="morebtn" aria-expanded="false" onclick="toggleMore('exAll', this,
+          ${rest.length})">${rest.length} more option${rest.length > 1 ? "s" : ""} ${icn("chev")}</button>`;
+  }
+  if (opts.pending)
+    html += `<div class="pendingline"><div class="spinner"></div>Still checking
+      ${opts.pending} more way${opts.pending > 1 ? "s" : ""} to go&hellip;</div>`;
+  const resultsBox = document.getElementById("results");
+  // a repaint while answers arrive must not replay every card's entrance
+  resultsBox.classList.toggle("quiet", !!opts.quiet);
+  resultsBox.innerHTML = html;
+  if (opts.animateFrom){   // prices roll over from the previous fare type
+    for (const [cid, it] of Object.entries(itinsById)){
+      const el = document.getElementById(cid);
+      const costEl = el && el.querySelector(".cost");
+      const old = opts.animateFrom[itinSig(it)];
+      if (costEl && old != null){
+        const target = parseFloat(costEl.textContent.slice(1));
+        costEl.textContent = "$" + old.toFixed(2);
+        countTo(costEl, target);
+      }
+    }
+  }
+  let pick = Object.keys(itinsById)[0];
+  if (opts.selectSig){     // keep the user's selected trip selected
+    const hit = Object.entries(itinsById).find(([, it]) =>
+      itinSig(it) === opts.selectSig);
+    if (hit) pick = hit[0];
+  }
+  if (pick) window.select(pick, { fit: !opts.noFit, sweep: !opts.noSweep });
+  if (pool.length && !opts.quiet) revealResults();
+}
+/* With Trip options open, the results sit below ~380px of toggles, so a
+   re-plan you triggered from those toggles landed out of sight. Bring the
+   results up to just under the pinned search card. Only while the options
+   are open - otherwise the panel should stay where the user left it. */
+function revealResults(){
+  const wrap = document.getElementById("optWrap");
+  if (!wrap || !wrap.classList.contains("open")) return;
+  const ps = document.getElementById("panelScroll");
+  const res = document.getElementById("results");
+  const search = document.querySelector(".search");
+  const delta = res.getBoundingClientRect().top - ps.getBoundingClientRect().top
+    - (search ? search.offsetHeight : 0) - 8;
+  if (Math.abs(delta) < 2) return;
+  // Plain assignment, not scrollTo({behavior:"smooth"}): smooth scrolling is
+  // driven by requestAnimationFrame, which this app already knows gets frozen
+  // in a background tab - a dropped animation would leave the results exactly
+  // where they were, off-screen. Landing there instantly always works.
+  ps.scrollTop = Math.max(0, ps.scrollTop + delta);
+}
+window.toggleMore = function(exId, btn, n){
+  const el = document.getElementById(exId);
+  const open = el.classList.toggle("open");
+  btn.setAttribute("aria-expanded", open ? "true" : "false");
+  btn.innerHTML = (open ? "Show fewer" : `${n} more option${n > 1 ? "s" : ""}`)
+    + " " + icn("chev");
+};
+
+/* ---- drawing ---- */
+function modeColor(l){
+  if (l.mode === "WALK") return darkMql.matches ? "#98989d" : "#8e8e93";
+  if (l.mode === "BICYCLE") return "#34c759";
+  if (l.mode === "CAR") return darkMql.matches ? "#aeaeb2" : "#48484a";
+  return routeColor(l.route) || agencyColor(l);
+}
+/* a darker shade of the same color - the route line's outline */
+function shade(hex, f){
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
+  if (!m) return "rgba(0,0,0,.35)";
+  const n = parseInt(m[1], 16);
+  const ch = s => Math.round(((n >> s) & 255) * f)
+    .toString(16).padStart(2, "0");
+  return "#" + ch(16) + ch(8) + ch(0);
+}
+function buildFC(it, preview){
+  return { type: "FeatureCollection", features: it.legs.map(l => {
+    const color = modeColor(l);
+    return { type: "Feature",
+      properties: { color, ccolor: shade(color, 0.62),
+                    dash: l.mode === "WALK" ? 1 : 0,
+                    preview: preview ? 1 : 0 },
+      geometry: { type: "LineString",
+                  coordinates: decodePolyline(l.legGeometry.points) } };
+  }) };
+}
+/* decoded routes are cached per card - hovering shouldn't re-decode
+   every polyline every time the mouse moves */
+function cachedFC(cid, preview){
+  const key = cid + (preview ? "|p" : "");
+  if (!fcCache[key]) fcCache[key] = buildFC(itinsById[cid], preview);
+  return fcCache[key];
+}
+window.select = function(cid, opts){
+  opts = opts || {};
+  document.querySelectorAll(".card.sel").forEach(el => el.classList.remove("sel"));
+  const el = document.getElementById(cid);
+  if (el) el.classList.add("sel");
+  selId = cid;
+  const fc = cachedFC(cid);
+  showTripDocks(itinsById[cid]);
+  if (opts.sweep === false) drawRoute(fc); else animateRoute(fc);
+  if (opts.fit === false) return;
+  const all = fc.features.flatMap(f => f.geometry.coordinates);
+  if (all.length){
+    const b = all.reduce((bb,c) => bb.extend(c),
+      new maplibregl.LngLatBounds(all[0], all[0]));
+    // the fixed 430px left padding used to THROW on narrow windows, which
+    // killed the click handler and made cards unopenable on phones
+    const wide = map.getContainer().clientWidth > 760;
+    try {
+      map.fitBounds(b, { padding: wide
+          ? { top: 60, bottom: 60, right: 60, left: 430 }
+          : { top: 70, bottom: 40, right: 40, left: 40 },
+        maxZoom: 14 });
+    } catch (e){ /* a wrong zoom beats a dead card */ }
+  }
+};
+
+/* hovering a card previews its route (dimmed); leaving restores selection */
+const resultsEl = document.getElementById("results");
+resultsEl.addEventListener("mouseover", e => {
+  const c = e.target.closest(".card");
+  if (!c || c.id === selId || !itinsById[c.id]) return;
+  sweepToken++;  // cancel any in-flight sweep so it can't fight the preview
+  if (map.getSource("route")) map.getSource("route").setData(cachedFC(c.id, true));
+});
+/* keyboard: cards are real buttons - Enter or Space opens them */
+resultsEl.addEventListener("keydown", e => {
+  if ((e.key === "Enter" || e.key === " ") && e.target.classList.contains("card")){
+    e.preventDefault();
+    window.openIt(e.target.id);
+  }
+});
+resultsEl.addEventListener("mouseout", e => {
+  const c = e.target.closest(".card");
+  if (!c) return;
+  const into = e.relatedTarget && e.relatedTarget.closest
+    ? e.relatedTarget.closest(".card") : null;
+  if (into === c) return;
+  if (map.getSource("route") && lastRouteFC) map.getSource("route").setData(lastRouteFC);
+});
+
+/* ---- trip detail view ---- */
+window.openIt = function(cid){
+  if (itinsById[cid]) pickedSig = itinSig(itinsById[cid]);
+  window.select(cid);
+  renderDetail(cid);
+  document.body.classList.add("detail-open");
+};
+function renderDetail(cid){
+  const it = itinsById[cid];
+  const { total, items } = itineraryCostDetail(it);
+  let steps = "", sawTransit = false;
+  for (let li = 0; li < it.legs.length; li++){
+    const l = it.legs[li];
+    const mins = Math.round(l.duration/60);
+    const col = modeColor(l);
+    let what, sub, extra = "";
+    if (l.mode === "WALK"){
+      what = `${icn("walk")} Walk ${Math.round(l.distance)} m`;
+      sub = `${mins} min &middot; to ${esc(l.to.name === "Destination" ? "your destination" : l.to.name)}`;
+    } else if (l.mode === "BICYCLE" && l.rentedBike){
+      what = `${icn("bike")} Bike Share ${(l.distance/1000).toFixed(1)} km`;
+      sub = `${mins} min &middot; grab a bike at ${esc(l.from.name)}, dock it at ${esc(l.to.name)}`;
+    } else if (l.mode === "BICYCLE"){
+      what = `${icn("bike")} Bike ${(l.distance/1000).toFixed(1)} km`;
+      sub = `${mins} min &middot; park your bike at ${esc(l.to.name)}`;
+    } else if (l.mode === "CAR"){
+      what = `${icn("car")} Drive ${(l.distance/1000).toFixed(1)} km`;
+      // the router has no traffic model - say so instead of implying
+      // rush hour will really flow at free-way speed
+      sub = (sawTransit
+        ? `${mins} min &middot; to ${esc(l.to.name === "Destination" ? "your destination" : l.to.name)}`
+        : `${mins} min &middot; park at ${esc(l.to.name)}`)
+        + " &middot; light traffic assumed"
+        + (legTollM(l) >= TOLL_MIN_M
+          ? ` &middot; <span class="late">${(legTollM(l)/1000).toFixed(1)} km on
+              Highway 407${legTollCost(l) > 0
+                ? `, about $${legTollCost(l).toFixed(2)} in tolls (estimated,
+                   assumes a transponder - without one add
+                   $${TOLLRATE.fees.camera_charge.toFixed(2)})`
+                : ", toll not in the price"}</span>` : "");
+    } else {
+      sawTransit = true;
+      const r = l.route || {};
+      const stops = (l.intermediatePlaces || []).length + 1;
+      const bg = routeColor(r) || agencyColor(l);
+      what = `<span class="rt" style="background:${bg}">${esc(r.shortName || r.longName || "")}</span>
+        ${esc(prettyAgency(l))}`
+        + (l.headsign ? ` <span style="font-weight:500;color:var(--muted)">&middot; ${esc(to12h(tidyName(l.headsign)))}</span>` : "");
+      sub = `Board at ${esc(tidyName(l.from.name))} &middot; ride ${stops} stop${stops>1?"s":""}
+             (${mins} min) &middot; get off at ${esc(tidyName(l.to.name))}`;
+      // live delay note (rtDelaySec set only when the engine had real-time
+      // data for this leg; shown times already include the delay)
+      if (l.rtDelaySec != null){
+        const dm = Math.round(l.rtDelaySec / 60);
+        sub += dm >= 2 ? ` &middot; <span class="late">running ${dm} min late</span>`
+             : dm <= -2 ? ` &middot; <span class="early">running ${-dm} min early</span>`
+             : ` &middot; on time`;
+      }
+      const bi = boardingInfo(it.legs, li);
+      if (bi) extra = trainDiagram(bi, (l.to.name || "").split(" Station")[0]);
+    }
+    // service alerts for this leg's route/stop (the header always shows; the
+    // longer description, when there is one, is revealed by tapping)
+    for (const a of (l.alerts || [])){
+      extra += `<details class="legalert"><summary>${icn("warn", 12)}
+        <span class="ah">${esc(a.header)}</span>${
+        a.desc ? '<span class="amore">more</span>' : ""}</summary>${
+        a.desc ? `<div class="ad">${esc(a.desc)}</div>` : ""}${
+        a.url ? `<a class="al" href="${esc(a.url)}" target="_blank" rel="noopener">Agency page &rarr;</a>` : ""}</details>`;
+    }
+    steps += `<div class="step ${l.mode === "WALK" ? "walkstep" : ""}" style="--rail:${col}">
+      <div class="t">${hhmm(l.startTime)}</div>
+      <div class="rail"><div class="dot"></div><div class="bar"></div></div>
+      <div class="body"><div class="what">${what}</div><div class="sub">${sub}</div>${extra}</div>
+    </div>`;
+  }
+  steps += `<div class="step"><div class="t">${hhmm(it.endTime)}</div>
+    <div class="rail"><div class="dot" style="--rail:#ff453a"></div></div>
+    <div class="body"><div class="what">Arrive</div></div></div>`;
+  // Bike Share dock list: the exact dock this trip uses (live counts) plus a
+  // few nearby alternatives, each clickable to fly the map straight there
+  let dockSection = "";
+  const rentLeg = it.legs.find(l => l.mode === "BICYCLE" && l.rentedBike);
+  if (rentLeg && dockFC){
+    const firstTransit = it.legs.findIndex(x => TRANSIT.has(x.mode));
+    const isStart = firstTransit < 0 || it.legs.indexOf(rentLeg) < firstTransit;
+    const pt = isStart ? rentLeg.from : rentLeg.to;
+    const rows = nearestDocks(pt.lon, pt.lat, 4).map((f, idx) => {
+      const p = f.properties, c = f.geometry.coordinates;
+      const cnt = (p.bikes != null && p.bikes !== "null")
+        ? `${p.bikes} bike${p.bikes == 1 ? "" : "s"} &middot; ${p.spaces} dock${p.spaces == 1 ? "" : "s"}` : "";
+      return `<button class="dockrow ${idx === 0 ? "here" : ""}" onclick="flyDock(${c[0]},${c[1]})">
+        <span class="dot"></span><span class="nm">${esc(p.name)}</span>
+        ${idx === 0 ? `<span class="tag">${isStart ? "Rent here" : "Dock here"}</span>` : ""}
+        <span class="cnt">${cnt}</span></button>`;
+    }).join("");
+    dockSection = `<div class="docklist">
+      <h3>Bike Share ${isStart ? "pickup" : "drop-off"} &middot; live availability</h3>${rows}</div>`;
+  }
+  const fares = items.map(x => `<div class="fitem"><span>${x.label}</span>
+      <span>${x.amount === 0 ? "free" : "$" + x.amount.toFixed(2)}</span></div>`).join("");
+  document.getElementById("detail").innerHTML = `
+    <div class="dhead">
+      <button class="back" onclick="closeDetail()" title="Back to results">${icn("back")}</button>
+      <span><span class="mins">${Math.round(it.duration/60)} min</span>
+        <span class="times">${hhmm(it.startTime)} &ndash; ${hhmm(it.endTime)}</span></span>
+      <span class="dcost">$${total.toFixed(2)}</span>
+    </div>
+    <div class="tl">${steps}</div>
+    ${dockSection}
+    <div class="fares"><h3>Cost breakdown${rider === "youth" ? " &middot; youth fare" : ""}</h3>
+      ${fares}
+      <div class="fitem total"><span>Total</span><span>$${total.toFixed(2)}</span></div>
+      <div class="fnote">PRESTO-level fares, checked against each agency in 2026. One Fare makes local
+        transit free when a GO trip is part of the journey. ${rider === "youth"
+          ? "Youth rates applied for every system."
+          : "Adult rates applied for every system."}
+        Driving times assume light traffic, so rush hour will be slower.</div>
+    </div>`;
+}
+window.closeDetail = function(){
+  const b = document.body;
+  // reduced-motion or already closing: just snap back, no exit animation
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches
+      || b.classList.contains("detail-closing")){
+    b.classList.remove("detail-open", "detail-closing");
+    return;
+  }
+  b.classList.add("detail-closing");            // keeps #detail visible while it slides out
+  document.getElementById("detail").addEventListener("animationend", () => {
+    b.classList.remove("detail-open", "detail-closing");
+  }, { once: true });
+};
+
+/* ---- controls ---- */
+document.getElementById("go").onclick = plan;
+/* ---- drive-distance slider ----
+   A continuous slider, remembered between visits, with a line underneath
+   when the cap is hiding something faster. Useful park-and-ride stations
+   often start around 15 km, so a low fixed cap would silently hide them. */
+(function(){
+  const rng = document.getElementById("driveRange"),
+        out = document.getElementById("driveVal"),
+        hint = document.getElementById("driveHint");
+  const STEP = +rng.step, MIN = +rng.min, ANY = +rng.max;  // top of track = no limit
+  const stored = parseInt(store.get("driveKm"), 10);
+  if (stored >= MIN && stored <= ANY) rng.value = stored;
+  const paint = () => {
+    const km = +rng.value, any = km >= ANY;
+    maxDriveM = any ? 9999000 : km * 1000;
+    out.textContent = any ? "Any" : km + " km";
+    rng.style.setProperty("--pct", ((km - MIN) / (ANY - MIN) * 100) + "%");
+    paintOptsRow();
+  };
+  paint();
+  const rerender = () => {
+    if (!lastParts) return;
+    const keepSig = selId && itinsById[selId] ? itinSig(itinsById[selId]) : null;
+    // no re-query: the cap only filters what the engine already returned
+    renderResults(lastParts, { selectSig: keepSig, noFit: true, noSweep: true });
+  };
+  rng.addEventListener("input", () => { paint(); rerender(); });
+  rng.addEventListener("change", () => store.set("driveKm", rng.value));
+  // one tap on the hint raises the cap exactly far enough to reveal them
+  const takeHint = () => {
+    const km = +hint.dataset.km;
+    if (!km) return;
+    rng.value = Math.min(ANY, Math.ceil(km / STEP) * STEP);
+    store.set("driveKm", rng.value);
+    paint(); rerender();
+  };
+  hint.addEventListener("click", takeHint);   // a real <button>: Enter/Space free
+})();
+
+/* "Avoid tolls" - pure filtering (see the toll-roads block), so it never
+   needs a re-query, and it persists like the drive limit */
+(function(){
+  const b = document.getElementById("noTolls");
+  const paint = () => {
+    b.classList.toggle("on", avoidTolls);
+    b.setAttribute("aria-pressed", avoidTolls ? "true" : "false");
+    paintOptsRow();
+  };
+  paint();
+  b.onclick = () => {
+    avoidTolls = !avoidTolls;
+    store.set("avoidTolls", avoidTolls ? "1" : "");
+    paint();
+    if (!lastParts) return;
+    const keepSig = selId && itinsById[selId] ? itinSig(itinsById[selId]) : null;
+    renderResults(lastParts, { selectSig: keepSig, noFit: true, noSweep: true });
+  };
+})();
+document.getElementById("daySel").addEventListener("change", plan);
+document.getElementById("timeSel").addEventListener("change", plan);
+const bikeSel = document.getElementById("bikeSel");
+bikeSel.value = bikePref;
+bikeSel.addEventListener("change", e => {
+  bikePref = e.target.value;
+  store.set("bikePref", bikePref);
+  paintOptsRow();
+  plan();   // routing changes, not just filtering - re-query
+});
+document.querySelectorAll("#whenSeg button").forEach(b => {
+  b.onclick = () => {
+    const want = b.dataset.when === "arrive";
+    if (arriveBy === want) return;
+    arriveBy = want;
+    document.querySelectorAll("#whenSeg button").forEach(x => {
+      x.classList.toggle("on", x === b);
+      x.setAttribute("aria-pressed", x === b ? "true" : "false");
+    });
+    plan();
+  };
+});
+document.getElementById("swap").innerHTML = icn("swap", 14);
+
+/* ---- the "More" menu: Share / Clear / Service alerts ---- */
+(function(){
+  const btn = document.getElementById("moreBtn");
+  const menu = document.getElementById("moreMenu");
+  btn.innerHTML = icn("more", 16);
+  const close = () => { menu.classList.remove("open"); btn.setAttribute("aria-expanded", "false"); };
+  const open = () => {
+    const r = btn.getBoundingClientRect();
+    menu.style.top = (r.bottom + 6) + "px";
+    menu.style.left = Math.min(r.left, innerWidth - 236 - 8) + "px";
+    menu.classList.add("open"); btn.setAttribute("aria-expanded", "true");
+  };
+  btn.onclick = e => { e.stopPropagation();
+    menu.classList.contains("open") ? close() : open(); };
+  // click anywhere else closes it
+  document.addEventListener("click", e => {
+    if (menu.classList.contains("open") && !menu.contains(e.target) && e.target !== btn) close();
+  });
+  document.getElementById("mmShare").onclick = () => { close(); shareTrip(); };
+  document.getElementById("mmClear").onclick = () => { close(); clearTrip(); };
+  // alerts sub-list expand/collapse
+  const tog = document.getElementById("mmAlertsToggle");
+  const list = document.getElementById("moreAlerts");
+  tog.onclick = () => {
+    const on = list.classList.toggle("open");
+    tog.setAttribute("aria-expanded", on ? "true" : "false");
+  };
+})();
+
+/* a brief floating message (e.g. "Link copied") - no dependency, self-removes */
+let toastTimer = null;
+function toast(msg){
+  let t = document.getElementById("toast");
+  if (!t){
+    t = document.createElement("div");
+    t.id = "toast";
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 1900);
+}
+
+/* Build a link that reopens THIS trip on someone else's device: the two
+   ends (with their labels) plus when/who, so the shared trip matches. */
+function buildShareURL(){
+  const q = new URLSearchParams();
+  q.set("f", fromPt.lng.toFixed(5) + "," + fromPt.lat.toFixed(5));
+  q.set("t", toPt.lng.toFixed(5) + "," + toPt.lat.toFixed(5));
+  const fl = document.getElementById("fromBox").value,
+        tl = document.getElementById("toBox").value;
+  if (fl) q.set("fl", fl);
+  if (tl) q.set("tl", tl);
+  if (arriveBy) q.set("when", "arrive");
+  q.set("d", document.getElementById("daySel").value);
+  q.set("tm", document.getElementById("timeSel").value);
+  if (rider !== "adult") q.set("r", rider);
+  return location.origin + location.pathname + "?" + q.toString();
+}
+
+// hoisted: the More menu (set up above) calls it
+async function shareTrip(){
+  if (!fromPt || !toPt){ toast("Pick a start and an end first"); return; }
+  const url = buildShareURL();
+  const done = () => toast("Link copied");
+  try {
+    await navigator.clipboard.writeText(url);
+    done();
+  } catch (e){
+    // clipboard API needs a secure context / permission - fall back to a
+    // hidden textarea + execCommand, and if THAT fails, show the raw link
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = url; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      const ok = document.execCommand("copy");
+      ta.remove();
+      ok ? done() : prompt("Copy this link to your trip:", url);
+    } catch (e2){ prompt("Copy this link to your trip:", url); }
+  }
+}
+/* animate a dollar figure rolling from its current value to a new one */
+function countTo(el, to){
+  const final = "$" + to.toFixed(2);
+  // animation frames don't run in hidden/background tabs - never let the
+  // displayed price depend on them
+  if (document.hidden){ el.textContent = final; return; }
+  const tok = (+el.dataset.ct || 0) + 1;  // a newer roll cancels this one
+  el.dataset.ct = tok;
+  const from = parseFloat((el.textContent || "").replace(/[^0-9.]/g, "")) || 0;
+  const t0 = performance.now(), dur = 450;
+  let done = false;
+  (function step(now){
+    if (+el.dataset.ct !== tok) return;
+    const p = Math.min((now - t0) / dur, 1);
+    const eased = 1 - Math.pow(1 - p, 3);
+    el.textContent = "$" + (from + (to - from) * eased).toFixed(2);
+    if (p < 1) requestAnimationFrame(step); else done = true;
+  })(t0);
+  setTimeout(() => {
+    if (!done && +el.dataset.ct === tok) el.textContent = final; }, dur + 150);
+}
+
+/* the "Using:" toggles - flip one and the trip is re-planned with the
+   matching mode mixes included/excluded */
+// the Bike / Car row label carries the mode now, so the pills say only
+// which one - no icon, no repeating the word in every button
+const HAVE_LABEL = { bike:"My bike", carStart:"At the start", carEnd:"At the end",
+  share:"Bike Share" };
+for (const id of ["haveBike", "haveCarStart", "haveCarEnd", "haveShare"]){
+  const b = document.getElementById(id);
+  const k = b.dataset.have;
+  b.textContent = HAVE_LABEL[k];
+  b.classList.toggle("on", !!have[k]);
+  b.setAttribute("aria-pressed", have[k] ? "true" : "false");
+  b.onclick = () => {
+    have[k] = !have[k];
+    store.set("have", JSON.stringify(have));
+    b.classList.toggle("on", have[k]);
+    b.setAttribute("aria-pressed", have[k] ? "true" : "false");
+    paintOptsRow();
+    plan();
+  };
+}
+
+/* The drawer's front door. Two jobs, and the second line does both:
+   while everything is default it LISTS what's inside (so the row explains
+   its own purpose instead of just saying "Options"), and the moment
+   anything is off-default it switches to naming what you changed, in
+   accent colour. That way a filter can never sit collapsed and quietly
+   drop trips - the thing you set is on screen even when the drawer is
+   shut. Hoisted on purpose: the slider/tolls/bike blocks above all paint
+   themselves at startup and call this before this line is reached. */
+function optsSummary(){
+  const bits = [];
+  if (!have.bike && !have.share) bits.push("no bike");
+  else if (!have.bike) bits.push("no bike of your own");
+  else if (!have.share) bits.push("no Bike Share");
+  if (!have.carStart && !have.carEnd) bits.push("no car");
+  else if (!have.carStart) bits.push("no driving to a station");
+  else if (!have.carEnd) bits.push("no ride at the end");
+  if (rider !== "adult") bits.push("Youth fare");
+  if (have.bike || have.share){
+    if (bikePref !== "safest") bits.push("bike: " + bikePref);
+  }
+  // tolls and the drive cap only bite on trips that drive, so listing them
+  // next to "no car" reads as a contradiction. Still SET, just not said.
+  if (have.carStart || have.carEnd){
+    if (avoidTolls) bits.push("avoiding tolls");
+    // the slider is the source of truth for its own value (maxDriveM is
+    // 9999000 at the top of the track, which would read as nonsense here)
+    const rng = document.getElementById("driveRange");
+    const km = rng ? +rng.value : 15;
+    if (rng && km >= +rng.max) bits.push("any drive");
+    else if (km !== 15) bits.push("drive up to " + km + " km");
+  }
+  return bits;
+}
+function paintOptsRow(){
+  // kept INSIDE the function on purpose: this is called during startup by
+  // the slider/tolls blocks above, and a top-level const declared down
+  // here would still be in its dead zone at that point - referencing it
+  // threw and killed the rest of the script
+  const BLURB = "Bike, car, fares and how far you'll drive";
+  const btn = document.getElementById("optsBtn");
+  if (!btn) return;
+  if (!btn.firstChild)
+    btn.innerHTML = '<span class="oi">' + icn("sliders") + '</span>'
+      + '<span class="otx"><span class="ott">Trip options</span>'
+      + '<span class="osub"></span></span>'
+      + '<span class="ochev">' + icn("chev") + '</span>';
+  const bits = optsSummary(), on = bits.length > 0;
+  const txt = on ? bits.join(", ").replace(/^./, c => c.toUpperCase()) : BLURB;
+  btn.querySelector(".osub").textContent = txt;
+  btn.classList.toggle("set", on);
+  btn.title = on ? "You've changed: " + txt : BLURB;
+}
+
+/* the Options row folds the toggle/fare/drive/bike controls away
+   (Apple's "Now / Avoid" trick). Open state sticks across visits. */
+(function(){
+  const btn = document.getElementById("optsBtn"),
+        wrap = document.getElementById("optWrap");
+  paintOptsRow();
+  function setOpen(open){
+    wrap.classList.toggle("open", open);
+    btn.classList.toggle("on", open);
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    try { localStorage.setItem("optsOpen", open ? "1" : ""); } catch (e){}
+  }
+  btn.onclick = () => setOpen(!wrap.classList.contains("open"));
+  let saved = "";
+  try { saved = localStorage.getItem("optsOpen") || ""; } catch (e){}
+  setOpen(saved === "1");
+})();
+
+document.querySelectorAll("#riderSeg button").forEach(b => {
+  b.onclick = () => {
+    if (rider === b.dataset.rider) return;
+    // remember old prices (to roll from) and the selected trip (to keep)
+    const oldCosts = {};
+    for (const it of Object.values(itinsById))
+      oldCosts[itinSig(it)] = itineraryCost(it);
+    const keepSig = selId && itinsById[selId] ? itinSig(itinsById[selId]) : null;
+    rider = b.dataset.rider;
+    document.querySelectorAll("#riderSeg button").forEach(x => {
+      x.classList.toggle("on", x === b);
+      x.setAttribute("aria-pressed", x === b ? "true" : "false");
+    });
+    paintOptsRow();
+    // full re-rank, not repricing in place: youth prices can change which
+    // options win, and the Cheapest badge must never point at a hidden card
+    if (lastParts) renderResults(lastParts,
+      { selectSig: keepSig, noFit: true, noSweep: true, animateFrom: oldCosts });
+    if (document.body.classList.contains("detail-open")
+        && selId && itinsById[selId]) renderDetail(selId);
+  };
+});
+function swapEnds(){
+  if (!fromPt || !toPt) return;
+  const f = { ...fromPt }, t = { ...toPt };
+  const fl = document.getElementById("fromBox").value,
+        tl = document.getElementById("toBox").value;
+  setPoint("from", t, tl); setPoint("to", f, fl);
+  plan();
+}
+document.getElementById("swap").onclick = swapEnds;
+// clicking a coloured dot ARMS that end: your next map click drops THAT point.
+// This fixes the old "second click is always the destination" trap - now you
+// can re-place the start any time by arming its green dot first.
+document.querySelectorAll(".pt.pick").forEach(d => {
+  const f = d.dataset.field;
+  const arm = () => { pickOverride = f; refreshPick(); };
+  d.onclick = arm;
+  d.onkeydown = e => { if (e.key === "Enter" || e.key === " "){ e.preventDefault(); arm(); } };
+});
+refreshPick();
+// hoisted: the More menu (set up above) calls it
+function clearTrip(){
+  // a search still in flight would otherwise finish and paint its results
+  // and route back onto the empty form
+  if (planCtrl) planCtrl.abort();
+  planSeq++;
+  if (fromMarker) fromMarker.remove(); if (toMarker) toMarker.remove();
+  fromPt = toPt = fromMarker = toMarker = null;
+  pickOverride = null; refreshPick();
+  lastParts = null; lastRouteFC = null;
+  syncTransitEmphasis();   // no trip on screen: the lines come back up
+  clearTripDocks();
+  closeDetail();
+  document.getElementById("fromBox").value = "";
+  document.getElementById("toBox").value = "";
+  document.getElementById("results").innerHTML =
+    '<div class="hint">Pick a start and an end to compare every mix of transit, driving, your bike and Bike Share, with real fares.</div>';
+  if (map.getSource("route"))
+    map.getSource("route").setData({ type:"FeatureCollection", features: [] });
+}
+
+/* populate the day + time pickers (default: today, next quarter hour).
+   #daySel is still the source of truth for the date - it just wears a
+   calendar instead of a list (see skinSelect/buildCalendar). Its option
+   set IS the set of bookable days, so the calendar greys out anything the
+   loaded schedules can't answer for; addDayOptions extends it once the
+   engine reports how far the timetables run. */
+let scheduleEnd = 0;   // ms; last day the loaded timetables can answer for
+const DOW = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const pad2 = n => String(n).padStart(2,"0");
+const isoDay = d => d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate());
+/* grow #daySel to `days` days from today (idempotent - safe to call again
+   with a bigger number once serviceTimeRange comes back) */
+function addDayOptions(days){
+  const daySel = document.getElementById("daySel");
+  const have = new Set([...daySel.options].map(o => o.value));
+  const today = torontoWall(Date.now()); today.setHours(12, 0, 0, 0);   // noon: DST-proof
+  for (let i = 0; i < days; i++){
+    const d = new Date(today.getTime() + i*86400000);
+    const val = isoDay(d);
+    if (have.has(val)) continue;
+    daySel.add(new Option(i === 0 ? "Today" : i === 1 ? "Tomorrow"
+      : `${DOW[d.getDay()].slice(0,3)}, ${MON[d.getMonth()]} ${d.getDate()}`, val));
+  }
+}
+(function(){
+  const timeSel = document.getElementById("timeSel");
+  const pad = pad2;
+  addDayOptions(14);   // enough to use immediately; extended once we know
+  for (let h = 0; h < 24; h++) for (const m of [0,15,30,45]){
+    const ampm = h < 12 ? "AM" : "PM";
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+    timeSel.add(new Option(`${h12}:${pad(m)} ${ampm}`, `${pad(h)}:${pad(m)}`));
+  }
+  // rolling to the next quarter hour can cross midnight - let Date carry
+  // the day over, then move the day picker with it (else the default was
+  // "today at 12:00 AM", i.e. almost a full day in the PAST)
+  const daySel = document.getElementById("daySel");
+  const now = torontoWall(Date.now() + 5*60000);
+  now.setMinutes(Math.ceil(now.getMinutes()/15)*15, 0, 0);
+  const dval = isoDay(now);
+  if ([...daySel.options].some(o => o.value === dval)) daySel.value = dval;
+  timeSel.value = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+})();
+
+/* ---- themed dropdowns ----
+   A native <select>'s option list is drawn by the OS: it can't take the
+   app's card material, radius or accent, so every picker opened into a
+   grey system menu. This skins them WITHOUT touching any of the code
+   that uses them - the real <select> stays put and keeps owning its
+   options, .value and change events; it just goes invisible behind a
+   .selbtn, and .selmenu draws the list the same way the "More" menu
+   does. Must run AFTER the day/time options are populated. */
+function skinSelect(sel, opts){
+  opts = opts || {};
+  const wrap = document.createElement("span");
+  wrap.className = "selwrap";
+  sel.parentNode.insertBefore(wrap, sel);
+  wrap.appendChild(sel);
+
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "selbtn";
+  btn.setAttribute("aria-haspopup", "listbox");
+  btn.setAttribute("aria-expanded", "false");
+  if (sel.title) btn.title = sel.title;
+  if (sel.getAttribute("aria-label")) btn.setAttribute("aria-label", sel.getAttribute("aria-label"));
+  wrap.appendChild(btn);
+
+  const menu = document.createElement("div");
+  menu.className = "selmenu" + (opts.calendar ? " selmenu-cal" : "");
+  menu.setAttribute("role", opts.calendar ? "dialog" : "listbox");
+  document.body.appendChild(menu);
+
+  const sync = () => {
+    const o = sel.selectedOptions[0];
+    btn.textContent = o ? o.textContent : "";
+  };
+  // .value is assigned programmatically all over (day/time defaults, shared
+  // links, restore) and that fires no event - intercept the setter so the
+  // button label can never drift from the real select
+  const desc = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value");
+  Object.defineProperty(sel, "value", {
+    configurable: true,
+    get(){ return desc.get.call(this); },
+    set(v){ desc.set.call(this, v); sync(); }
+  });
+  sel.addEventListener("change", sync);
+  sync();
+
+  let hi = -1;
+  const items = () => [...menu.querySelectorAll("[data-oi]")];
+  const setHi = i => {
+    const list = items();
+    if (!list.length) return;
+    hi = (i + list.length) % list.length;
+    list.forEach((el, n) => el.classList.toggle("hi", n === hi));
+    list[hi].scrollIntoView({ block: "nearest" });
+  };
+  // where the CURRENT value sits among the rendered items (the calendar
+  // only renders one month, so it is often not there at all)
+  const hiOfSelected = () => Math.max(0,
+    items().findIndex(el => +el.dataset.oi === sel.selectedIndex));
+  let posRAF = 0;
+  const close = () => {
+    cancelAnimationFrame(posRAF);
+    menu.classList.remove("open");
+    btn.setAttribute("aria-expanded", "false");
+  };
+  const choose = el => {
+    const o = sel.options[+el.dataset.oi];
+    if (!o) return;
+    close();
+    if (o.value === sel.value) return;       // no phantom change events
+    sel.value = o.value;                     // (setter above re-syncs the label)
+    sel.dispatchEvent(new Event("change", { bubbles: true }));
+  };
+  const mkItem = (o, i) => {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.dataset.oi = i;
+    item.setAttribute("role", "option");
+    item.setAttribute("aria-selected", o.selected ? "true" : "false");
+    item.onclick = e => { e.stopPropagation(); choose(item); };
+    return item;
+  };
+  const buildList = () => {
+    [...sel.options].forEach((o, i) => {
+      const item = mkItem(o, i);
+      item.className = "sel-item" + (o.selected ? " on" : "");
+      item.innerHTML = `<span></span><span class="sel-tick">&#10003;</span>`;
+      item.firstChild.textContent = o.textContent;
+      menu.appendChild(item);
+    });
+  };
+  /* month grid. The <select>'s option set IS the bookable range, so a day
+     with no option is simply not a button - past dates and anything past
+     the end of the loaded timetables grey out for free. */
+  let calMonth = null;   // Date pinned to the 1st of the shown month
+  const buildCalendar = () => {
+    const byDay = new Map();
+    [...sel.options].forEach((o, i) => byDay.set(o.value, i));
+    const sel1 = sel.value ? new Date(sel.value + "T12:00:00") : new Date();
+    if (!calMonth) calMonth = new Date(sel1.getFullYear(), sel1.getMonth(), 1);
+    const today = isoDay(torontoWall(Date.now()));
+    const head = document.createElement("div");
+    head.className = "cal-head";
+    head.innerHTML = `<button type="button" class="cal-nav" data-d="-1"
+        aria-label="Previous month">&lsaquo;</button>
+      <span class="cal-title"></span>
+      <button type="button" class="cal-nav" data-d="1"
+        aria-label="Next month">&rsaquo;</button>`;
+    head.querySelector(".cal-title").textContent =
+      `${MON[calMonth.getMonth()]} ${calMonth.getFullYear()}`;
+    head.querySelectorAll(".cal-nav").forEach(b => b.onclick = e => {
+      e.stopPropagation();
+      calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + +b.dataset.d, 1);
+      menu.innerHTML = ""; buildCalendar(); setHi(0);
+    });
+    menu.appendChild(head);
+    const grid = document.createElement("div");
+    grid.className = "cal-grid";
+    for (const d of ["S","M","T","W","T","F","S"]){
+      const s = document.createElement("span");
+      s.className = "cal-dow"; s.textContent = d; grid.appendChild(s);
+    }
+    const first = new Date(calMonth.getFullYear(), calMonth.getMonth(), 1);
+    const lastDate = new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 0).getDate();
+    for (let i = 0; i < first.getDay(); i++)
+      grid.appendChild(document.createElement("span"));
+    for (let day = 1; day <= lastDate; day++){
+      const val = isoDay(new Date(calMonth.getFullYear(), calMonth.getMonth(), day));
+      const oi = byDay.get(val);
+      if (oi === undefined){                       // outside the bookable range
+        const s = document.createElement("span");
+        s.className = "cal-day off"; s.textContent = day; grid.appendChild(s);
+        continue;
+      }
+      const item = mkItem(sel.options[oi], oi);
+      item.className = "cal-day" + (sel.options[oi].selected ? " on" : "")
+        + (val === today ? " today" : "");
+      item.textContent = day;
+      grid.appendChild(item);
+    }
+    menu.appendChild(grid);
+    if (scheduleEnd){
+      const f = document.createElement("div");
+      f.className = "cal-foot";
+      const e = torontoWall(scheduleEnd);
+      f.textContent = `Schedules loaded through ${MON[e.getMonth()]} ${e.getDate()}`;
+      menu.appendChild(f);
+    }
+  };
+  const place = () => {
+    const r = btn.getBoundingClientRect();
+    menu.style.minWidth = r.width + "px";
+    // flip above the button when there isn't room below (time picker near
+    // the bottom of a short window)
+    const h = menu.offsetHeight;
+    const below = innerHeight - r.bottom - 8;
+    menu.style.top = (h > below && r.top > below ? Math.max(8, r.top - h - 6)
+                                                 : r.bottom + 6) + "px";
+    menu.style.left = Math.max(8,
+      Math.min(r.left, innerWidth - menu.offsetWidth - 8)) + "px";
+  };
+  // re-place every frame while open. Positioning once was wrong whenever
+  // anything above the button changed height afterwards - the disruptions
+  // bar loads a second or two in and pushed the anchor 30 px down, leaving
+  // the popup sitting ON TOP of its own button.
+  const track = () => {
+    if (!isOpen()) return;
+    place();
+    posRAF = requestAnimationFrame(track);
+  };
+  const open = () => {
+    // nothing to anchor to if the button isn't laid out (drawer closed)
+    if (!btn.getBoundingClientRect().width) return;
+    // rebuilt every time: day/time options are generated at runtime
+    menu.innerHTML = "";
+    calMonth = null;
+    opts.calendar ? buildCalendar() : buildList();
+    menu.style.visibility = "hidden";
+    menu.classList.add("open");
+    place();
+    menu.style.visibility = "";
+    btn.setAttribute("aria-expanded", "true");
+    setHi(hiOfSelected());
+    track();
+  };
+  const isOpen = () => menu.classList.contains("open");
+
+  btn.onclick = e => { e.stopPropagation(); isOpen() ? close() : open(); };
+  btn.addEventListener("keydown", e => {
+    if (isOpen()) return;      // the document handler below drives an open menu
+    if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter" || e.key === " "){
+      // stop here: the document handler would otherwise see the SAME
+      // keystroke against the now-open menu and skip the first item
+      e.preventDefault(); e.stopPropagation(); open();
+    }
+  });
+  document.addEventListener("keydown", e => {
+    if (!isOpen()) return;
+    // in the month grid up/down is a WEEK, left/right a day; in a list
+    // up/down is the only axis
+    const week = opts.calendar ? 7 : 1;
+    if (e.key === "Escape"){ close(); btn.focus(); }
+    else if (e.key === "ArrowDown"){ e.preventDefault(); setHi(hi + week); }
+    else if (e.key === "ArrowUp"){ e.preventDefault(); setHi(hi - week); }
+    else if (opts.calendar && e.key === "ArrowRight"){ e.preventDefault(); setHi(hi + 1); }
+    else if (opts.calendar && e.key === "ArrowLeft"){ e.preventDefault(); setHi(hi - 1); }
+    else if (e.key === "Enter"){
+      e.preventDefault();
+      const el = items()[hi];
+      if (el) choose(el);
+      btn.focus();
+    }
+  });
+  document.addEventListener("click", e => {
+    if (isOpen() && !menu.contains(e.target) && e.target !== btn) close();
+  });
+  // a fixed menu would hang in mid-air once the panel scrolls under it
+  // (capture: scroll doesn't bubble out of #panelScroll). Scrolling INSIDE
+  // the menu is not that - the time picker has 96 options and used to
+  // close itself the moment you scrolled the list.
+  document.addEventListener("scroll", e => {
+    if (isOpen() && !menu.contains(e.target)) close();
+  }, true);
+  addEventListener("resize", () => { if (isOpen()) close(); });
+}
+skinSelect(document.getElementById("daySel"), { calendar: true });
+["timeSel", "bikeSel"].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) skinSelect(el);
+});
+
+/* Open a trip from a shared ?f=..&t=.. link: someone sent this exact trip,
+   so show it and plan it right away. This is now the ONLY way the app opens
+   with points already set (the saved-pins restore was dropped). A malformed
+   or half link falls through to an empty form. Returns the two points (so we
+   know a link was consumed) or null. */
+function tripFromURL(){
+  const q = new URLSearchParams(location.search);
+  const parse = s => {
+    if (!s) return null;
+    const [lng, lat] = s.split(",").map(Number);
+    if (!isFinite(lng) || !isFinite(lat)) return null;
+    // keep it in/near the GTA - a junk link shouldn't fling the map
+    if (lng < -81 || lng > -78 || lat < 43 || lat > 45) return null;
+    return { lng, lat };
+  };
+  const f = parse(q.get("f")), t = parse(q.get("t"));
+  if (!f || !t) return null;
+  // when: arrive/depart toggle
+  if (q.get("when") === "arrive"){
+    const btn = document.querySelector('#whenSeg button[data-when="arrive"]');
+    if (btn) btn.click();   // reuses the existing handler (sets arriveBy + UI)
+  }
+  const daySel = document.getElementById("daySel"),
+        timeSel = document.getElementById("timeSel");
+  const d = q.get("d"), tm = q.get("tm");
+  if (d && [...daySel.options].some(o => o.value === d)) daySel.value = d;
+  if (tm && [...timeSel.options].some(o => o.value === tm)) timeSel.value = tm;
+  const r = q.get("r");
+  if (r === "youth"){
+    const btn = document.querySelector('#riderSeg button[data-rider="youth"]');
+    if (btn) btn.click();
+  }
+  setPoint("from", f, q.get("fl") || undefined);
+  setPoint("to", t, q.get("tl") || undefined);
+  // clean the query out of the address bar so a reload/re-share is clean
+  try { history.replaceState(null, "", location.origin + location.pathname); } catch (e){}
+  return { from: f, to: t };
+}
+
+/* The app opens with empty search boxes; the previous trip is not restored.
+   A shared link still fills both ends and plans itself straight away. */
+(function(){
+  const shared = tripFromURL();
+  const j = shared ? { from: { ...shared.from }, to: { ...shared.to } } : {};
+  const ok = p => p && isFinite(p.lng) && isFinite(p.lat);
+  if (ok(j.from) && ok(j.to)){
+    try {
+      const b = new maplibregl.LngLatBounds(
+        [j.from.lng, j.from.lat], [j.from.lng, j.from.lat]);
+      b.extend([j.to.lng, j.to.lat]);
+      map.fitBounds(b, { padding: 120, maxZoom: 12 });
+    } catch (e){}
+  }
+  if (shared) plan();   // a shared trip plans itself; a restored one waits
+})();
+
+/* warn when the loaded schedules are close to running out - GTFS data rots
+   and the app must not keep answering confidently from expired timetables.
+
+   serviceTimeRange covers ALL feeds at once, so it reports whichever agency
+   expires last: it can read "156 days left" (GO runs to December) while
+   TTC has hours left. Ask each feed for its OWN
+   last service day instead and warn on the EARLIEST, by name.
+
+   The probe: routes(feeds:[F], serviceDates:{start:D, end:LAST}) comes back
+   empty exactly when feed F has nothing left on or after D. That's
+   monotonic in D, so a binary search pins each feed's last day in ~11 tiny
+   queries, and every feed's step rides in one batched request. The answer
+   only changes when the graph is rebuilt, so it's cached against the global
+   range and normally costs one query. */
+const FEED_END_CACHE = "feedEnds";
+(async function(){
+  const DAY = 86400000;
+  // ms values below are Toronto wall-clock noons (see torontoWall), so the
+  // date is read off the local fields; noon keeps a DST hour from tipping
+  // it into the next or previous day
+  const iso = ms => isoDay(new Date(ms));
+  const ask = async q => {
+    const r = await fetch(OTP, { method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: q }) });
+    const js = await r.json();
+    if (js.errors) throw new Error(js.errors[0].message);
+    return js.data || {};
+  };
+  const asMs = v => typeof v === "string" ? Date.parse(v) : (v || 0) * 1000;
+
+  try {
+    const base = await ask("{ serviceTimeRange{start end} feeds{feedId} }");
+    const end = asMs((base.serviceTimeRange || {}).end);
+    const start = asMs((base.serviceTimeRange || {}).start);
+    if (!end) return;
+    // the calendar can offer exactly as far as the timetables reach, no
+    // further: a date past the end plans a confidently empty trip. This
+    // still uses the GLOBAL end - a GO-only trip stays plannable after TTC
+    // stops; the warning below is what tells you TTC is gone.
+    scheduleEnd = end;
+    addDayOptions(Math.min(Math.max(Math.round((end - Date.now()) / DAY) + 1, 1), 400));
+
+    const feeds = (base.feeds || []).map(f => f.feedId)
+      .filter(f => f && /^[A-Za-z0-9_-]+$/.test(f));   // these get inlined below
+    if (!feeds.length) return;
+
+    // serviceDates is a HALF-OPEN range - {start:D, end:D} matches nothing,
+    // and end is never included. serviceTimeRange.end happens to be
+    // one-past-the-last-day too, but don't lean on two bounds agreeing:
+    // push the window out a day so it covers the real last day either way.
+    const LAST = isoDay(torontoWall(end + DAY));
+    const key = FEED_END_CACHE + ":" + LAST + ":" + feeds.join(",");
+    let ends = loadStored(key, null);
+
+    if (!ends){
+      // one request per binary-search step, every still-searching feed
+      // batched in by alias
+      const probe = async jobs => {
+        const d = await ask("{" + jobs.map((j, i) =>
+          `f${i}: routes(feeds:["${j.feed}"], ` +
+          `serviceDates:{start:"${iso(j.ms)}", end:"${LAST}"}){ gtfsId }`
+        ).join(" ") + "}");
+        return jobs.map((j, i) => ((d["f" + i] || []).length > 0));
+      };
+      const day0 = torontoWall(start || Date.now()).setHours(12, 0, 0, 0);
+      const span = Math.max(1, Math.round((end - day0) / DAY));
+      const lo = {}, hi = {};
+      ends = {};
+      // a feed with nothing even at the global start has no service at all
+      const anyAtAll = await probe(feeds.map(f => ({ feed: f, ms: day0 })));
+      let live = [];
+      feeds.forEach((f, i) => {
+        if (!anyAtAll[i]) ends[f] = null;
+        else { lo[f] = 0; hi[f] = span + 1; live.push(f); }
+      });
+      let guard = 0;
+      while (live.length && guard++ < 24){
+        const jobs = live.map(f =>
+          ({ feed: f, ms: day0 + Math.floor((lo[f] + hi[f]) / 2) * DAY }));
+        const res = await probe(jobs);
+        live.forEach((f, i) => {
+          const mid = Math.floor((lo[f] + hi[f]) / 2);
+          if (res[i]) lo[f] = mid; else hi[f] = mid;
+        });
+        live = live.filter(f => hi[f] - lo[f] > 1);
+      }
+      for (const f of feeds)
+        if (ends[f] === undefined) ends[f] = iso(day0 + lo[f] * DAY);
+      try { localStorage.setItem(key, JSON.stringify(ends)); } catch (e){}
+    }
+
+    // FEED_LABEL is declared further down, but this function has already
+    // awaited a fetch by now, so the rest of the script has finished running
+    const label = f => (typeof FEED_LABEL === "object" && FEED_LABEL[f]) || f;
+    const midnight = torontoWall(Date.now()).setHours(0, 0, 0, 0);
+    const worst = Object.keys(ends)
+      .map(f => ({ f, days: ends[f] === null
+        ? -1 : Math.round((Date.parse(ends[f] + "T00:00:00") - midnight) / DAY) }))
+      .sort((a, b) => a.days - b.days)[0];
+    if (!worst || worst.days > 14) return;
+
+    const who = label(worst.f);
+    const div = document.createElement("div");
+    div.className = "warnbar";
+    div.textContent = worst.days < 0
+      ? `${who} schedules have expired. Its trips may be wrong, so re-run refresh.sh.`
+      : worst.days === 0
+        ? `${who} schedules run out today. Re-run refresh.sh.`
+        : `${who} schedules run out in ${worst.days} day${worst.days === 1 ? "" : "s"}. Re-run refresh.sh soon.`;
+    document.querySelector(".wordmark").after(div);
+  } catch (e){ /* engine down - plan() already explains that */ }
+})();
+
+/* CURRENT DISRUPTIONS BAR - all active service alerts across the loaded
+   feeds (TTC/YRT/MiWay today), so a rider sees "Line 1 no service" BEFORE
+   planning. Collapsed by default (just a count); tap to expand; the x
+   dismisses it for this browser session. Refreshes every 2 min, skipped
+   while the tab is hidden. Fails silent if the engine is down. */
+const ALERTS_QUERY = `{ alerts { id feed alertHeaderText alertDescriptionText
+  alertUrl alertSeverityLevel effectiveStartDate effectiveEndDate } }`;
+const FEED_LABEL = { TTC:"TTC", YRT:"York/Viva", MIWAY:"MiWay",
+  GO:"GO Transit", UP:"UP Express", BRAMPTON:"Brampton", DRT:"Durham" };
+(function(){
+  const tog = document.getElementById("mmAlertsToggle");
+  const countEl = document.getElementById("mmAlertCount");
+  const listEl = document.getElementById("moreAlerts");
+  const noneEl = document.getElementById("mmNoAlerts");
+  const moreBtn = document.getElementById("moreBtn");
+  // isInitial: the first fetch runs even in a background tab; only the
+  // periodic polling is skipped while hidden.
+  async function refresh(isInitial){
+    if (!isInitial && document.hidden) return;
+    let alerts;
+    try {
+      const r = await fetch(OTP, { method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: ALERTS_QUERY }) });
+      const js = await r.json();
+      if (js.errors) return;                 // schema mismatch: stay silent
+      alerts = cleanAlerts((js.data || {}).alerts)
+        .map(a => ({ ...a, feedLabel: FEED_LABEL[a.feed] || "" }));
+    } catch (e){ return; }                    // engine down: leave menu as-is
+    render(alerts);
+  }
+  function render(alerts){
+    const n = alerts.length;
+    if (!n){
+      tog.hidden = true; listEl.classList.remove("open"); listEl.innerHTML = "";
+      countEl.textContent = ""; noneEl.hidden = false;
+      moreBtn.classList.remove("hasalerts");
+      return;
+    }
+    noneEl.hidden = true; tog.hidden = false;
+    countEl.textContent = n;
+    // the count chip alone left this menu item unnamed in the a11y tree
+    tog.setAttribute("aria-label",
+      `Service alerts, ${n} active`);
+    moreBtn.classList.add("hasalerts");   // amber dot on the ellipsis
+    listEl.innerHTML = alerts.map(a =>
+      `<div class="abitem"><div class="ah">${a.feedLabel
+        ? `<b>${esc(a.feedLabel)}</b> ` : ""}${esc(a.header)}</div>${
+        a.desc ? `<div class="ad">${esc(a.desc)}</div>` : ""}${
+        a.url ? `<a class="al" href="${esc(a.url)}" target="_blank" rel="noopener">Agency page &rarr;</a>` : ""}</div>`
+    ).join("");
+  }
+  refresh(true);
+  setInterval(() => refresh(false), 120000);
+})();
+
+/* ===================== REACH MODE =====================
+   Tap the map -> paint a travel-time "bloom" from that point. Colours
+   come from a switchable scheme. Isochrones from the read-only 2.5
+   "reach" engine on :8090 (walk+transit, tied to the app's date/time).
+   If that engine isn't running, the card says so and nothing else breaks. */
+(function(){
+  const ISO_API = LOCAL ? "http://localhost:8090/otp/traveltime/isochrone" : "/otp/traveltime/isochrone";
+  const CUTS = ["900","1800","2700","3600","4500","5400","6300","7200","8100","9000"];
+  const MINS = { "900":"15","1800":"30","2700":"45","3600":"60","4500":"75","5400":"90",
+    "6300":"105","7200":"120","8100":"135","9000":"150" };
+  const NBANDS = CUTS.length;
+  const SCHEMES = {
+    A: { name:"Heat", ramp:{ "900":"#ff4d3f","1800":"#ff7a34","2700":"#ffa733","3600":"#ffcf3d","4500":"#d9d94f","5400":"#8fd14f","6300":"#46c4a0","7200":"#3fb6c4","8100":"#5a86d6","9000":"#6a6ad4" } },
+    B: { name:"Viridis", ramp:{ "900":"#fde725","1800":"#b5de2b","2700":"#6ece58","3600":"#35b779","4500":"#1f9e89","5400":"#26828e","6300":"#31688e","7200":"#3e4989","8100":"#482878","9000":"#440154" } },
+    C: { name:"Ocean", ramp:{ "900":"#afe0ff","1800":"#8fd3ff","2700":"#6ab8f5","3600":"#4aa9f0","4500":"#3d82db","5400":"#2f66c9","6300":"#2b5cba","7200":"#1e4aa5","8100":"#16388a","9000":"#0d2668" } }
+  };
+  let scheme = store.get("reachScheme") || "B";
+  if (!SCHEMES[scheme]) scheme = "B";
+
+  // Transit reach depends on WHEN you travel (schedules), so we can't truly
+  // ignore time. Instead we anchor every bloom to 8:00 AM on a weekday -
+  // when service (incl. GO) runs fullest - so the map is stable and shows
+  // the best-case reach no matter when the user is looking.
+  function weekdayMorning(){
+    const d = torontoWall(Date.now()); d.setHours(12,0,0,0);  // Toronto's today
+    const wd = d.getDay();                    // 0 Sun .. 6 Sat
+    if (wd === 0) d.setDate(d.getDate() + 1); // Sun -> Mon
+    if (wd === 6) d.setDate(d.getDate() + 2); // Sat -> Mon
+    return torontoISO(isoDay(d), "08:00");
+  }
+
+  const colorExpr = () => {
+    const e = ["match", ["get","time"]];
+    for (const c of CUTS) e.push(c, SCHEMES[scheme].ramp[c]);
+    e.push("#888"); return e;
+  };
+  const opacityExpr = p =>
+    ["*", 0.82, ["max", 0, ["min", 1, ["-", p, ["get","ord"]]]]];
+
+  function firstSymbol(){
+    const ls = map.getStyle().layers;
+    const s = ls.find(l => l.type === "symbol");
+    return s && s.id;
+  }
+  function ensureLayers(fc){
+    for (const f of fc.features) f.properties.ord = f.properties.time/900 - 1;
+    if (map.getSource("reach")){
+      map.getSource("reach").setData(fc);
+    } else {
+      map.addSource("reach", { type:"geojson", data:fc });
+      map.addLayer({ id:"reach-fill", type:"fill", source:"reach",
+        paint:{ "fill-color":colorExpr(), "fill-opacity":opacityExpr(0) } }, firstSymbol());
+    }
+    map.setPaintProperty("reach-fill","fill-color", colorExpr());
+  }
+  function setProgress(p){
+    if (map.getLayer("reach-fill"))
+      map.setPaintProperty("reach-fill","fill-opacity", opacityExpr(p));
+  }
+  function ripple(){
+    const END = NBANDS + 0.6;   // fully revealed just past the outermost band
+    const dur = 1400, t0 = performance.now();
+    (function frame(nowT){
+      if (document.hidden){ setProgress(END); return; }   // don't freeze half-drawn
+      const p = Math.min(1, (nowT - t0)/dur) * END;
+      setProgress(p);
+      if (p < END) requestAnimationFrame(frame);
+    })(performance.now());
+  }
+  function clearReach(){
+    lastReachFC = null;
+    ["reach-fill"].forEach(l => map.getLayer(l) && map.removeLayer(l));
+    map.getSource("reach") && map.removeSource("reach");
+  }
+  /* A theme or map-look change swaps the whole style, which takes our layer
+     with it; the bloom used to vanish until you tapped again. Same pattern
+     as ensureRoute: put it back, fully revealed, whenever it is missing. */
+  let lastReachFC = null, reachRetry = 0;
+  function restoreReach(){
+    if (!lastReachFC || map.getSource("reach")) return;
+    try {
+      ensureLayers(lastReachFC);
+      setProgress(NBANDS + 0.6);
+      reachRetry = 0;
+    } catch (e){ if (reachRetry++ < 40) setTimeout(restoreReach, 250); }
+  }
+  map.on("style.load", restoreReach);
+  map.on("styledata", restoreReach);
+
+  // ---- pulsing "computing" dot at the tapped point ----
+  let pulseMarker = null;
+  function showPulse(lngLat){
+    hidePulse();
+    const el = document.createElement("div");
+    el.className = "reach-pulse";
+    pulseMarker = new maplibregl.Marker({ element: el, anchor:"center" })
+      .setLngLat(lngLat).addTo(map);
+  }
+  function hidePulse(){ if (pulseMarker){ pulseMarker.remove(); pulseMarker = null; } }
+
+  let busy = false;
+  window.__reachTap = async function(lngLat){
+    if (busy) return;
+    busy = true; setStatus("Working out how far you can go…");
+    showPulse(lngLat);
+    try {
+      const iso  = weekdayMorning();
+      const url = ISO_API + "?location=" + lngLat.lat + "," + lngLat.lng
+        + "&time=" + encodeURIComponent(iso) + "&modes=WALK,TRANSIT&arriveBy=false"
+        + CUTS.map(c => "&cutoff=" + MINS[c] + "M").join("");
+      // timeout so a hung engine can't leave reach stuck on "busy" forever.
+      // 30 s, not 15: a full ten-band bloom measured 11-13 s on a laptop
+      // with the engine otherwise idle (2026-10-03), so 15 s failed whenever
+      // anything else was running.
+      const sig = AbortSignal.timeout ? AbortSignal.timeout(30000) : undefined;
+      const r = await fetch(url, { signal: sig });
+      if (!r.ok) throw new Error("http " + r.status);
+      const fc = await r.json();
+      hidePulse();
+      // The engine has answered, so nothing from here on is its fault. If
+      // the map is mid style-load (a look switch, a slow first load), adding
+      // the layer throws; restoreReach then draws it the moment the style is
+      // ready instead of the bloom being lost to "engine isn't running".
+      lastReachFC = fc;
+      try { ensureLayers(fc); ripple(); } catch (e){ restoreReach(); }
+      setStatus("Weekday-morning reach. Tap elsewhere to move it.");
+    } catch (err) {
+      hidePulse();
+      // tell the truth about WHAT failed - a bad tap spot is not a dead engine
+      if (String(err.message).startsWith("http"))
+        setStatus("Couldn't map that spot. Try tapping near a street.");
+      else if (err.name === "TimeoutError" || err.name === "AbortError")
+        setStatus("That took too long. Try again in a moment.");
+      else
+        setStatus("Reach engine isn't running yet. Restart the app (Ctrl+C, then bash run.sh).");
+    } finally { busy = false; }
+  };
+
+  // ---- floating control card ----
+  const card = document.createElement("div");
+  card.id = "reachCard";
+  card.innerHTML = `
+    <button id="reachToggle" type="button" aria-pressed="false"
+      title="Tap the map to see how far you can get by transit">
+      <span class="rt-dot"></span> Reach map</button>
+    <div id="reachBody" hidden>
+      <div class="reach-hint" id="reachStatus">Tap anywhere to see how far you can travel by transit on a weekday morning.</div>
+      <div class="reach-schemes" id="reachSchemes"></div>
+      <div class="reach-bar" id="reachBar"></div>
+      <div class="reach-scale"><span>15 min</span><span>2½ hr</span></div>
+    </div>`;
+  document.body.appendChild(card);
+
+  // a small launcher that brings the card back after it's hidden
+  const launcher = document.createElement("button");
+  launcher.id = "reachLauncher";
+  launcher.type = "button";
+  launcher.title = "Show the reach map";
+  launcher.setAttribute("aria-label", "Show the reach map");
+  launcher.innerHTML = `<svg class="icn" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>`;
+  document.body.appendChild(launcher);
+  const bodyEl = card.querySelector("#reachBody");
+  const toggle = card.querySelector("#reachToggle");
+  function setStatus(t){ const s = document.getElementById("reachStatus"); if (s) s.textContent = t; }
+
+  function paintSchemes(){
+    const wrap = card.querySelector("#reachSchemes"); wrap.innerHTML = "";
+    for (const k of ["A","B","C"]){
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "reach-sw" + (k===scheme ? " on" : "");
+      b.title = SCHEMES[k].name;
+      const bar = CUTS.map(c => `<i style="background:${SCHEMES[k].ramp[c]}"></i>`).join("");
+      b.innerHTML = `<div class="sw-bar">${bar}</div><div class="sw-name">${SCHEMES[k].name}</div>`;
+      b.onclick = () => {
+        scheme = k; store.set("reachScheme", k);
+        paintSchemes(); paintLegend();
+        if (map.getLayer("reach-fill")) map.setPaintProperty("reach-fill","fill-color", colorExpr());
+      };
+      wrap.appendChild(b);
+    }
+  }
+  function paintLegend(){
+    const bar = card.querySelector("#reachBar");
+    const stops = CUTS.map((c,i) =>
+      SCHEMES[scheme].ramp[c] + " " + Math.round(i/(NBANDS-1)*100) + "%").join(",");
+    bar.style.background = "linear-gradient(to right," + stops + ")";
+  }
+
+  function setMode(on){
+    window.__reachMode = on;
+    toggle.classList.toggle("on", on);
+    toggle.setAttribute("aria-pressed", on ? "true" : "false");
+    bodyEl.hidden = !on;
+    if (!on){ clearReach(); hidePulse(); }
+    map.getCanvas().style.cursor = on ? "crosshair" : "";
+  }
+  toggle.onclick = () => setMode(!window.__reachMode);
+
+  // ---- hide / show the reach panel (persisted) ----
+  // The icon now lives in the column permanently and works as the toggle;
+  // the panel hangs to its left. Hiding still stops tap-to-bloom and clears
+  // the bloom, so a closed panel can't leave colours stranded on the map.
+  /* The launcher is a toggle, so its label has to say what the NEXT press
+     does. It used to be a fixed "Show the reach map", which meant that with
+     the card open you had an X labelled "Hide the reach map" sitting 18px
+     from a button labelled "Show the reach map" - two controls, opposite
+     labels, same action. */
+  function labelLauncher(shown){
+    const t = shown ? "Hide the reach map" : "Show the reach map";
+    launcher.title = t;
+    launcher.setAttribute("aria-label", t);
+    launcher.setAttribute("aria-pressed", shown ? "true" : "false");
+  }
+  function showReach(persist){
+    window.__closeLookPop && window.__closeLookPop();  // both hang at right:62
+    card.style.display = "";
+    launcher.classList.add("on");
+    labelLauncher(true);
+    if (persist) store.set("reachHidden", "0");
+  }
+  function hideReach(persist){
+    setMode(false);                 // stop tap-to-bloom + clear any bloom
+    card.style.display = "none";
+    launcher.classList.remove("on");
+    labelLauncher(false);
+    if (persist) store.set("reachHidden", "1");
+  }
+  window.__closeReachCard = () => hideReach(false);
+  launcher.onclick = () =>
+    (card.style.display === "none" ? showReach : hideReach)(true);
+  if (store.get("reachHidden") === "1") hideReach(false);
+  else { launcher.classList.add("on"); labelLauncher(true); }
+
+  paintSchemes(); paintLegend();
+})();

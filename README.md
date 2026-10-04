@@ -78,9 +78,9 @@ worth checking again.
 The routing engine is [OpenTripPlanner 2.9](https://www.opentripplanner.org/),
 built from each agency's GTFS feed and an OpenStreetMap extract of the GTA,
 with a small patch that tags commuter lots OpenStreetMap is missing. The web
-app is a single page (`web/index.html`, with its fare, toll and ranking rules
-in `web/core.js`) that queries OpenTripPlanner's GraphQL API and renders the
-map with [MapLibre GL JS](https://maplibre.org/) on
+app is a single page (`web/index.html`, its code in `web/app.js` and its fare,
+toll and ranking rules in `web/core.js`) that queries OpenTripPlanner's GraphQL
+API and renders the map with [MapLibre GL JS](https://maplibre.org/) on
 [OpenFreeMap](https://openfreemap.org/) tiles.
 
 OpenTripPlanner has no concept of fares for most of these agencies or of
@@ -128,7 +128,7 @@ python3 tests/benchmark.py -v     # print each itinerary in full
 ## Project structure
 
 ```
-web/                 the web app (index.html; its rules in core.js), plus the data files it loads
+web/                 the web app (index.html, app.js; its rules in core.js), plus the data files it loads
 engine/              OpenTripPlanner configuration; downloaded feeds, map and graphs go here
 scripts/             data generation (fares, tolls, transit lines, feed patches)
 tests/               unit tests and the routing benchmark
