@@ -6,6 +6,10 @@
 
 set -e  # stop on first error
 cd "$(dirname "$0")"
+# the engine reads router-config.json even to build a graph, and refuses to
+# start without the Metrolinx key and GTA_ROUTER_DIR it names. Checked first,
+# so a missing metrolinx.env stops here, not after a 1.5 GB download.
+. scripts/engine-env.sh
 
 echo "=== Step 1/6: Installing Java 25 and osmium (via Homebrew) ==="
 if ! command -v brew &> /dev/null; then

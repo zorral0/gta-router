@@ -24,6 +24,8 @@
 
 set -e
 cd "$(dirname "$0")/engine"   # feeds, jars and graphs live in engine/
+# the engine reads router-config.json even to build, and needs these to
+. ../scripts/engine-env.sh
 
 # refuse to run alongside the servers: the build needs the RAM, and
 # swapping graph files under a live engine helps nobody
