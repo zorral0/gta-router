@@ -388,6 +388,10 @@
     color: var(--bad); font-size: 11.5px; font-weight: 600;
     border-radius: 10px; padding: 7px 10px; margin: -4px 2px 10px; }
   .card:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  #results.quiet .card { animation: none; }
+  .pendingline { display: flex; align-items: center; gap: 8px; color: var(--muted);
+    font-size: 12px; padding: 2px 4px 10px; }
+  .pendingline .spinner { width: 12px; height: 12px; border-width: 2px; }
   .loading { display: flex; align-items: center; justify-content: center;
     gap: 10px; color: var(--muted); padding: 28px 0; font-size: 12.5px; }
   .spinner { width: 16px; height: 16px; border-radius: 50%;
@@ -2506,6 +2510,8 @@ function friendlyErr(e){
 }
 
 let planCtrl = null, planSeq = 0;
+// the trip you opened while results were still arriving (see plan)
+let pickedSig = null;
 async function plan(){
   if (!fromPt || !toPt) return;
   closeDetail();
@@ -2526,24 +2532,43 @@ async function plan(){
     const t = document.getElementById("loadTxt");
     if (t && seq === planSeq)
       t.innerHTML = `Comparing your options&hellip; ${done}/${active.length}`; };
-  const parts = await Promise.all(active.map(async c => {
+  /* Results go up as each mode mix answers instead of all at the end: the
+     21 queries take 5-12 s together, but Transit only is back in about one.
+     Each arrival re-ranks everything so far. Until you open a card the
+     highlight follows the best trip; once you do, it stays on yours. Only
+     the first paint moves the map. */
+  pickedSig = null;
+  const parts = active.map(c => ({ c, its: [], pending: true }));
+  let shown = false;
+  const paint = () => {
+    if (seq !== planSeq) return;   // superseded, or Clear was pressed
+    const settled = parts.filter(p => !p.pending);
+    const left = parts.length - settled.length;
+    // nothing to show yet: keep the spinner, rather than flash "No sensible
+    // route" (or a lone error) while most of the answers are still out
+    if (left && !settled.some(p => visibleIts(p).length)) return;
+    lastParts = settled;
+    renderResults(settled, { selectSig: pickedSig, noFit: shown, noSweep: shown,
+                             quiet: shown, pending: left });
+    shown = true;
+  };
+  await Promise.all(active.map(async (c, i) => {
     try {
-      if (!c.drive) return { c, its: await fetchCombo(c, date, time, null, ctrl.signal) };
-      // Drive queries run once per DRIVE_RELUCTANCE and are merged, so the
-      // drive slider always has near, middle and far lots to choose from
-      // without re-querying.
-      const rels = DRIVE_RELUCTANCE.concat(c.extraReluctance || []);
-      const tries = await Promise.all(rels.map(r =>
-        fetchCombo(c, date, time, r, ctrl.signal)));
-      return { c, its: spreadByDrive(dedupeAlts([].concat(...tries))) };
+      if (!c.drive) parts[i] = { c, its: await fetchCombo(c, date, time, null, ctrl.signal) };
+      else {
+        // Drive queries run once per DRIVE_RELUCTANCE and are merged, so the
+        // drive slider always has near, middle and far lots to choose from
+        // without re-querying.
+        const rels = DRIVE_RELUCTANCE.concat(c.extraReluctance || []);
+        const tries = await Promise.all(rels.map(r =>
+          fetchCombo(c, date, time, r, ctrl.signal)));
+        parts[i] = { c, its: spreadByDrive(dedupeAlts([].concat(...tries))) };
+      }
     }
-    catch (e){ return { c, err: friendlyErr(e) }; }
-    finally { tick(); }
+    catch (e){ parts[i] = { c, err: friendlyErr(e) }; }
+    finally { tick(); paint(); }
   }));
   clearTimeout(timer);
-  if (seq !== planSeq) return;   // superseded while we were waiting
-  lastParts = parts;
-  renderResults(parts);
 }
 
 function cardHTML(it, cid, fastestIt, cheapestIt, latestIt){
@@ -2672,7 +2697,13 @@ function renderResults(parts, opts){
         <button class="morebtn" aria-expanded="false" onclick="toggleMore('exAll', this,
           ${rest.length})">${rest.length} more option${rest.length > 1 ? "s" : ""} ${icn("chev")}</button>`;
   }
-  document.getElementById("results").innerHTML = html;
+  if (opts.pending)
+    html += `<div class="pendingline"><div class="spinner"></div>Still checking
+      ${opts.pending} more way${opts.pending > 1 ? "s" : ""} to go&hellip;</div>`;
+  const resultsBox = document.getElementById("results");
+  // a repaint while answers arrive must not replay every card's entrance
+  resultsBox.classList.toggle("quiet", !!opts.quiet);
+  resultsBox.innerHTML = html;
   if (opts.animateFrom){   // prices roll over from the previous fare type
     for (const [cid, it] of Object.entries(itinsById)){
       const el = document.getElementById(cid);
@@ -2692,7 +2723,7 @@ function renderResults(parts, opts){
     if (hit) pick = hit[0];
   }
   if (pick) window.select(pick, { fit: !opts.noFit, sweep: !opts.noSweep });
-  if (pool.length) revealResults();
+  if (pool.length && !opts.quiet) revealResults();
 }
 /* With Trip options open, the results sit below ~380px of toggles, so a
    re-plan you triggered from those toggles landed out of sight. Bring the
@@ -2807,6 +2838,7 @@ resultsEl.addEventListener("mouseout", e => {
 
 /* ---- trip detail view ---- */
 window.openIt = function(cid){
+  if (itinsById[cid]) pickedSig = itinSig(itinsById[cid]);
   window.select(cid);
   renderDetail(cid);
   document.body.classList.add("detail-open");
@@ -3891,15 +3923,21 @@ const FEED_LABEL = { TTC:"TTC", YRT:"York/Viva", MIWAY:"MiWay",
       const url = ISO_API + "?location=" + lngLat.lat + "," + lngLat.lng
         + "&time=" + encodeURIComponent(iso) + "&modes=WALK,TRANSIT&arriveBy=false"
         + CUTS.map(c => "&cutoff=" + MINS[c] + "M").join("");
-      // timeout so a hung engine can't leave reach stuck on "busy" forever
-      const sig = AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined;
+      // timeout so a hung engine can't leave reach stuck on "busy" forever.
+      // 30 s, not 15: a full ten-band bloom measured 11-13 s on a laptop
+      // with the engine otherwise idle (2026-10-03), so 15 s failed whenever
+      // anything else was running.
+      const sig = AbortSignal.timeout ? AbortSignal.timeout(30000) : undefined;
       const r = await fetch(url, { signal: sig });
       if (!r.ok) throw new Error("http " + r.status);
       const fc = await r.json();
       hidePulse();
-      ensureLayers(fc);
+      // The engine has answered, so nothing from here on is its fault. If
+      // the map is mid style-load (a look switch, a slow first load), adding
+      // the layer throws; restoreReach then draws it the moment the style is
+      // ready instead of the bloom being lost to "engine isn't running".
       lastReachFC = fc;
-      ripple();
+      try { ensureLayers(fc); ripple(); } catch (e){ restoreReach(); }
       setStatus("Weekday-morning reach. Tap elsewhere to move it.");
     } catch (err) {
       hidePulse();
