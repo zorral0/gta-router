@@ -81,51 +81,53 @@ def js_scalar(src, name):
     return float(m.group(1)) if m else None
 
 
-def loaded_agencies():
-    payload = json.dumps({"query": "{agencies{name}}"}).encode()
+def loaded_feeds():
+    payload = json.dumps({"query": "{agencies{gtfsId}}"}).encode()
     req = urllib.request.Request(
         OTP_URL, data=payload, headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=30) as resp:
         data = json.load(resp)
-    return sorted({a["name"] for a in data["data"]["agencies"]})
+    return sorted({a["gtfsId"].split(":")[0] for a in data["data"]["agencies"]})
 
 
 def check_feeds(js_rows, problems):
-    """Every agency the graph actually loads should have a fare row. This is
-    the check that would have caught the Halton gap."""
+    """Every feed the RUNNING graph actually holds should have a fare row (a
+    stale graph can differ from build-config.json)."""
     if "--feeds" not in sys.argv:
         return
     try:
-        agencies = loaded_agencies()
+        feeds = loaded_feeds()
     except Exception as e:
         print(f"feeds: could not reach the engine ({e}). Is it running?")
         return
-    for name in agencies:
-        upper = name.upper()
-        # GO and UP are priced by their own rules, not by LOCAL_FARES
-        if "GO" in upper or "UP" in upper:
-            continue
-        hits = [row[0] for row in js_rows if row[0] in upper]
-        if not hits:
-            problems.append(f"{name}: loaded in the graph but has no fare "
+    keys = {row[0] for row in js_rows}
+    for feed in feeds:
+        if feed not in OWN_RULES and feed not in keys:
+            problems.append(f"{feed}: loaded in the graph but has no fare "
                             f"row, so its legs price as $0")
-        elif len(hits) > 1:
-            problems.append(f"{name}: matches several fare rows ({', '.join(hits)}); "
-                            f"the app silently takes the first")
-    print(f"feeds: {len(agencies)} agencies in the graph checked")
+    print(f"feeds: {len(feeds)} feeds in the running graph checked")
 
 
-# Agency names that must NOT pick up any fare row: the trap with substring
-# matching is a short key landing inside a longer, unrelated name.
-NOT_MODELLED = ["HAMILTON STREET RAILWAY", "GRAND RIVER TRANSIT",
-                "GUELPH TRANSIT", "BARRIE TRANSIT"]
 PROGRAMMES = {"onefare", "gocofare"}
+# priced by their own rules (the GO fare table, the UP fares), not LOCAL_FARES
+OWN_RULES = {"GO", "UP"}
+
+
+def built_feeds():
+    """The feedIds engine/build-config.json builds the graph from. The file
+    allows // comments, which json does not."""
+    with open(os.path.join(ROOT, "engine", "build-config.json")) as fh:
+        text = re.sub(r"(?m)^\s*//[^\n]*", "", fh.read())
+    return {f["feedId"] for f in json.loads(text)["transitFeeds"]}
 
 
 def check_rows(js_rows, problems):
-    """Sanity checks on the fare table itself. Unlike the two-copy diff these
-    need nothing local, so they run everywhere, GitHub included."""
+    """Sanity checks on the fare table itself, against the feeds the graph is
+    built from. Needs nothing local, so it runs everywhere, GitHub included.
+    This is the check that would have caught the Halton gap at the moment
+    the three feeds were added to build-config.json."""
     keys = [r[0] for r in js_rows]
+    feeds = built_feeds()
     for r in js_rows:
         if len(r) != 5:
             problems.append(f"{r[0]}: expected 5 columns, found {len(r)}")
@@ -141,16 +143,14 @@ def check_rows(js_rows, problems):
             problems.append(f"{key}: transfer programme {prog!r} is not one of {sorted(PROGRAMMES)}")
         if keys.count(key) > 1:
             problems.append(f"{key}: appears more than once")
-    for a in keys:
-        for b in keys:
-            if a != b and a in b:
-                problems.append(f"{a}: is inside {b}, so the first one listed "
-                                f"would catch the other agency's legs")
-    for name in NOT_MODELLED:
-        hit = [k for k in keys if k in name]
-        if hit:
-            problems.append(f"{name}: would be priced as {hit[0]}")
-    print(f"LOCAL_FARES: {len(js_rows)} rows sanity-checked")
+        if key not in feeds:
+            problems.append(f"{key}: no such feedId in engine/build-config.json, "
+                            f"so this fare row can never match")
+    for feed in sorted(feeds - OWN_RULES - set(keys)):
+        problems.append(f"{feed}: built into the graph but has no fare row, "
+                        f"so its legs price as $0")
+    print(f"LOCAL_FARES: {len(js_rows)} rows checked against "
+          f"{len(feeds)} feeds in build-config.json")
 
 
 def report(problems):
