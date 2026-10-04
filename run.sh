@@ -5,22 +5,15 @@
 
 cd "$(dirname "$0")"
 
-# 0) The GO real-time feeds need a free Metrolinx key. It lives in
-#    metrolinx.env, which is never uploaded to GitHub. router-config.json
-#    reads it as ${METROLINX_KEY}; without it the engine won't start.
-if [ ! -f metrolinx.env ]; then
-  echo "Missing metrolinx.env. Copy metrolinx.env.example to metrolinx.env"
-  echo "and put your Metrolinx Open Data key in it."
-  exit 1
-fi
-set -a; . ./metrolinx.env; set +a
+# 0) The Metrolinx key and GTA_ROUTER_DIR, which router-config.json needs;
+#    without them the engine won't start (see scripts/engine-env.sh)
+. scripts/engine-env.sh || exit 1
 
 # 0b) Metrolinx's alerts feed ships empty agency_id/route_id fields that make
 #     OTP throw once a minute and drop EVERY GO alert. This rewrites a clean
 #     copy next to this script; router-config.json reads that file instead of
 #     the live URL. One pass now so the file exists before the engine starts,
 #     then a loop to keep it fresh.
-export GTA_ROUTER_DIR="$(pwd)"
 python3 scripts/go-alerts-filter.py --once >/dev/null 2>&1 \
   || echo "Note: GO service alerts could not be fetched. Everything else still works."
 # Its log (one line a minute, errors included) is engine/go-alerts.log.

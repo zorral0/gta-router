@@ -32,6 +32,8 @@ import tempfile
 import time
 import urllib.request
 
+from pbwire import emit, walk  # shared wire-format helpers
+
 FEED_URL = ("https://api.openmetrolinx.com/OpenDataAPI/api/V1/Gtfs.proto"
             "/Feed/Alerts")
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -47,59 +49,6 @@ F_TRIP = 4                    # EntitySelector.trip
 TRIP_IDS = {1, 5}             # TripDescriptor trip_id, route_id
 
 stripped = 0
-
-
-def read_varint(buf, i):
-    v = shift = 0
-    while True:
-        b = buf[i]
-        i += 1
-        v |= (b & 0x7F) << shift
-        if not b & 0x80:
-            return v, i
-        shift += 7
-
-
-def write_varint(v):
-    out = bytearray()
-    while True:
-        b = v & 0x7F
-        v >>= 7
-        out.append(b | (0x80 if v else 0))
-        if not v:
-            return bytes(out)
-
-
-def walk(buf):
-    """Yield (field_no, wire_type, raw_value) for one message."""
-    i, n = 0, len(buf)
-    while i < n:
-        tag, i = read_varint(buf, i)
-        fn, wt = tag >> 3, tag & 7
-        if wt == 0:
-            v, i = read_varint(buf, i)
-            yield fn, wt, v
-        elif wt == 2:
-            ln, i = read_varint(buf, i)
-            yield fn, wt, buf[i:i + ln]
-            i += ln
-        elif wt == 5:
-            yield fn, wt, buf[i:i + 4]
-            i += 4
-        elif wt == 1:
-            yield fn, wt, buf[i:i + 8]
-            i += 8
-        else:
-            raise ValueError(f"unsupported wire type {wt}")
-
-
-def emit(fn, wt, val):
-    tag = write_varint((fn << 3) | wt)
-    if wt == 0:
-        return tag + write_varint(val)
-    if wt == 2:
-        return tag + write_varint(len(val)) + val
-    return tag + val
 
 
 def clean_trip(buf):
