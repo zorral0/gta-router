@@ -2401,7 +2401,7 @@ const PC_QUERY = `query PC($origin:PlanLabeledLocationInput!,
       legs{ mode distance duration headsign rentedBike
             start{scheduledTime estimated{time}}
             end{scheduledTime estimated{time}}
-            agency{name} route{shortName longName color}
+            agency{gtfsId name} route{shortName longName color}
             from{name lat lon stop{gtfsId}} to{name lat lon stop{gtfsId}}
             stopCalls{stopLocation{... on Stop {name}}}
             alerts{ id alertHeaderText alertDescriptionText alertUrl
@@ -2445,15 +2445,12 @@ function routeColor(r){
   const c = ((r || {}).color || "").replace(/^#/, "");
   return /^[0-9a-f]{6}$/i.test(c) ? "#" + c : null;
 }
-function agencyColor(a){
-  if (a.includes("GO")) return "#256434";
-  if (a.includes("UP")) return "#6d4c2f";
-  if (a.includes("TTC") || a.includes("TORONTO")) return "#c8102e";
-  if (a.includes("YORK")) return "#0072bc";
-  if (a.includes("MIWAY")) return "#e77817";
-  if (a.includes("DURHAM")) return "#00703c";
-  if (a.includes("BRAMPTON")) return "#005daa";
-  return "#666";
+/* the agency's own colour, for routes whose feed gives none (keyed by
+   feed id, see feedOf in core.js) */
+const FEED_COLOR = { GO: "#256434", UP: "#6d4c2f", TTC: "#c8102e", YRT: "#0072bc",
+  MIWAY: "#e77817", DRT: "#00703c", BRAMPTON: "#005daa" };
+function agencyColor(l){
+  return isUP(l) ? FEED_COLOR.UP : (FEED_COLOR[feedOf(l)] || "#666");
 }
 /* the card's mode sequence, Apple-style: a glyph per real leg (transit legs
    also carry their colored route badge), joined by chevrons, with a trailing
@@ -2469,7 +2466,7 @@ function legRow(it){
       parts.push(`<span class="lg" title="${l.rentedBike ? "Bike Share" : "Your bike"}">${icn("bike")}</span>`);
     else if (TRANSIT.has(l.mode)){
       const r = l.route || {}, name = r.shortName || r.longName || "";
-      const bg = routeColor(r) || agencyColor(agencyOf(l));
+      const bg = routeColor(r) || agencyColor(l);
       parts.push(`<span class="lg" title="${esc(r.longName || name)}">`
         + `<span class="rt" style="background:${bg}">${esc(name)}</span>`
         + icn(modeIcon(l.mode)) + `</span>`);
@@ -2729,7 +2726,7 @@ function modeColor(l){
   if (l.mode === "WALK") return darkMql.matches ? "#98989d" : "#8e8e93";
   if (l.mode === "BICYCLE") return "#34c759";
   if (l.mode === "CAR") return darkMql.matches ? "#aeaeb2" : "#48484a";
-  return routeColor(l.route) || agencyColor(agencyOf(l));
+  return routeColor(l.route) || agencyColor(l);
 }
 /* a darker shade of the same color - the route line's outline */
 function shade(hex, f){
@@ -2851,9 +2848,9 @@ function renderDetail(cid){
       sawTransit = true;
       const r = l.route || {};
       const stops = (l.intermediatePlaces || []).length + 1;
-      const bg = routeColor(r) || agencyColor(agencyOf(l));
+      const bg = routeColor(r) || agencyColor(l);
       what = `<span class="rt" style="background:${bg}">${esc(r.shortName || r.longName || "")}</span>
-        ${esc(prettyAgency(agencyOf(l)))}`
+        ${esc(prettyAgency(l))}`
         + (l.headsign ? ` <span style="font-weight:500;color:var(--muted)">&middot; ${esc(to12h(tidyName(l.headsign)))}</span>` : "");
       sub = `Board at ${esc(tidyName(l.from.name))} &middot; ride ${stops} stop${stops>1?"s":""}
              (${mins} min) &middot; get off at ${esc(tidyName(l.to.name))}`;

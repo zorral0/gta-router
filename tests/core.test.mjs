@@ -31,14 +31,16 @@ const T0 = Date.parse("2026-10-06T12:00:00Z");          // Tue 8:00 AM Toronto
 const leg = (mode, startMin, endMin, o = {}) => ({
   mode, distance: o.dist ?? 1000, duration: (endMin - startMin) * 60,
   rentedBike: !!o.rented, startTime: T0 + startMin * 60000, endTime: T0 + endMin * 60000,
-  agency: o.ag ? { name: o.ag } : null, route: o.rt ? { shortName: o.rt } : null,
+  // agencies by feed id, the way the engine's gtfsId carries them ("TTC:1")
+  agency: o.ag ? { gtfsId: o.ag + ":1", name: o.ag } : null,
+  route: o.rt || o.rtLong ? { shortName: o.rt || "", longName: o.rtLong || "" } : null,
   from: { name: o.from || "A", stop: o.fs ? { gtfsId: o.fs } : null },
   to: { name: o.to || "B", stop: o.ts ? { gtfsId: o.ts } : null },
   legGeometry: o.geom ? { points: o.geom } : null,
 });
 const trip = (...legs) => ({ legs, duration: (legs.at(-1).endTime - legs[0].startTime) / 1000,
                              startTime: legs[0].startTime, endTime: legs.at(-1).endTime });
-const TTC = "Toronto Transit Commission", YRT = "York Region Transit", GO = "GO Transit";
+const TTC = "TTC", YRT = "YRT", GO = "GO";
 const cost = (core, it) => core("itineraryCostDetail")(it);
 const money = x => Math.round(x * 100) / 100;
 
@@ -89,16 +91,16 @@ test("One Fare: YRT then TTC pays YRT only", () => {
 });
 
 test("Halton co-fare: Oakville is free with GO but NOT on a TTC transfer", () => {
-  const withGo = trip(leg("BUS", 0, 10, { ag: "Oakville Transit" }), leg("RAIL", 12, 50, { ag: GO, dist: 30000 }));
+  const withGo = trip(leg("BUS", 0, 10, { ag: "OAKVILLE" }), leg("RAIL", 12, 50, { ag: GO, dist: 30000 }));
   const free = cost(load(), withGo).items.find(x => x.label.startsWith("Oakville"));
   assert.equal(free.amount, 0);
-  const withTtc = trip(leg("BUS", 0, 10, { ag: "Oakville Transit" }), leg("SUBWAY", 12, 30, { ag: TTC }));
+  const withTtc = trip(leg("BUS", 0, 10, { ag: "OAKVILLE" }), leg("SUBWAY", 12, 30, { ag: TTC }));
   assert.equal(money(cost(load(), withTtc).total), money(3.50 + 3.30));
 });
 
 test("Burlington youth ride free on weekday evenings and weekends only", () => {
   const core = load({ rider: "youth" });
-  const at = iso => trip({ ...leg("BUS", 0, 10, { ag: "Burlington Transit" }), startTime: Date.parse(iso) });
+  const at = iso => trip({ ...leg("BUS", 0, 10, { ag: "BURLINGTON" }), startTime: Date.parse(iso) });
   assert.equal(cost(core, at("2026-10-06T22:30:00Z")).total, 0);       // Tue 6:30 PM
   assert.equal(money(cost(core, at("2026-10-06T21:30:00Z")).total), 2); // Tue 5:30 PM
   assert.equal(cost(core, at("2026-10-10T16:00:00Z")).total, 0);       // Sat noon
@@ -106,7 +108,7 @@ test("Burlington youth ride free on weekday evenings and weekends only", () => {
 });
 
 test("UP Express charges the Pearson fare only on airport trips", () => {
-  const up = to => trip(leg("RAIL", 0, 25, { ag: "UP Express", from: "Union Station", to }));
+  const up = to => trip(leg("RAIL", 0, 25, { ag: "UP", from: "Union Station", to }));
   assert.equal(money(cost(load(), up("Pearson Airport Terminal 1")).total), 9.25);
   assert.equal(money(cost(load({ rider: "youth" }), up("Pearson Airport Terminal 1")).total), 7.41);
   assert.equal(money(cost(load(), up("Bloor")).total), 5.02);
@@ -124,10 +126,19 @@ test("driving to a station costs gas and wear, with no parking fee", () => {
   assert.ok(!items.some(x => /parking/i.test(x.label)));
 });
 
-test("MILTON TRANSIT does not catch Hamilton", () => {
-  const core = load();
-  assert.equal(core(`prettyAgency("HAMILTON STREET RAILWAY")`), "HAMILTON STREET RAILWAY");
-  assert.equal(core(`prettyAgency("MILTON TRANSIT")`), "Milton Transit");
+test("an agency the fare table doesn't know is never priced as another one", () => {
+  // the old name matching priced Hamilton as Milton; by feed id it can't happen
+  const it = trip(leg("BUS", 0, 20, { ag: "HSR" }));
+  assert.equal(cost(load(), it).items.length, 0);
+  assert.equal(load()("prettyAgency")({ agency: { gtfsId: "MILTON:0", name: "x" } }), "Milton Transit");
+});
+
+test("UP Express replacement buses in the GO feed charge the UP fare, not GO's", () => {
+  const bus = trip(leg("BUS", 0, 40, { ag: GO, rtLong: "Union Pearson Express",
+    from: "Union Station Bus Terminal", to: "Pearson Airport Terminal 1" }));
+  const { total, items } = cost(load(), bus);
+  assert.equal(money(total), 9.25);
+  assert.ok(items[0].label.startsWith("UP Express"));
 });
 
 /* ===================== tolls ===================== */

@@ -53,14 +53,14 @@ function torontoISO(date, time){
 }
 
 /* ---- fare model ---- */
-// [name-match, adult fare, youth fare (null = not modelled), verified?]
 // verified against each agency's official fare page (July 2026, Halton
-// 2026-09-19)
-// (PRESTO-level; unverified fares would say so in the UI via the flag)
-/* [match key, adult, youth (null = no youth rate modelled), verified,
-    transfer program]. The key is matched as a SUBSTRING of the uppercased
-    agency name, so it has to be long enough not to collide: "MILTON" alone
-    also matches HAMILTON.
+// 2026-09-19); PRESTO-level, and an unverified fare says so in the UI
+/* [feed id, adult, youth (null = no youth rate modelled), verified,
+    transfer program]. The feed id is the one in engine/build-config.json,
+    which is also the prefix of every agency's gtfsId (see feedOf). These
+    used to be matched against agency NAMES by substring, which is how a
+    "MILTON" key once caught HAMILTON. tests/fare-sync.py checks every
+    loaded feed has a row.
 
     The transfer program decides who rides free, and the two are not the
     same thing:
@@ -71,9 +71,9 @@ function torontoISO(date, time){
                 Each runs its own GO co-fare instead, which makes the local
                 ride free when the trip touches GO, but a transfer from the
                 TTC with no GO in it is paid in full. */
-const LOCAL_FARES = [["TTC",3.30,2.35,true,"onefare"],["TORONTO",3.30,2.35,true,"onefare"],
-                     ["YORK",4.24,3.29,true,"onefare"],["MIWAY",3.50,2.90,true,"onefare"],
-                     ["DURHAM",3.84,3.46,true,"onefare"],["BRAMPTON",3.55,2.95,true,"onefare"],
+const LOCAL_FARES = [["TTC",3.30,2.35,true,"onefare"],
+                     ["YRT",4.24,3.29,true,"onefare"],["MIWAY",3.50,2.90,true,"onefare"],
+                     ["DRT",3.84,3.46,true,"onefare"],["BRAMPTON",3.55,2.95,true,"onefare"],
                      // Halton, verified 2026-09-19. Oakville youth 13-19 ride
                      // FREE every day with PRESTO. Burlington youth also ride
                      // free on weekdays after 6 pm and at weekends, which is
@@ -85,7 +85,7 @@ const LOCAL_FARES = [["TTC",3.30,2.35,true,"onefare"],["TORONTO",3.30,2.35,true,
                      // all weekend: see burlingtonYouthFree(), which is a rule
                      // rather than a number because it depends on the clock.
                      ["BURLINGTON",2.85,2.00,true,"gocofare"],
-                     ["MILTON TRANSIT",3.85,2.90,true,"gocofare"]];
+                     ["MILTON",3.85,2.90,true,"gocofare"]];
 // UP PRESTO fares: any trip to or from Pearson pays the airport fare;
 // city-only trips (Union, Bloor, Weston) are 4.71-5.02, top modelled.
 const GO_BASE = 3.70, GO_PER_KM = 0.11, UP_FARE = 9.25, UP_PEARSON_YOUTH = 7.41,
@@ -110,20 +110,23 @@ function goTableFare(fromStop, toStop){
   return p ?? null;
 }
 
-function agencyOf(l){ return ((l.agency||{}).name||"").toUpperCase(); }
-function prettyAgency(a){
-  if (a.includes("GO")) return "GO Transit";
-  if (a.includes("UP")) return "UP Express";
-  if (a.includes("TTC") || a.includes("TORONTO")) return "TTC";
-  if (a.includes("YORK")) return "YRT";
-  if (a.includes("MIWAY")) return "MiWay";
-  if (a.includes("DURHAM")) return "DRT";
-  if (a.includes("BRAMPTON")) return "Brampton Transit";
-  if (a.includes("OAKVILLE")) return "Oakville Transit";
-  if (a.includes("BURLINGTON")) return "Burlington Transit";
-  // full name, not "MILTON": the short key also matches HAMILTON
-  if (a.includes("MILTON TRANSIT")) return "Milton Transit";
-  return a;
+/* Which feed a leg belongs to: the prefix of its agency's gtfsId ("GO:GO",
+   "TTC:1", "MILTON:0"), the same ids as engine/build-config.json. */
+function feedOf(l){ return (((l.agency || {}).gtfsId) || "").split(":")[0]; }
+/* UP Express replacement buses run inside the GO feed as route 35, "Union
+   Pearson Express" (they ran 2026-09-11 to 09-20). They charge the UP fare,
+   so they count as UP, not GO. */
+const isUP = l => feedOf(l) === "UP"
+  || /union pearson/i.test((l.route || {}).longName || "");
+const isGO = l => feedOf(l) === "GO" && !isUP(l);
+const FEED_NAME = { GO: "GO Transit", UP: "UP Express", TTC: "TTC", YRT: "YRT",
+  MIWAY: "MiWay", DRT: "DRT", BRAMPTON: "Brampton Transit",
+  OAKVILLE: "Oakville Transit", BURLINGTON: "Burlington Transit",
+  MILTON: "Milton Transit" };
+/* the name a rider knows the leg's agency by */
+function prettyAgency(l){
+  if (isUP(l)) return "UP Express";
+  return FEED_NAME[feedOf(l)] || (l.agency || {}).name || "Transit";
 }
 
 /* Burlington youth 13-19 ride free on weekdays after 6 pm and all weekend
@@ -141,7 +144,7 @@ function burlingtonYouthFree(ms){
 function itineraryCostDetail(it){
   const legs = it.legs, tlegs = legs.filter(l => TRANSIT.has(l.mode));
   const items = [];
-  const goLegs = tlegs.filter(l => agencyOf(l).includes("GO"));
+  const goLegs = tlegs.filter(isGO);
   const usedGo = goLegs.length > 0;
   if (usedGo){
     const exact = goTableFare(stopIdOf(goLegs[0].from),
@@ -156,7 +159,7 @@ function itineraryCostDetail(it){
     if (rider === "youth"){ f *= GO_YOUTH_FACTOR; label += ", youth 40% off"; }
     items.push({ label, amount: f });
   }
-  const upLegs = tlegs.filter(l => agencyOf(l).includes("UP"));
+  const upLegs = tlegs.filter(isUP);
   if (upLegs.length){
     const airport = upLegs.some(l => [l.from, l.to].some(
       e => ((e && e.name) || "").toUpperCase().includes("PEARSON")));
@@ -168,10 +171,10 @@ function itineraryCostDetail(it){
   }
   const ridden = [];
   for (const l of tlegs){
-    const a = agencyOf(l);
-    const hit = LOCAL_FARES.find(([k]) => a.includes(k));
-    if (hit && !ridden.some(r => r.a === a))
-      ridden.push({ a, key: hit[0], at: l.startTime,
+    const feed = feedOf(l);
+    const hit = LOCAL_FARES.find(([k]) => k === feed);
+    if (hit && !ridden.some(r => r.key === feed))
+      ridden.push({ leg: l, key: hit[0], at: l.startTime,
                     fare: (rider === "youth" && hit[2] != null) ? hit[2] : hit[1],
                     ver: hit[3], prog: hit[4] });
   }
@@ -190,7 +193,7 @@ function itineraryCostDetail(it){
         && burlingtonYouthFree(r.at)){
       free = true; why = "youth, evenings and weekends";
     }
-    items.push({ label: prettyAgency(r.a)
+    items.push({ label: prettyAgency(r.leg)
       + (free ? `, free (${why})`
               : (r.ver ? "" : ", fare unverified")), amount: free ? 0 : r.fare });
   });
