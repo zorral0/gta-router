@@ -6,7 +6,7 @@ benchmark.py asks "is the answer sane?". This asks a harder question:
 
 Two searches run for every trip.
 
-  APP     - a faithful mirror of what web/index.html fires: the twelve mode
+  APP     - a faithful mirror of what web/core.js fires: the twelve mode
             mixes in COMBOS, the three DRIVE_RELUCTANCE values on every
             drive combo, first:8, the same result filters, pooled and
             reduced to the same Pareto lead set.
@@ -71,7 +71,8 @@ TRANSIT = {"BUS", "RAIL", "SUBWAY", "TRAM", "FERRY", "CABLE_CAR",
 
 # ---------------------------------------------------------------- the app
 
-# Mirror of COMBOS in web/index.html, with every "Using:" toggle on.
+# Mirror of COMBOS in web/core.js, with every "Using:" toggle on.
+# tests/core.test.mjs fails if the two ever differ.
 # Keep in step with that list: a combo missing here would be reported as a
 # hole in the app that the app does not actually have.
 APP_COMBOS = [
@@ -80,7 +81,7 @@ APP_COMBOS = [
      "needsLeg": "BICYCLE"},
     {"key": "Bike Share at the start", "access": ["BICYCLE_RENTAL", "WALK"],
      "egress": ["WALK"], "rentStart": True, "walkReluctance": 6.0},
-    # extraReluctance mirrors index.html: one more value, this combo only
+    # extraReluctance mirrors core.js: one more value, this combo only
     {"key": "Drive to station", "access": ["CAR_PARKING"], "egress": ["WALK"],
      "drive": True, "needsLeg": "CAR", "extraReluctance": [8.0]},
     {"key": "Drive at the end", "access": ["WALK"], "egress": ["WALK", "CAR_PICKUP"],
@@ -101,7 +102,7 @@ APP_COMBOS = [
      "direct": ["WALK", "BICYCLE_RENTAL"], "walkReluctance": 6.0, "maxMin": 60},
     {"key": "Walk the whole way", "pure": "WALK", "maxMin": 45},
 ]
-DRIVE_RELUCTANCE = [30.0, 2.0, 1.0]        # mirror of index.html
+DRIVE_RELUCTANCE = [30.0, 2.0, 1.0]        # mirror of core.js
 APP_FIRST = 8
 
 # -------------------------------------------------------------- the oracle
@@ -208,7 +209,8 @@ def modes_for(combo):
 
 
 def prefs_for(combo, car_reluctance=None):
-    """Mirror of the per-request preferences fetchCombo() builds."""
+    """Mirror of comboPrefs() in core.js (with the default "safest" bike
+    setting, which sends nothing)."""
     street = {}
     if car_reluctance is not None:
         street["car"] = {"reluctance": car_reluctance}
@@ -217,9 +219,13 @@ def prefs_for(combo, car_reluctance=None):
     return {"street": street} if street else None
 
 
+def rented(leg):
+    return leg["mode"] == "BICYCLE" and bool(leg.get("rentedBike"))
+
+
 def keep(combo, itins):
-    """The same result filters fetchCombo() applies. Without these the app
-    would appear to find routes it actually discards."""
+    """Mirror of filterCombo() in core.js. Without these the app would
+    appear to find routes it actually discards."""
     out = []
     for it in itins:
         legs = it["legs"]
@@ -248,9 +254,9 @@ def keep(combo, itins):
             continue
         if combo.get("carAfter") and not end_leg_only(it, lambda l: l["mode"] == "CAR"):
             continue
-        if combo.get("rentEnd") and not end_leg_only(it, lambda l: l.get("rentedBike")):
+        if combo.get("rentEnd") and not end_leg_only(it, rented):
             continue
-        if combo.get("rentStart") and not start_leg_only(it, lambda l: l.get("rentedBike")):
+        if combo.get("rentStart") and not start_leg_only(it, rented):
             continue
         out.append(it)
     if combo.get("pure"):
@@ -259,7 +265,7 @@ def keep(combo, itins):
 
 
 def end_leg_only(it, match):
-    """Mirror of endLegOnly() in index.html."""
+    """Mirror of endLegOnly() in core.js."""
     last_transit = -1
     for i, l in enumerate(it["legs"]):
         if l["mode"] in TRANSIT:
@@ -292,8 +298,11 @@ def departure(it):
 
 
 def car_distance(it):
-    """Mirror of carDistance() in index.html."""
-    return sum(l.get("distance") or 0 for l in it["legs"] if l["mode"] == "CAR")
+    """Mirror of longestCarLegM() in core.js: the drive cap is judged on the
+    LONGEST single drive, not the total (a short drive to the station plus a
+    lift at the far end is not one long drive)."""
+    return max((l.get("distance") or 0 for l in it["legs"] if l["mode"] == "CAR"),
+               default=0)
 
 
 def deleted_by(it):

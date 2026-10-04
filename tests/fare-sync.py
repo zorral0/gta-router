@@ -1,7 +1,7 @@
 """
 Fare model sync check.
 
-scripts/costs.py and the fare model inside web/index.html are deliberately
+scripts/costs.py and the fare model inside web/core.js are deliberately
 duplicated, and both files carry a comment saying to keep them in sync. That
 comment was the only thing enforcing it. This script enforces it for real.
 
@@ -12,7 +12,7 @@ It compares, without running a browser:
 
 scripts/costs.py is a local-only file and is not in the public repository, so
 the two-copy diff is skipped when it is missing. The checks that read
-web/index.html always run.
+web/core.js always run.
 
 The last check is the one that would have caught the Halton gap: Oakville,
 Burlington and Milton were loaded as feeds on 2026-09-12 and had no fares in
@@ -32,7 +32,7 @@ import sys
 import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-INDEX = os.path.join(ROOT, "web", "index.html")
+INDEX = os.path.join(ROOT, "web", "core.js")   # the app's fare model
 OTP_URL = "http://localhost:8080/otp/gtfs/v1"
 
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
@@ -41,7 +41,7 @@ try:
 except ImportError:
     costs = None
 
-# name in costs.py -> name in index.html
+# name in costs.py -> name in core.js
 SCALARS = {
     "GO_BASE_FARE": "GO_BASE",
     "GO_PER_KM": "GO_PER_KM",
@@ -52,7 +52,6 @@ SCALARS = {
     "UP_EXPRESS_CITY": "UP_CITY",
     "GAS_PER_KM": "GAS_PER_KM",
     "WEAR_PER_KM": "WEAR_PER_KM",
-    "DOWNTOWN_PARKING": "DOWNTOWN_PARKING",
     "GO_STATION_PARKING": "GO_PARKING",
     "BIKESHARE_UNLOCK": "BIKESHARE_UNLOCK",
     "BIKESHARE_PER_MIN": "BIKESHARE_PER_MIN",
@@ -65,7 +64,7 @@ def js_source():
 
 
 def js_local_fares(src):
-    """Pull the LOCAL_FARES literal out of index.html. It is a plain array of
+    """Pull the LOCAL_FARES literal out of core.js. It is a plain array of
     arrays, so once the comments are stripped it is valid JSON apart from the
     bare true/false, which json already understands."""
     start = src.index("const LOCAL_FARES = [")
@@ -106,10 +105,52 @@ def check_feeds(js_rows, problems):
         # GO and UP are priced by their own rules, not by LOCAL_FARES
         if "GO" in upper or "UP" in upper:
             continue
-        if not any(row[0] in upper for row in js_rows):
+        hits = [row[0] for row in js_rows if row[0] in upper]
+        if not hits:
             problems.append(f"{name}: loaded in the graph but has no fare "
                             f"row, so its legs price as $0")
+        elif len(hits) > 1:
+            problems.append(f"{name}: matches several fare rows ({', '.join(hits)}); "
+                            f"the app silently takes the first")
     print(f"feeds: {len(agencies)} agencies in the graph checked")
+
+
+# Agency names that must NOT pick up any fare row: the trap with substring
+# matching is a short key landing inside a longer, unrelated name.
+NOT_MODELLED = ["HAMILTON STREET RAILWAY", "GRAND RIVER TRANSIT",
+                "GUELPH TRANSIT", "BARRIE TRANSIT"]
+PROGRAMMES = {"onefare", "gocofare"}
+
+
+def check_rows(js_rows, problems):
+    """Sanity checks on the fare table itself. Unlike the two-copy diff these
+    need nothing local, so they run everywhere, GitHub included."""
+    keys = [r[0] for r in js_rows]
+    for r in js_rows:
+        if len(r) != 5:
+            problems.append(f"{r[0]}: expected 5 columns, found {len(r)}")
+            continue
+        key, adult, youth, verified, prog = r
+        if not (isinstance(adult, (int, float)) and adult > 0):
+            problems.append(f"{key}: adult fare {adult!r} is not a positive number")
+        if youth is not None and not (0 <= youth <= adult):
+            problems.append(f"{key}: youth fare {youth!r} is not between 0 and the adult fare")
+        if not isinstance(verified, bool):
+            problems.append(f"{key}: verified flag {verified!r} is not true/false")
+        if prog not in PROGRAMMES:
+            problems.append(f"{key}: transfer programme {prog!r} is not one of {sorted(PROGRAMMES)}")
+        if keys.count(key) > 1:
+            problems.append(f"{key}: appears more than once")
+    for a in keys:
+        for b in keys:
+            if a != b and a in b:
+                problems.append(f"{a}: is inside {b}, so the first one listed "
+                                f"would catch the other agency's legs")
+    for name in NOT_MODELLED:
+        hit = [k for k in keys if k in name]
+        if hit:
+            problems.append(f"{name}: would be priced as {hit[0]}")
+    print(f"LOCAL_FARES: {len(js_rows)} rows sanity-checked")
 
 
 def report(problems):
@@ -126,11 +167,12 @@ def main():
     src = js_source()
     problems = []
     js_rows = js_local_fares(src)
+    check_rows(js_rows, problems)
 
     if costs is None:
         print("costs.py is not here (it is a local-only file), so the "
               "two-copy diff is skipped.")
-        print(f"LOCAL_FARES: {len(js_rows)} rows in index.html")
+        print(f"LOCAL_FARES: {len(js_rows)} rows in core.js")
         check_feeds(js_rows, problems)
         report(problems)
         return
@@ -142,22 +184,22 @@ def main():
     for key in sorted(set(py_by_key) | set(js_by_key)):
         p, j = py_by_key.get(key), js_by_key.get(key)
         if p is None:
-            problems.append(f"{key}: in index.html but not in costs.py")
+            problems.append(f"{key}: in core.js but not in costs.py")
             continue
         if j is None:
-            problems.append(f"{key}: in costs.py but not in index.html")
+            problems.append(f"{key}: in costs.py but not in core.js")
             continue
-        # index.html rows are [key, adult, youth, verified, programme];
+        # core.js rows are [key, adult, youth, verified, programme];
         # costs.py rows are (key, adult, youth, programme)
         if float(p[1]) != float(j[1]):
-            problems.append(f"{key}: adult {p[1]} in costs.py, {j[1]} in index.html")
+            problems.append(f"{key}: adult {p[1]} in costs.py, {j[1]} in core.js")
         if float(p[2] or 0) != float(j[2] or 0):
-            problems.append(f"{key}: youth {p[2]} in costs.py, {j[2]} in index.html")
+            problems.append(f"{key}: youth {p[2]} in costs.py, {j[2]} in core.js")
         if p[3] != j[4]:
             problems.append(f"{key}: transfer programme {p[3]} in costs.py, "
-                            f"{j[4]} in index.html")
+                            f"{j[4]} in core.js")
     print(f"LOCAL_FARES: {len(py_rows)} rows in costs.py, "
-          f"{len(js_rows)} in index.html")
+          f"{len(js_rows)} in core.js")
 
     for py_name, js_name in sorted(SCALARS.items()):
         p = getattr(costs, py_name, None)
@@ -165,9 +207,9 @@ def main():
         if p is None:
             problems.append(f"{py_name}: missing from costs.py")
         elif j is None:
-            problems.append(f"{js_name}: could not be read out of index.html")
+            problems.append(f"{js_name}: could not be read out of core.js")
         elif float(p) != j:
-            problems.append(f"{py_name}/{js_name}: {p} in costs.py, {j} in index.html")
+            problems.append(f"{py_name}/{js_name}: {p} in costs.py, {j} in core.js")
     print(f"scalars: {len(SCALARS)} compared")
 
     check_feeds(js_rows, problems)

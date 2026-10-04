@@ -3,7 +3,7 @@ Is there a hole in DRIVE_RELUCTANCE?
 
 carReluctance is the only knob that changes which parking lot OTP returns,
 and each value yields the one lot that is optimal at it, so the ladder in
-index.html decides which lots the app can ever see. The current ladder,
+web/core.js decides which lots the app can ever see. The current ladder,
 [30, 2, 1], was measured for which LOT gets picked. This asks a different
 question: which ladder gets you there EARLIEST.
 

@@ -1,0 +1,38 @@
+# The checks that need no routing engine, run on every push and pull request.
+# The routing benchmark (tests/benchmark.py) needs a built graph and ~8 GB of
+# memory, so it stays a local check.
+name: tests
+
+on: [push, pull_request]
+
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # The runner's clock is UTC, which is exactly what proves the app's
+      # times don't depend on the machine being in Toronto.
+      - name: Unit tests (fares, tolls, ranking, Toronto time)
+        run: node --test tests/core.test.mjs
+
+      - name: Fare model check
+        run: python3 tests/fare-sync.py
+
+      - name: Python scripts compile
+        run: python3 -m py_compile scripts/*.py tests/*.py
+
+      - name: Shell scripts parse
+        run: for f in *.sh scripts/*.sh; do bash -n "$f"; done
+
+      # every spelling: a plain grep for the character misses the HTML entities
+      - name: No em dashes in the app's text
+        run: |
+          if grep -nE '—|&mdash;|&#8212;|&#[xX]2014;|&#151;' web/index.html web/core.js; then
+            echo "Replace each em dash with a colon, a comma or a full stop."
+            exit 1
+          fi
