@@ -6,10 +6,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- served locally (web/vendor/) so an internet blip can't blank the app -->
 <link href="vendor/maplibre-gl.css" rel="stylesheet">
-<script src="vendor/maplibre-gl.js"></script>
+<!-- MapLibre 6 ships only as ES modules. This exposes it as the global the
+     rest of the app has always used. Module and defer scripts run in document
+     order once the page is parsed, so core.js and app.js always see it. If the
+     files are missing, app.js finds no maplibregl and says so on screen. -->
+<script type="module">
+  import * as maplibregl from "./vendor/maplibre-gl.mjs";
+  window.maplibregl = maplibregl;
+</script>
 <!-- the app's rules (fares, tolls, ranking, Toronto time): no map, no page,
      so tests/core.test.mjs can run them without a browser -->
-<script src="core.js"></script>
+<script defer src="core.js"></script>
 <style>
   /* Solid surfaces: the sheet, cards and chips are opaque for contrast
      (dark mode: black cards on a #1b sheet). */
@@ -802,6 +809,6 @@
   <div id="detail"></div>
 </div></div>
 
-<script src="app.js"></script>
+<script defer src="app.js"></script>
 </body>
 </html>
