@@ -61,7 +61,7 @@ SIGNIFICANT_SEC = 120
 # waiting is part of the trip. Arrival time makes the comparison honest,
 # because both searches start from the same requested departure.
 
-# The drive slider's default (maxDriveM in index.html, and the value= on
+# The drive slider's default (maxDriveM in web/app.js, and the value= on
 # #driveRange). visibleIts() drops longer drives before they ever render, so
 # an audit that ignores it would report options the user cannot actually see.
 MAX_DRIVE_M = 15000
@@ -342,7 +342,7 @@ def describe(it):
 
 
 def app_pass(trip, pool):
-    """Everything web/index.html would collect for this trip."""
+    """Everything the web app would collect for this trip."""
     jobs = []
     for combo in APP_COMBOS:
         if combo.get("drive"):
