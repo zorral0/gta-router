@@ -30,29 +30,17 @@ fi
 
 echo ""
 echo "=== Step 3/6: Downloading GTFS transit schedules ==="
-# GO Transit (Metrolinx open data)
-curl -L -o go-gtfs.zip "https://assets.metrolinx.com/raw/upload/v1683228856/Documents/Metrolinx/Open%20Data/GO-GTFS.zip"
-# UP Express
-curl -L -o up-gtfs.zip "https://assets.metrolinx.com/raw/upload/v1682367798/Documents/Metrolinx/Open%20Data/UP-GTFS.zip"
-# TTC merged feed (subway + streetcar + bus), City of Toronto open data
-curl -L -o ttc-gtfs.zip "https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/7795b45e-e65a-4465-81fc-c36b9dfff169/resource/cfb6b2b8-6191-41e3-bda1-b175c51148cb/download/TTC%20Routes%20and%20Schedules%20Data.zip"
-# YRT (York Region Transit). This URL is the long-standing direct link; if it
-# fails, download manually from https://www.yrt.ca/en/about-us/open-data.aspx
-curl -L -o yrt-gtfs.zip "https://www.yrt.ca/google/google_transit.zip" || \
-  echo "WARNING: YRT download failed. Get it manually from yrt.ca open data page and save as yrt-gtfs.zip"
-# MiWay (Mississauga)
-curl -L -o miway-gtfs.zip "https://www.miapp.ca/GTFS/google_transit.zip"
-# Brampton Transit. The old brampton.ca link died mid-2026; this is the
-# ArcGIS item transit.land lists as the official feed. If it fails, check
-# https://www.transit.land/feeds/f-dpz2-bramptontransit for the current URL.
-curl -L -o brampton-gtfs.zip "https://www.arcgis.com/sharing/rest/content/items/a355aabd5a8c490186bdce559c9c75fb/data"
-# DRT (Durham Region Transit)
-curl -L -o drt-gtfs.zip "https://maps.durham.ca/OpenDataGTFS/GTFS_Durham_TXT.zip"
-# Halton local buses: Oakville, Burlington, Milton (without them Halton only
-# has GO). Sources found via mobilitydatabase.org and transit.land.
-curl -L -o oakville-gtfs.zip "https://www.arcgis.com/sharing/rest/content/items/d78a1c1ad6a940009de8b68839a8f606/data"
-curl -L -o burlington-gtfs.zip "https://opendata.burlington.ca/gtfs-rt/GTFS_Data.zip"
-curl -L -o milton-gtfs.zip "https://metrolinx.tmix.se/gtfs/gtfs-milton.zip"
+# The list of feeds and the download checks live in scripts/feeds.sh,
+# shared with refresh.sh. A broken download (an error page saved as .zip)
+# is caught here, before anything below tries to use it.
+. ../scripts/feeds.sh
+if ! fetch_all; then
+  echo ""
+  echo "Some schedule feeds could not be downloaded (see PROBLEM above)."
+  echo "The graph cannot be built without them. Fix the link or download the"
+  echo "file by hand into engine/, then run this script again."
+  exit 1
+fi
 
 # TTC publishes no transfers.txt; inject subway interchange transfers so
 # the router knows Bloor-Yonge etc. are internal
@@ -112,17 +100,6 @@ else
   echo "works, but the app will not mark or price Highway 407 tolls until"
   echo "this succeeds. Re-run:  bash setup.sh  (or see scripts/make_toll_cells.py)"
 fi
-
-# Basic sanity checks on the downloads
-echo ""
-echo "=== Verifying downloads ==="
-for f in go-gtfs.zip up-gtfs.zip ttc-gtfs.zip yrt-gtfs.zip miway-gtfs.zip brampton-gtfs.zip drt-gtfs.zip oakville-gtfs.zip burlington-gtfs.zip milton-gtfs.zip; do
-  if unzip -l "$f" | grep -q "stops.txt"; then
-    echo "OK: $f looks like a valid GTFS feed"
-  else
-    echo "PROBLEM: $f does not contain stops.txt - it may be an error page. Re-download manually."
-  fi
-done
 
 echo ""
 echo "=== Step 6/6: Building the routing graph (5-15 minutes) ==="
