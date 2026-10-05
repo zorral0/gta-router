@@ -3017,9 +3017,13 @@ const FEED_LABEL = { TTC:"TTC", YRT:"York/Viva", MIWAY:"MiWay",
    Tap the map -> paint a travel-time "bloom" from that point. Colours
    come from a switchable scheme. Isochrones from the read-only 2.5
    "reach" engine on :8090 (walk+transit, tied to the app's date/time).
-   If that engine isn't running, the card says so and nothing else breaks. */
+   If that engine isn't running, the card says so and nothing else breaks.
+   Both locally and hosted the page asks its own server, which passes the
+   question on. Locally that is scripts/web-server.py, which only runs the
+   reach engine while it's in use: the first tap answers 503 "starting"
+   for about 10 seconds, and we wait it out. */
 (function(){
-  const ISO_API = LOCAL ? "http://localhost:8090/otp/traveltime/isochrone" : "/otp/traveltime/isochrone";
+  const ISO_API = "/otp/traveltime/isochrone";
   const CUTS = ["900","1800","2700","3600","4500","5400","6300","7200","8100","9000"];
   const MINS = { "900":"15","1800":"30","2700":"45","3600":"60","4500":"75","5400":"90",
     "6300":"105","7200":"120","8100":"135","9000":"150" };
@@ -3126,9 +3130,19 @@ const FEED_LABEL = { TTC:"TTC", YRT:"York/Viva", MIWAY:"MiWay",
       // timeout so a hung engine can't leave reach stuck on "busy" forever.
       // 30 s, not 15: a full ten-band bloom measured 11-13 s on a laptop
       // with the engine otherwise idle (2026-10-03), so 15 s failed whenever
-      // anything else was running.
-      const sig = AbortSignal.timeout ? AbortSignal.timeout(30000) : undefined;
-      const r = await fetch(url, { signal: sig });
+      // anything else was running. A fresh one per try, so the wait for a
+      // starting engine doesn't eat into it.
+      let r;
+      for (let tries = 0; ; tries++){
+        const sig = AbortSignal.timeout ? AbortSignal.timeout(30000) : undefined;
+        r = await fetch(url, { signal: sig });
+        // still loading: up to a minute, though it measured 9 s
+        if (r.status !== 503 || tries >= 30) break;
+        setStatus("Starting the reach map. The first one takes about 10 seconds…");
+        await new Promise(res => setTimeout(res, 2000));
+      }
+      // 502: the local server couldn't start the reach engine at all
+      if (r.status === 502 || r.status === 503) throw new Error("no engine");
       if (!r.ok) throw new Error("http " + r.status);
       const fc = await r.json();
       hidePulse();
@@ -3147,7 +3161,7 @@ const FEED_LABEL = { TTC:"TTC", YRT:"York/Viva", MIWAY:"MiWay",
       else if (err.name === "TimeoutError" || err.name === "AbortError")
         setStatus("That took too long. Try again in a moment.");
       else
-        setStatus("Reach engine isn't running yet. Restart the app (Ctrl+C, then bash run.sh).");
+        setStatus("The reach map's engine isn't running. Restart the app (bash stop.sh, then bash run.sh).");
     } finally { busy = false; }
   };
 
@@ -3207,6 +3221,9 @@ const FEED_LABEL = { TTC:"TTC", YRT:"York/Viva", MIWAY:"MiWay",
     toggle.setAttribute("aria-pressed", on ? "true" : "false");
     bodyEl.hidden = !on;
     if (!on){ clearReach(); hidePulse(); }
+    // start the reach engine now, so it's ready by the first tap (local
+    // only: hosted, it is always running and this path doesn't exist)
+    else if (LOCAL) fetch("/reach-engine/wake").catch(() => {});
     map.getCanvas().style.cursor = on ? "crosshair" : "";
   }
   toggle.onclick = () => setMode(!window.__reachMode);

@@ -92,7 +92,7 @@ and the published rate chart.
 ## Getting started
 
 Requirements: macOS with [Homebrew](https://brew.sh), Python 3, about 8 GB of
-free memory (a few more with the Reach map running) and 5 GB of disk space.
+free memory (about 3 more while the Reach map is in use) and 5 GB of disk space.
 
 ```bash
 git clone https://github.com/zorral0/gta-router.git
@@ -101,6 +101,8 @@ cp metrolinx.env.example metrolinx.env   # then add your Metrolinx key
 bash setup.sh    # installs Java and osmium, downloads the engine, feeds and map, builds the graph
 bash run.sh      # starts the engine and the web app, and opens it in your browser
 ```
+
+Stop it with Ctrl+C in that window, or `bash stop.sh` from any other.
 
 GO real-time data needs a free
 [Metrolinx Open Data key](https://api.openmetrolinx.com/OpenDataAPI/Help/Registration/en).
@@ -134,7 +136,7 @@ scripts/             data generation (fares, tolls, transit lines, feed patches)
 tests/               unit tests and the routing benchmark
 data/                OpenStreetMap patch for missing park-and-ride lots
 docs/                screenshot
-setup.sh, run.sh, refresh.sh
+setup.sh, run.sh, stop.sh, refresh.sh
 ```
 
 ## Known limitations
