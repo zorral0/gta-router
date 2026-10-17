@@ -704,6 +704,18 @@ function rankPool(pool, arriveBy){
     && (!arriveBy || y.it.startTime >= x.it.startTime)
     && (metric(y.it) < metric(x.it) || y.cost < x.cost
         || (arriveBy && y.it.startTime > x.it.startTime));
+  /* A drive has to buy you something. The drive mixes demand a car leg, so
+     the engine always finds one, even when it is pointless: from near
+     Bathurst and Bloor it drove 4 km west to the Dundas West lot and rode
+     Line 2 back east past home, slower AND dearer than just taking the
+     subway. Direction is NOT the test (driving back to a GO station with an
+     express train can be the fastest way); being beaten by a trip with no
+     car in it is. Those are dropped outright, not folded into "more
+     options". Removing a beaten trip never changes who leads, since whatever
+     beat it still beats everything it did. */
+  const drives = x => (x.it.legs || []).some(l => l.mode === "CAR");
+  pool = pool.filter(x => !drives(x)
+    || !pool.some(y => !drives(y) && beats(y, x)));
   const lead = pool.filter(x => !pool.some(y => y !== x && beats(y, x)));
   let main = lead.slice(0, 5);
   let cheapest = null, latest = null;

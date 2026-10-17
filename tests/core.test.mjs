@@ -242,6 +242,18 @@ test("ranking hides anything both slower and no cheaper than another option", ()
   assert.equal(r.cheapestIt, cheap.it);
 });
 
+test("a drive beaten by a trip with no car is dropped, even from more options", () => {
+  const core = load();
+  const withCar = (mins, cost) => ({ ...opt(mins, cost), it: { ...opt(mins, cost).it, legs: [{ mode: "CAR" }, { mode: "SUBWAY" }] } });
+  const subway = opt(29, 3.30), pricey = opt(45, 9);
+  const pointless = withCar(53, 4.27);   // the reported trip: slower AND dearer than the subway
+  const faster = withCar(20, 6);         // a drive (any direction) that saves time stays
+  const r = core("rankPool")([pointless, subway, faster, pricey], false);
+  assert.ok(!r.pool.includes(pointless) && !r.rest.includes(pointless), "the pointless drive must be gone");
+  assert.deepEqual(r.main, [faster, subway]);
+  assert.deepEqual(r.rest, [pricey], "a no-car trip that loses still folds, as before");
+});
+
 test("ranking pins the cheapest option into the top five", () => {
   const core = load();
   const pool = [opt(30, 20), opt(31, 19), opt(32, 18), opt(33, 17), opt(34, 16), opt(35, 15), opt(90, 1)];
