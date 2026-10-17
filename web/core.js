@@ -1,15 +1,14 @@
 /* GTA Router - the app's rules, with no map and no page in them.
 
    Fares, tolls, the mode mixes the planner fires, how results are filtered,
-   deduplicated and ranked, and Toronto time. index.html loads this first, as
-   a classic script, so everything here is a plain global exactly as it was
-   when it lived inline. Keeping it free of the DOM and the map is what lets
+   deduplicated and ranked, and Toronto time. index.html loads this before
+   app.js, both as classic scripts, so everything here is a plain global. Keeping it free of the DOM and the map is what lets
    tests/core.test.mjs run it in Node without a browser.
 
-   Globals this file READS but does not own (index.html declares them):
+   Globals this file READS but does not own (app.js declares them):
      rider     "adult" | "youth"
      GO_FARES  the GO fare table from go-fares.json, or null until loaded
-   TOLL and TOLLRATE are declared here and filled in by index.html once
+   TOLL and TOLLRATE are declared here and filled in by app.js once
    toll-roads.json and toll-rates.json arrive. */
 "use strict";
 
@@ -250,7 +249,7 @@ function inToll(lng, lat){
    how many metres of it are tolled, how those metres split across 407 ETR's
    twelve rate zones, which way it was going and when it got on. Cached on
    the leg (the grid has to be loaded first, so nothing is cached before
-   that - index.html re-renders once it arrives). */
+   that - app.js re-renders once it arrives). */
 function legTollGeom(l){
   if (!TOLL || l.mode !== "CAR" || !l.legGeometry) return null;
   if (l._tollGeom !== undefined) return l._tollGeom;
