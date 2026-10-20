@@ -78,9 +78,9 @@ worth checking again.
 The routing engine is [OpenTripPlanner 2.9](https://www.opentripplanner.org/),
 built from each agency's GTFS feed and an OpenStreetMap extract of the GTA,
 with a small patch that tags commuter lots OpenStreetMap is missing. The web
-app is a single page (`web/index.html`, with its fare, toll and ranking rules
-in `web/core.js`) that queries OpenTripPlanner's GraphQL API and renders the
-map with [MapLibre GL JS](https://maplibre.org/) on
+app is a single page (`web/index.html`, its code in `web/app.js` and its fare,
+toll and ranking rules in `web/core.js`) that queries OpenTripPlanner's GraphQL
+API and renders the map with [MapLibre GL JS](https://maplibre.org/) 6 on
 [OpenFreeMap](https://openfreemap.org/) tiles.
 
 OpenTripPlanner has no concept of fares for most of these agencies or of
@@ -92,7 +92,7 @@ and the published rate chart.
 ## Getting started
 
 Requirements: macOS with [Homebrew](https://brew.sh), Python 3, about 8 GB of
-free memory (a few more with the Reach map running) and 5 GB of disk space.
+free memory (about 3 more while the Reach map is in use) and 5 GB of disk space.
 
 ```bash
 git clone https://github.com/zorral0/gta-router.git
@@ -101,6 +101,8 @@ cp metrolinx.env.example metrolinx.env   # then add your Metrolinx key
 bash setup.sh    # installs Java and osmium, downloads the engine, feeds and map, builds the graph
 bash run.sh      # starts the engine and the web app, and opens it in your browser
 ```
+
+Stop it with Ctrl+C in that window, or `bash stop.sh` from any other.
 
 GO real-time data needs a free
 [Metrolinx Open Data key](https://api.openmetrolinx.com/OpenDataAPI/Help/Registration/en).
@@ -128,13 +130,13 @@ python3 tests/benchmark.py -v     # print each itinerary in full
 ## Project structure
 
 ```
-web/                 the web app (index.html; its rules in core.js), plus the data files it loads
+web/                 the web app (index.html, app.js; its rules in core.js), plus the data files it loads
 engine/              OpenTripPlanner configuration; downloaded feeds, map and graphs go here
 scripts/             data generation (fares, tolls, transit lines, feed patches)
 tests/               unit tests and the routing benchmark
 data/                OpenStreetMap patch for missing park-and-ride lots
 docs/                screenshot
-setup.sh, run.sh, refresh.sh
+setup.sh, run.sh, stop.sh, refresh.sh
 ```
 
 ## Known limitations
@@ -146,6 +148,9 @@ setup.sh, run.sh, refresh.sh
 - The Reach map runs on a separate OpenTripPlanner 2.5 instance. To enable
   it, save the OpenTripPlanner 2.5 jar as `engine/otp25.jar` and run
   `bash refresh.sh`. The rest of the app works without it.
+- The app has to be served over http (`bash run.sh` does that): MapLibre 6
+  loads as JavaScript modules, which browsers refuse to run from a file
+  opened straight off the disk.
 - Search uses the public [Photon](https://photon.komoot.io) geocoder, so it
   needs an internet connection: what you type in the search boxes, and the
   spot where you drop a pin (to name it), are sent to Photon. Map tiles come
@@ -164,8 +169,8 @@ setup.sh, run.sh, refresh.sh
   (2005) and shared under the guide's license,
   [CC BY-NC-SA 2.0](https://creativecommons.org/licenses/by-nc-sa/2.0/).
   Stations renovated since 2005 may be off by a car.
-- [MapLibre GL JS](https://github.com/maplibre/maplibre-gl-js) is included
-  under its BSD 3-Clause license.
+- [MapLibre GL JS](https://github.com/maplibre/maplibre-gl-js) 6.12 is included
+  under its BSD 3-Clause license (`web/vendor/MAPLIBRE-LICENSE.txt`).
 
 This project is not affiliated with any transit agency, 407 ETR or Apple.
 

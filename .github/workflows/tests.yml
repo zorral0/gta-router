@@ -17,6 +17,9 @@ jobs:
 
       # The runner's clock is UTC, which is exactly what proves the app's
       # times don't depend on the machine being in Toronto.
+      - name: The page's scripts parse
+        run: node --check web/core.js && node --check web/app.js
+
       - name: Unit tests (fares, tolls, ranking, Toronto time)
         run: node --test tests/core.test.mjs
 
@@ -32,7 +35,7 @@ jobs:
       # every spelling: a plain grep for the character misses the HTML entities
       - name: No em dashes in the app's text
         run: |
-          if grep -nE '—|&mdash;|&#8212;|&#[xX]2014;|&#151;' web/index.html web/core.js; then
+          if grep -nE '—|&mdash;|&#8212;|&#[xX]2014;|&#151;' web/index.html web/app.js web/core.js; then
             echo "Replace each em dash with a colon, a comma or a full stop."
             exit 1
           fi

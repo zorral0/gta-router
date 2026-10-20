@@ -1,9 +1,21 @@
 #!/bin/bash
 # GTA Router - start everything.
 # Starts the routing engine AND the app page, then opens the app in your
-# browser at http://localhost:8081. Stop it all with Ctrl+C.
+# browser at http://localhost:8081. Stop it all with Ctrl+C, or with
+# bash stop.sh from any Terminal window.
 
 cd "$(dirname "$0")"
+
+# 00) Already running? A second copy can't use the ports the first one
+#     holds, but it still loads a whole second engine, about 6 GB of memory
+#     (2026-10-04: two copies made every search "take too long").
+for port in 8080 8081 8090; do
+  if lsof -nP -iTCP:$port -sTCP:LISTEN -t >/dev/null 2>&1; then
+    echo "GTA Router is already running (something is using port $port)."
+    echo "Open http://localhost:8081, or stop it first with: bash stop.sh"
+    exit 1
+  fi
+done
 
 # 0) The Metrolinx key and GTA_ROUTER_DIR, which router-config.json needs;
 #    without them the engine won't start (see scripts/engine-env.sh)
@@ -28,9 +40,12 @@ python3 scripts/drt-rt-filter.py --once >/dev/null 2>&1 \
 python3 -u scripts/drt-rt-filter.py >engine/drt-rt.log 2>&1 &
 DRT_PID=$!
 
-# 1) The app page (the pretty UI in web/), served at :8081. Bound to this
-#    computer only: by default http.server answers anyone on the same Wi-Fi.
-python3 -m http.server 8081 --bind 127.0.0.1 --directory web >/dev/null 2>&1 &
+# 1) The app page (the pretty UI in web/), served at :8081 to this computer
+#    only. The same server starts the "Reach map" engine (:8090, about
+#    3.3 GB) the first time you tap with Reach on, and stops it after 15
+#    quiet minutes; see scripts/web-server.py. It prints a line here when
+#    it does either.
+python3 -u scripts/web-server.py &
 WEB_PID=$!
 
 # 2) The routing engine at :8080 (the app talks to it behind the scenes;
@@ -40,16 +55,15 @@ WEB_PID=$!
 java -Xmx6G -jar engine/otp.jar --load engine --bindAddress 127.0.0.1 &
 OTP_PID=$!
 
-# 2b) The "Reach map" engine at :8090. This is the older engine (kept as a
-#     backup) - it's the only one that can draw the travel-time colour
-#     blooms. It's read-only and uses about 1.7 GB while running. If it
-#     ever fails to start, the Reach button just says so and the rest of
-#     the app works exactly as before. Its log goes to engine/reach-engine/reach.log
-java -Xmx3G -jar engine/otp25.jar --load engine/reach-engine --port 8090 --bindAddress 127.0.0.1 >engine/reach-engine/reach.log 2>&1 &
-REACH_PID=$!
-
-# Ctrl+C (or the engine dying) stops all three, plus the two feed filters
-trap 'kill $WEB_PID $OTP_PID $REACH_PID $ALERTS_PID $DRT_PID 2>/dev/null' EXIT INT TERM
+# Ctrl+C (or the engine dying, or bash stop.sh) stops the engine, the page
+# server (which takes the Reach engine with it) and the two feed filters.
+# Ctrl+C and stop.sh exit straight away, so a stop during loading doesn't
+# say "Engine failed to start".
+cleanup(){ kill $WEB_PID $OTP_PID $ALERTS_PID $DRT_PID 2>/dev/null; rm -f run.pid; }
+trap cleanup EXIT
+trap 'exit 130' INT TERM
+# stop.sh reads this to find this script from any Terminal window
+echo $$ > run.pid
 
 # 3) Wait until the engine answers, then open the app in the browser
 echo ""
