@@ -17,3 +17,6 @@ graph.obj*
 
 # secrets
 metrolinx.env
+
+# run.sh writes its process id here for stop.sh
+run.pid
