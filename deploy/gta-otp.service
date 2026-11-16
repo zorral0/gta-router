@@ -1,0 +1,19 @@
+[Unit]
+Description=GTA Router engine (OTP 2.9, trip planning)
+After=network.target gta-go-alerts.service gta-drt-rt.service
+# Start after the two feed filters so their .pb files exist. Wants, not
+# Requires: if a filter fails, the engine still starts without that feed.
+Wants=gta-go-alerts.service gta-drt-rt.service
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/gta-router
+# router-config.json reads file:${GTA_ROUTER_DIR}/go-alerts-filtered.pb and
+# drt-rt-filtered.pb; OTP refuses to start if this variable is unset.
+Environment=GTA_ROUTER_DIR=/home/ubuntu/gta-router
+EnvironmentFile=/home/ubuntu/gta-router/metrolinx.env
+ExecStart=/usr/bin/java -Xmx6G -jar otp.jar --load . --bindAddress 127.0.0.1
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

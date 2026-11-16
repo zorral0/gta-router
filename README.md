@@ -108,7 +108,8 @@ GO real-time data needs a free
 [Metrolinx Open Data key](https://api.openmetrolinx.com/OpenDataAPI/Help/Registration/en).
 
 Transit agencies replace their schedules every few weeks. To pull fresh feeds
-and rebuild, stop the app and run `bash refresh.sh`.
+and rebuild, stop the app and run `bash refresh.sh`. `python3 scripts/check-feeds.py`
+shows which schedules have run out.
 
 ### Tests
 
@@ -116,8 +117,13 @@ The fare, toll and ranking rules live in `web/core.js` and have unit tests
 that need nothing but Node (GitHub runs them on every push):
 
 ```bash
-node --test tests/core.test.mjs
+node --test tests/core.test.mjs tests/routing.test.mjs
 ```
+
+`tests/routing.test.mjs` replays saved engine answers through the same code
+the page uses, so a change that alters which trips are shown is caught without
+a running engine. `tests/config-guard.py` checks the engine settings the
+routing depends on.
 
 `tests/benchmarks.json` holds a set of GTA trips with known good answers. With
 the engine running:
@@ -135,9 +141,14 @@ engine/              OpenTripPlanner configuration; downloaded feeds, map and gr
 scripts/             data generation (fares, tolls, transit lines, feed patches)
 tests/               unit tests and the routing benchmark
 data/                OpenStreetMap patch for missing park-and-ride lots
-docs/                screenshot
+docs/                runbooks, routing and design notes, known issues, plans
+deploy/              scripts for hosting it (page on Vercel, engines on a small server)
 setup.sh, run.sh, stop.sh, refresh.sh
 ```
+
+Maintaining or changing the project? Start with [HANDOFF.md](HANDOFF.md): how
+to run and test it, where everything lives, what is broken right now and what
+to do next.
 
 ## Known limitations
 
