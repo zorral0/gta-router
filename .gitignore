@@ -15,6 +15,9 @@ graph.obj*
 # generated realtime feed copies (see scripts/go-alerts-filter.py)
 *.pb
 
+# live feed recordings (see scripts/record-feeds.py)
+/recordings/
+
 # secrets
 metrolinx.env
 
