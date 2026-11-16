@@ -16,7 +16,7 @@ const root = new URL("../", import.meta.url);
 const read = p => readFileSync(new URL(p, root), "utf8");
 
 /* A fresh copy of core.js per call, so no test leaks state into another.
-   index.html declares `rider` and `GO_FARES`; core.js only reads them. */
+   app.js declares `rider` and `GO_FARES`; core.js only reads them. */
 function load({ rider = "adult", goFares = null, toll = null, tollRate = null } = {}){
   const ctx = vm.createContext({ console });
   vm.runInContext(read("web/core.js"), ctx, { filename: "core.js" });
