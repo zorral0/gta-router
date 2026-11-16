@@ -26,6 +26,9 @@ jobs:
       - name: Fare model check
         run: python3 tests/fare-sync.py
 
+      - name: Feed recorder checks
+        run: python3 tests/record-feeds.py
+
       - name: Python scripts compile
         run: python3 -m py_compile scripts/*.py tests/*.py
 
