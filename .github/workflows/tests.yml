@@ -23,6 +23,10 @@ jobs:
       - name: Unit tests (fares, tolls, ranking, Toronto time)
         run: node --test tests/core.test.mjs
 
+      # saved real engine answers replayed through the page's own planning code
+      - name: Routing replay (which trips are shown, and why)
+        run: node --test tests/routing.test.mjs
+
       - name: Fare model check
         run: python3 tests/fare-sync.py
 
@@ -40,7 +44,7 @@ jobs:
         run: python3 -m py_compile scripts/*.py tests/*.py
 
       - name: Shell scripts parse
-        run: for f in *.sh scripts/*.sh; do bash -n "$f"; done
+        run: for f in *.sh scripts/*.sh deploy/*.sh; do bash -n "$f"; done
 
       # every spelling: a plain grep for the character misses the HTML entities
       - name: No em dashes in the app's text

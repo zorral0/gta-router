@@ -1,0 +1,59 @@
+{
+  "main": [
+    {
+      "minutes": 21,
+      "cost": 3.3,
+      "legs": "WALK > SUBWAY 1 > WALK",
+      "firstBoard": "St Andrew Station - Northbound Platform",
+      "badges": [
+        "Fastest"
+      ]
+    },
+    {
+      "minutes": 22,
+      "cost": 0,
+      "legs": "BICYCLE",
+      "firstBoard": null,
+      "badges": [
+        "Cheapest"
+      ]
+    }
+  ],
+  "rest": [
+    {
+      "minutes": 24,
+      "cost": 3.3,
+      "legs": "BICYCLE > WALK > SUBWAY 1 > WALK",
+      "firstBoard": "St Andrew Station - Northbound Platform",
+      "badges": []
+    },
+    {
+      "minutes": 24,
+      "cost": 5.26,
+      "legs": "WALK > BUS 97 > WALK > BICYCLE > WALK",
+      "firstBoard": "Bay St at King St West",
+      "badges": []
+    },
+    {
+      "minutes": 25,
+      "cost": 3.16,
+      "legs": "WALK > BICYCLE > WALK",
+      "firstBoard": null,
+      "badges": []
+    },
+    {
+      "minutes": 27,
+      "cost": 4.9,
+      "legs": "WALK > BUS 19 > WALK > BICYCLE > WALK",
+      "firstBoard": "Bay St at King St West",
+      "badges": []
+    },
+    {
+      "minutes": 31,
+      "cost": 0,
+      "legs": "WALK",
+      "firstBoard": null,
+      "badges": []
+    }
+  ]
+}

@@ -383,3 +383,71 @@ print(json.dumps({
   // and drops something
   js.keep.forEach((k, i) => assert.ok(k.length > 0 && k.length < fixtures.length, combos[i].key));
 });
+
+/* ===================== planning glue (what the page used to hold) ===================== */
+
+test("activeCombos with every toggle off keeps only the mixes that need nothing", () => {
+  const core = load();
+  const keys = code => JSON.parse(core(`JSON.stringify(${code}.map(c => c.key))`));
+  assert.deepEqual(keys(`activeCombos({})`),
+    ["Transit only", "Walk the whole way"]);
+  const all = keys(`activeCombos({ bike: true, carStart: true, carEnd: true, share: true })`);
+  assert.equal(all.length, JSON.parse(core("JSON.stringify(COMBOS.length)")));
+  // one toggle brings in only its own mixes
+  assert.ok(keys(`activeCombos({ carStart: true })`).includes("Drive to station"));
+  assert.ok(!keys(`activeCombos({ carStart: true })`).includes("Drive at the end"));
+});
+
+test("reluctancesFor: drive mixes run once per reluctance, the rest once with none", () => {
+  const core = load();
+  const rel = key => JSON.parse(core(`JSON.stringify(reluctancesFor(COMBOS.find(c => c.key === ${JSON.stringify(key)})))`));
+  assert.deepEqual(rel("Drive to station"), [30, 2, 1, 8]);
+  assert.deepEqual(rel("Drive at the end"), [30, 2, 1]);
+  assert.deepEqual(rel("Transit only"), [null]);
+});
+
+test("comboAnswer keeps at most 4 trips, or 8 for a drive mix", () => {
+  const core = load();
+  // 10 transit trips that differ in length, so none dedupe into another
+  const nodes = Array.from({ length: 10 }, (_, i) => {
+    const s = T0 + i * 600000;
+    return { duration: (30 + i) * 60, start: new Date(s).toISOString(),
+      end: new Date(s + (30 + i) * 60000).toISOString(),
+      legs: [{ mode: "RAIL", distance: 20000, duration: (30 + i) * 60, rentedBike: false,
+        start: { scheduledTime: new Date(s).toISOString() },
+        end: { scheduledTime: new Date(s + (30 + i) * 60000).toISOString() },
+        agency: { gtfsId: "GO:1" }, route: { shortName: "LW" } }] };
+  });
+  const n = key => core(`comboAnswer(COMBOS.find(c => c.key === ${JSON.stringify(key)}), ${JSON.stringify(nodes)}).length`);
+  assert.equal(n("Transit only"), 4);
+  // the drive mix needs a car leg to keep anything, so give it one up front
+  const withCar = nodes.map(x => ({ ...x, legs: [{ ...x.legs[0], mode: "CAR", distance: 3000,
+    start: x.legs[0].start, end: x.legs[0].start, route: null, agency: null }, x.legs[0]] }));
+  const m = core(`comboAnswer(COMBOS.find(c => c.key === "Drive to station"), ${JSON.stringify(withCar)}).length`);
+  assert.equal(m, 8);
+});
+
+test("visibleTrips hides a drive over the cap, and a tolled trip when asked", () => {
+  // a tiny made-up toll grid: 0.001-degree cells covering ~0.8 km of one street
+  const cells = { 800: new Set(Array.from({ length: 15 }, (_, i) => 498 + i)) };
+  const toll = { lat0: 43, lon0: -80, dlat: 0.001, dlon: 0.001, cells };
+  const core = load({ toll });
+  const enc = n => { let v = Math.round(n * 1e5); v = v < 0 ? ~(v << 1) : v << 1; let s = "";
+    while (v >= 0x20){ s += String.fromCharCode((0x20 | (v & 0x1f)) + 63); v >>= 5; }
+    return s + String.fromCharCode(v + 63); };
+  const poly = (...pts) => { let la = 0, lo = 0, s = "";
+    for (const [lat, lng] of pts){ s += enc(lat - la) + enc(lng - lo); la = lat; lo = lng; } return s; };
+  const near = leg("CAR", 0, 8, { dist: 5000 });
+  const far = leg("CAR", 0, 25, { dist: 20000 });
+  const tolled = leg("CAR", 0, 5, { dist: 900, geom: poly([43.8005, -79.5], [43.8005, -79.49]) });
+  const rail = leg("RAIL", 10, 40, { ag: GO });
+  const drive = { key: "d", drive: true }, plain = { key: "p" };
+  const p = (c, ...its) => ({ c, its });
+  // call the real function with plain objects built here
+  const g = (part, cap, avoid) => core("visibleTrips")(part, cap, avoid);
+  const tNear = trip(near, rail), tFar = trip(far, rail), tToll = trip(tolled, rail);
+  assert.equal(g(p(drive, tNear, tFar), 15000, false).length, 1);
+  assert.equal(g(p(plain, tNear, tFar), 15000, false).length, 2); // cap is for drive mixes only
+  assert.equal(g(p(plain, tNear, tToll), 15000, false).length, 2);
+  assert.equal(g(p(plain, tNear, tToll), 15000, true).length, 1);
+});

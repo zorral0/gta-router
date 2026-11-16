@@ -1,0 +1,94 @@
+{
+  "main": [
+    {
+      "minutes": 47,
+      "cost": 9.89,
+      "legs": "CAR > WALK > RAIL BR > WALK",
+      "firstBoard": "Maple GO",
+      "badges": [
+        "Fastest"
+      ]
+    },
+    {
+      "minutes": 56,
+      "cost": 8.65,
+      "legs": "CAR > WALK > RAIL RH > WALK",
+      "firstBoard": "Richmond Hill GO",
+      "badges": []
+    },
+    {
+      "minutes": 86,
+      "cost": 4.24,
+      "legs": "WALK > BUS blue B > WALK > SUBWAY 1 > WALK",
+      "firstBoard": "YONGE / CROSBY",
+      "badges": [
+        "Cheapest"
+      ]
+    }
+  ],
+  "rest": [
+    {
+      "minutes": 48,
+      "cost": 9.89,
+      "legs": "CAR > WALK > RAIL BR > WALK",
+      "firstBoard": "Maple GO",
+      "badges": []
+    },
+    {
+      "minutes": 76,
+      "cost": 8.65,
+      "legs": "CAR > WALK > BUS 004 > WALK > RAIL BR > WALK",
+      "firstBoard": "MAJOR MACKENZIE DR / NEWKIRK RD",
+      "badges": []
+    },
+    {
+      "minutes": 86,
+      "cost": 4.24,
+      "legs": "WALK > BUS blue > WALK > SUBWAY 1 > WALK",
+      "firstBoard": "YONGE / CROSBY",
+      "badges": []
+    },
+    {
+      "minutes": 88,
+      "cost": 8.05,
+      "legs": "WALK > BUS blue > WALK > BUS 40 > BUS 41 > WALK > RAIL KI > WALK",
+      "firstBoard": "YONGE / CROSBY",
+      "badges": []
+    },
+    {
+      "minutes": 88,
+      "cost": 4.24,
+      "legs": "WALK > BUS blue > WALK > SUBWAY 1 > WALK",
+      "firstBoard": "YONGE / CROSBY",
+      "badges": []
+    },
+    {
+      "minutes": 92,
+      "cost": 4.24,
+      "legs": "BICYCLE > WALK > BUS blue > WALK > SUBWAY 1 > WALK",
+      "firstBoard": "YONGE / CROSBY",
+      "badges": []
+    },
+    {
+      "minutes": 94,
+      "cost": 4.24,
+      "legs": "BICYCLE > WALK > BUS blue B > WALK > SUBWAY 1 > WALK",
+      "firstBoard": "YONGE / ELGIN MILLS",
+      "badges": []
+    },
+    {
+      "minutes": 96,
+      "cost": 8.05,
+      "legs": "BICYCLE > WALK > BUS blue > WALK > BUS 40 > BUS 41 > WALK > RAIL KI > WALK",
+      "firstBoard": "YONGE / ELGIN MILLS",
+      "badges": []
+    },
+    {
+      "minutes": 96,
+      "cost": 4.24,
+      "legs": "BICYCLE > WALK > BUS blue > WALK > SUBWAY 1 > WALK",
+      "firstBoard": "YONGE / ELGIN MILLS",
+      "badges": []
+    }
+  ]
+}

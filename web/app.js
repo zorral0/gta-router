@@ -1593,54 +1593,18 @@ let have = Object.assign({ bike: true, carStart: true, carEnd: true, share: true
   storedHave);
 store.set("have", JSON.stringify(have));
 
-/* OTP 2.9: the old "plan" query is GONE - this is planConnection.
-   Coordinates are latitude/longitude here (the old API wanted lat/lon!),
-   times are ISO strings, legs carry start/end objects and stopCalls. */
-const PC_QUERY = `query PC($origin:PlanLabeledLocationInput!,
-    $destination:PlanLabeledLocationInput!,$dateTime:PlanDateTimeInput!,
-    $modes:PlanModesInput!,$first:Int,$prefs:PlanPreferencesInput){
-  planConnection(origin:$origin,destination:$destination,dateTime:$dateTime,
-                 modes:$modes,first:$first,preferences:$prefs){
-    edges{node{ duration start end
-      legs{ mode distance duration headsign rentedBike
-            start{scheduledTime estimated{time}}
-            end{scheduledTime estimated{time}}
-            agency{gtfsId name} route{shortName longName color}
-            from{name lat lon stop{gtfsId}} to{name lat lon stop{gtfsId}}
-            stopCalls{stopLocation{... on Stop {name}}}
-            alerts{ id alertHeaderText alertDescriptionText alertUrl
-                    alertSeverityLevel effectiveStartDate effectiveEndDate }
-            legGeometry{points} } } } } }`;
-
 async function fetchCombo(combo, date, time, carReluctance, signal){
   const r = await fetch(OTP, { method: "POST", signal,
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query: PC_QUERY, variables: {
-      origin: { location: { coordinate:
-        { latitude: fromPt.lat, longitude: fromPt.lng } } },
-      destination: { location: { coordinate:
-        { latitude: toPt.lat, longitude: toPt.lng } } },
-      // Arrive by pins the ARRIVAL end. Verified live: "first" already
-      // returns the best (latest-departing) trips for latestArrival too;
-      // "last" pads in pointlessly-early departures - don't use it.
-      dateTime: arriveBy
-        ? { latestArrival: torontoISO(date, time) }
-        : { earliestDeparture: torontoISO(date, time) },
-      first: 8,
-      modes: comboModes(combo),
-      prefs: comboPrefs(combo, carReluctance, bikePref) } }) });
+    body: JSON.stringify({ query: PC_QUERY, variables: planVariables(
+      combo, fromPt, toPt, date, time, arriveBy, carReluctance, bikePref) }) });
   // an error page is HTML, and r.json() on it used to surface as a raw
   // "Unexpected token <" under the search box
   if (!r.ok) throw new Error(`The trip engine answered with an error (${r.status}). Try again in a moment.`);
   const js = await r.json();
   if (js.errors) throw new Error(js.errors.map(e => e.message).join("; "));
-  const its = filterCombo(combo, (((js.data || {}).planConnection || {}).edges || [])
-    .map(e => normalizeItin(e.node)));
-  if (combo.pure) return its;     // already the single best ride, or nothing
-  // drive queries keep more: at reluctance 1.0 the engine returns six real
-  // park-and-ride answers spread from 2 km to 39 km, and a keep of 4 cut
-  // exactly the middle ones this combo was already bad at finding
-  return dedupeAlts(its).slice(0, combo.drive ? 8 : 4);
+  return comboAnswer(combo, (((js.data || {}).planConnection || {}).edges || [])
+    .map(e => e.node));
 }
 
 /* GTFS colors come straight from the feeds - only trust clean 6-digit hex,
@@ -1725,7 +1689,7 @@ async function plan(){
   const date = document.getElementById("daySel").value;
   const time = document.getElementById("timeSel").value;
   const box = document.getElementById("results");
-  const active = COMBOS.filter(c => c.need.every(k => have[k]));
+  const active = activeCombos(have);
   box.innerHTML = '<div class="loading"><div class="spinner"></div><span id="loadTxt">Comparing your options&hellip;</span></div>';
   let done = 0;
   const tick = () => { done++;
@@ -1746,7 +1710,7 @@ async function plan(){
     const left = parts.length - settled.length;
     // nothing to show yet: keep the spinner, rather than flash "No sensible
     // route" (or a lone error) while most of the answers are still out
-    if (left && !settled.some(p => visibleIts(p).length)) return;
+    if (left && !settled.some(p => visibleTrips(p, maxDriveM, avoidTolls).length)) return;
     lastParts = settled;
     renderResults(settled, { selectSig: pickedSig, noFit: shown, noSweep: shown,
                              quiet: shown, pending: left });
@@ -1759,10 +1723,9 @@ async function plan(){
         // Drive queries run once per DRIVE_RELUCTANCE and are merged, so the
         // drive slider always has near, middle and far lots to choose from
         // without re-querying.
-        const rels = DRIVE_RELUCTANCE.concat(c.extraReluctance || []);
-        const tries = await Promise.all(rels.map(r =>
+        const tries = await Promise.all(reluctancesFor(c).map(r =>
           fetchCombo(c, date, time, r, ctrl.signal)));
-        parts[i] = { c, its: spreadByDrive(dedupeAlts([].concat(...tries))) };
+        parts[i] = { c, its: mergeDriveTries(tries) };
       }
     }
     catch (e){ parts[i] = { c, err: friendlyErr(e) }; }
@@ -1831,16 +1794,6 @@ fetch("toll-rates.json").then(r => r.ok ? r.json() : null).then(j => {
   if (lastParts) renderResults(lastParts, { noFit: true, noSweep: true });
 }).catch(() => {});   // no file, no dollar figure - the km still show
 
-/* itineraries a part actually shows, after the "max drive" cap
-   (applies to both drive categories - "at the end" should stay short) */
-function visibleIts(p){
-  let its = p.its || [];
-  if (p.c.drive)
-    its = its.filter(it => longestCarLegM(it) <= maxDriveM);
-  if (avoidTolls) its = its.filter(it => !isTolled(it));
-  return its;
-}
-
 /* the drive cap is allowed to hide options, but never silently: if
    something it dropped is FASTER than everything still on screen, say so
    under the slider and offer the exact limit that would bring it back. */
@@ -1868,12 +1821,9 @@ function renderResults(parts, opts){
   opts = opts || {};
   itinsById = {}; selId = null; fcCache = {};
 
-  // one pool, drive cap applied, deduped (departure alts collected), then
-  // ranked by rankPool() in core.js
-  const all = [], raw = [];
-  for (const p of parts){ all.push(...visibleIts(p)); raw.push(...(p.its || [])); }
-  const { pool, main, rest, fastestIt, cheapestIt, latestIt } = rankPool(
-    dedupeAlts(all).map(it => ({ it, cost: itineraryCost(it) })), arriveBy);
+  // one pool, drive cap applied, deduped and ranked: rankParts() in core.js
+  const { pool, main, rest, fastestIt, cheapestIt, latestIt, raw } =
+    rankParts(parts, maxDriveM, avoidTolls, arriveBy);
   driveHint(pool, raw);
 
   const errs = [...new Set(parts.filter(p => p.err).map(p => p.err))];

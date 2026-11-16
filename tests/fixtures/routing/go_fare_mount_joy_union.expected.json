@@ -1,0 +1,15 @@
+{
+  "main": [
+    {
+      "minutes": 58,
+      "cost": 10.05,
+      "legs": "RAIL ST",
+      "firstBoard": "Mount Joy GO",
+      "badges": [
+        "Fastest",
+        "Cheapest"
+      ]
+    }
+  ],
+  "rest": []
+}

@@ -1,0 +1,158 @@
+{
+  "_readme": [
+    "Trips for tests/capture-routing-fixtures.mjs. Each one is run against the real engine once and saved under tests/fixtures/routing/.",
+    "'why' says what behaviour the trip guards. Coordinates come from tests/benchmarks.json and tests/audit-trips.json where a trip matches."
+  ],
+  "trips": [
+    {
+      "id": "park_and_ride_headlines",
+      "why": "Drive-to-station appears and beats transit-only for a suburban start going downtown.",
+      "from": {
+        "lat": 43.8828,
+        "lng": -79.4403,
+        "name": "Richmond Hill, Yonge St and Major Mackenzie Dr"
+      },
+      "to": {
+        "lat": 43.6453,
+        "lng": -79.3806,
+        "name": "Union Station"
+      },
+      "weekday": "tuesday",
+      "time": "08:00",
+      "arriveBy": false,
+      "have": {
+        "bike": true,
+        "carStart": true,
+        "carEnd": true,
+        "share": true
+      },
+      "maxDriveKm": 15,
+      "rider": "adult"
+    },
+    {
+      "id": "markham_to_square_one",
+      "why": "A long cross-region trip where two GO buses win. Every drive the engine offers is either beaten by a car-free trip or longer than the drive limit, so none may headline.",
+      "from": {
+        "lat": 43.8563,
+        "lng": -79.3105,
+        "name": "Unionville, Markham"
+      },
+      "to": {
+        "lat": 43.5931,
+        "lng": -79.6423,
+        "name": "Square One, Mississauga"
+      },
+      "weekday": "tuesday",
+      "time": "08:00",
+      "arriveBy": false,
+      "have": {
+        "bike": true,
+        "carStart": true,
+        "carEnd": true,
+        "share": true
+      },
+      "maxDriveKm": 15,
+      "rider": "adult"
+    },
+    {
+      "id": "short_downtown_no_pointless_drive",
+      "why": "A drive that a car-free trip beats (Bathurst and Bloor to Front and Simcoe) is dropped.",
+      "from": {
+        "lat": 43.6655,
+        "lng": -79.411,
+        "name": "Bathurst St and Bloor St W"
+      },
+      "to": {
+        "lat": 43.6445,
+        "lng": -79.3855,
+        "name": "Front St W and Simcoe St"
+      },
+      "weekday": "tuesday",
+      "time": "00:54",
+      "arriveBy": false,
+      "have": {
+        "bike": true,
+        "carStart": true,
+        "carEnd": true,
+        "share": true
+      },
+      "maxDriveKm": 15,
+      "rider": "adult"
+    },
+    {
+      "id": "go_fare_mount_joy_union",
+      "why": "The GO fare table: Mount Joy to Union is adult $10.05, youth $6.03.",
+      "from": {
+        "lat": 43.900521,
+        "lng": -79.26313,
+        "name": "Mount Joy GO"
+      },
+      "to": {
+        "lat": 43.645195,
+        "lng": -79.3806,
+        "name": "Union Station"
+      },
+      "weekday": "tuesday",
+      "time": "08:00",
+      "arriveBy": false,
+      "have": {
+        "bike": false,
+        "carStart": false,
+        "carEnd": false,
+        "share": false
+      },
+      "maxDriveKm": 15,
+      "rider": "adult"
+    },
+    {
+      "id": "short_trip_pure_modes",
+      "why": "Whole-way walk and bike options appear on a short trip and are capped.",
+      "from": {
+        "lat": 43.6487,
+        "lng": -79.3817,
+        "name": "King St and Bay St"
+      },
+      "to": {
+        "lat": 43.6644,
+        "lng": -79.3923,
+        "name": "Queen's Park"
+      },
+      "weekday": "tuesday",
+      "time": "12:00",
+      "arriveBy": false,
+      "have": {
+        "bike": true,
+        "carStart": false,
+        "carEnd": false,
+        "share": true
+      },
+      "maxDriveKm": 15,
+      "rider": "adult"
+    },
+    {
+      "id": "arrive_by_evening",
+      "why": "Arrive-by ranking and the Latest leave badge for a suburb to downtown trip.",
+      "from": {
+        "lat": 43.856,
+        "lng": -79.109,
+        "name": "Pickering"
+      },
+      "to": {
+        "lat": 43.6453,
+        "lng": -79.3806,
+        "name": "Union Station"
+      },
+      "weekday": "tuesday",
+      "time": "18:00",
+      "arriveBy": true,
+      "have": {
+        "bike": true,
+        "carStart": true,
+        "carEnd": true,
+        "share": true
+      },
+      "maxDriveKm": 15,
+      "rider": "adult"
+    }
+  ]
+}
