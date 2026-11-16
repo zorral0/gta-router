@@ -584,8 +584,9 @@ re-verified).
 Each agency's schedule has an end date. After it, the app answers from stale
 data with confidence. Before blaming routing for a regression, check the
 feeds' service dates. A past refresh loaded a TTC feed that did not start
-until a later date; the root-level `use-new-schedules.sh` exists for that
-situation (from older notes, not re-verified).
+until eight days later, and TTC vanished from every trip for a week.
+`refresh.sh` now runs `scripts/check-feeds.py` before building and asks
+before going on when a feed has not started yet.
 
 ---
 

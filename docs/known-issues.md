@@ -2,7 +2,7 @@
 
 How to use this list:
 
-1. Find the issue in the contents, read its **Status** first. Only "open" and "partly done" items are yours to fix.
+1. Find the issue in the contents, read its **Status** first. A status that starts with "open", "partly done" or "written, untested" is yours to work on.
 2. Items marked "needs the owner's decision" or "cannot be fixed" must not be changed without asking the owner.
 3. Search the code for the function name or the quoted string in **Where**. Line numbers move, so none are given.
 4. Do the numbered steps in **How to fix** in order, then do **How to check it worked**.
@@ -43,7 +43,7 @@ Not bugs
 - [18. Not built: which door at Union for GO trains](#18-not-built-which-door-at-union-for-go-trains)
 - [20. Pure car trips are deliberately not offered](#20-pure-car-trips-are-deliberately-not-offered)
 
-Notes: `deploy/`, `ISSUES.md` and `scripts/costs.py` are local-only files, kept out of the public repository on purpose. If a file named here is missing on your copy, that is why.
+Notes: a few files named below are on the owner's computer only and are not in the repository: `scripts/costs.py`, `HANDOFF-go-union-door.md`, `ttc-rider-efficiency-guide-2005.pdf`, the old `ISSUES.md`, and everything in `research/` and `recordings/`. If one is missing on your copy, that is why. `deploy/` IS in the repository.
 
 ---
 
@@ -52,7 +52,7 @@ Notes: `deploy/`, `ISSUES.md` and `scripts/costs.py` are local-only files, kept 
 ### 1. Toggle clicks re-plan with no debounce
 - **Status:** open
 - **What is wrong:** One search sends about 21 questions to the routing engine at once. Every time you flip a "Using:" button, a rider or option control that re-plans, change the day or time, or swap the ends, all 21 go out again immediately. Click three buttons fast and the engine gets the burst three times. Fine on one computer, a problem on a shared hosted engine.
-- **Where:** `web/app.js`, function `plan()` (search for `async function plan`). The page code is being refactored, so search by name. The count of 21 comes from `web/core.js`: `activeCombos` picks the mixes the toggles allow, `reluctancesFor` gives how many queries each runs, and `COMBOS` has 11 mode mixes with every toggle on. Five are single queries that are neither pure nor drive (Transit only, Bike to station, Bike Share at the start, Bike Share at the end, Bike + Bike Share at the end). Three are "pure" single queries (the three `pure:` entries: bike, Bike Share, walk the whole way). That is 8 single queries. The four mixes marked `drive: true` run once per value in `DRIVE_RELUCTANCE` (`[30.0, 2.0, 1.0]`, so 3 each), and "Drive to station" has `extraReluctance: [8.0]`, so it runs 4 times. 8 + 4 + 3 + 3 + 3 = 21. All four toggles default to on (in `web/app.js`, `let have = Object.assign({ bike: true, carStart: true, carEnd: true, share: true }`), so 21 is the default.
+- **Where:** `web/app.js`, function `plan()` (search for `async function plan`). The page code is being refactored, so search by name. The count of 21 comes from `web/core.js`: `activeCombos` picks the mixes the toggles allow, `reluctancesFor` gives how many queries each runs, and `COMBOS` has 12 mode mixes with every toggle on. Five are single queries that are neither pure nor drive (Transit only, Bike to station, Bike Share at the start, Bike Share at the end, Bike + Bike Share at the end). Three are "pure" single queries (the three `pure:` entries: bike, Bike Share, walk the whole way). That is 8 single queries. The four mixes marked `drive: true` run once per value in `DRIVE_RELUCTANCE` (`[30.0, 2.0, 1.0]`, so 3 each), and "Drive to station" has `extraReluctance: [8.0]`, so it runs 4 times. 8 + 4 + 3 + 3 + 3 = 21. All four toggles default to on (in `web/app.js`, `let have = Object.assign({ bike: true, carStart: true, carEnd: true, share: true }`), so 21 is the default.
   Call sites of `plan()` (search `plan()` and `, plan)` in `web/app.js`):
   - Plan trip button: `document.getElementById("go").onclick = plan;` (leave as is)
   - Toggles and controls, which should be debounced: `document.getElementById("daySel").addEventListener("change", plan)`, the same for `timeSel`, the `bikeSel` change handler (comment "routing changes, not just filtering"), the `#whenSeg button` handler (Leave now / Arrive by), the `HAVE_LABEL` loop's `b.onclick` (the four "Using:" buttons), and `swapEnds()`.
@@ -74,7 +74,7 @@ Notes: `deploy/`, `ISSUES.md` and `scripts/costs.py` are local-only files, kept 
 ### 2. No rate limiting in front of a hosted engine
 - **Status:** open (cannot be tested until a server exists)
 - **What is wrong:** Anyone who finds the address can send unlimited searches, and each costs about 21 engine queries. A few fast users could slow the engine for everyone. Caddy has no rate limiting built in.
-- **Where:** `deploy/server-setup.sh` (local only). Search for `Open 80 and 443 here` and the line `command -v netfilter-persistent`. `deploy/Caddyfile` is where a Caddy plugin would be configured.
+- **Where:** `deploy/server-setup.sh`. Search for `Open 80 and 443 here` and the line `command -v netfilter-persistent`. `deploy/Caddyfile` is where a Caddy plugin would be configured.
 - **How to fix:**
   1. Simplest: a firewall rule on the server that limits new connections to port 443 per source address. In `deploy/server-setup.sh`, after the `for p in 80 443` loop and before the `command -v netfilter-persistent` line, add:
      ```bash
@@ -96,7 +96,7 @@ Notes: `deploy/`, `ISSUES.md` and `scripts/costs.py` are local-only files, kept 
 ### 21. Cloud setup files have never been run on a server
 - **Status:** written, untested until a server exists (found while writing this list)
 - **What is wrong:** The older review said the cloud engine could not load GO alerts or Durham delays. The files now fix this: `deploy/gta-otp.service` sets `GTA_ROUTER_DIR`, `deploy/gta-go-alerts.service` and `deploy/gta-drt-rt.service` exist, `deploy/push-engine.sh` uploads the filter scripts and the Durham zip, and `deploy/server-setup.sh` enables the services. But no server has ever existed, so none of it has run.
-- **Where:** the files above, all in `deploy/` (local only). `docs/runbooks.md` section 4 still lists this as a gap and says the service file lacks `GTA_ROUTER_DIR`; that text is out of date compared with the files.
+- **Where:** the files above, all in `deploy/`.
 - **How to fix:**
   1. When a server exists, follow `docs/runbooks.md` section 4.
   2. After `server-setup.sh` finishes, run `sudo systemctl status gta-go-alerts gta-drt-rt gta-otp` and confirm all three are active.
@@ -162,7 +162,7 @@ Notes: `deploy/`, `ISSUES.md` and `scripts/costs.py` are local-only files, kept 
 ### 6. The page code is one 3300-line file
 - **Status:** open, optional
 - **What is wrong:** Nothing a user notices. `web/app.js` is hard to navigate and a weaker model can easily break something while editing it.
-- **Where:** `web/app.js` (3267 lines) and the `<style>` block in `web/index.html` (about 685 lines, from `<style>` to `</style>`). The file's own section comments show the groups: icons (`ICONS`, `icn`), subway diagrams (`BOARDING`, `boardingInfo`, `trainDiagram`), map looks (`LOOKS`, `PALETTES`, `appleGeometry`, `recolorStyle`, `applyLook`), highway shields (`SHIELD_REFS`, `prepareShields`, `ensureShields`), POI badges (`POI_BADGE`, `badgeSvg`, `ensurePoiBadges`), map buttons (look, 3D, rotate, compass), route drawing (`ensureRoute`, `drawRoute`), transit lines (`ensureTransit`), Bike Share docks (`loadDocks`), search suggestions (`attachSuggest`), planning (`fetchCombo`, `plan`), results (`renderResults`, `cardHTML`), detail view (`renderDetail`), controls, More menu, themed dropdowns (`skinSelect`), and Reach mode (the `REACH MODE` block).
+- **Where:** `web/app.js` (about 3,200 lines) and the `<style>` block in `web/index.html` (about 685 lines, from `<style>` to `</style>`). The file's own section comments show the groups: icons (`ICONS`, `icn`), subway diagrams (`BOARDING`, `boardingInfo`, `trainDiagram`), map looks (`LOOKS`, `PALETTES`, `appleGeometry`, `recolorStyle`, `applyLook`), highway shields (`SHIELD_REFS`, `prepareShields`, `ensureShields`), POI badges (`POI_BADGE`, `badgeSvg`, `ensurePoiBadges`), map buttons (look, 3D, rotate, compass), route drawing (`ensureRoute`, `drawRoute`), transit lines (`ensureTransit`), Bike Share docks (`loadDocks`), search suggestions (`attachSuggest`), planning (`fetchCombo`, `plan`), results (`renderResults`, `cardHTML`), detail view (`renderDetail`), controls, More menu, themed dropdowns (`skinSelect`), and Reach mode (the `REACH MODE` block).
 - **How to fix:** Do only the two safe splits, one at a time, no build step:
   1. Move the CSS into `web/style.css` and replace the `<style>` block with `<link rel="stylesheet" href="style.css">`. Check that `deploy/deploy-web.sh` and any file lists include the new file.
   2. Move the map styling group (from the `map (vector, light/dark follows the system)` section through the POI badge functions, roughly lines 125 to 780) into `web/map-style.js`, loaded as a classic script before `app.js`. `app.js` is a classic script on purpose (its top-level `let` and `const` are shared with `core.js`), so do not turn anything into a module.

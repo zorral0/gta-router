@@ -1,0 +1,46 @@
+{
+  "main": [
+    {
+      "minutes": 55,
+      "cost": 10.59,
+      "legs": "CAR > WALK > RAIL LE > WALK",
+      "firstBoard": "Rouge Hill GO",
+      "badges": [
+        "Fastest"
+      ]
+    },
+    {
+      "minutes": 62,
+      "cost": 10.5,
+      "legs": "CAR > WALK > RAIL LE > WALK",
+      "firstBoard": "Pickering GO",
+      "badges": []
+    },
+    {
+      "minutes": 63,
+      "cost": 10.48,
+      "legs": "CAR > WALK > RAIL LE > WALK",
+      "firstBoard": "Pickering GO",
+      "badges": []
+    },
+    {
+      "minutes": 78,
+      "cost": 9.4,
+      "legs": "BICYCLE > WALK > RAIL LE > WALK",
+      "firstBoard": "Pickering GO",
+      "badges": [
+        "Latest leave",
+        "Cheapest"
+      ]
+    }
+  ],
+  "rest": [
+    {
+      "minutes": 94,
+      "cost": 9.4,
+      "legs": "WALK > BUS 112 > WALK > RAIL LE > WALK",
+      "firstBoard": "Liverpool Southbound @ Finch",
+      "badges": []
+    }
+  ]
+}

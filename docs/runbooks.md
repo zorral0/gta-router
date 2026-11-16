@@ -152,8 +152,9 @@ EXPIRED, NOT STARTED YET or MISSING, or about every month (TTC changes its
 schedule about every 6 weeks). Also when the app shows its red "schedule data
 runs out" warning.
 
-**How long it takes:** 10 to 15 minutes of waiting, mostly the two graph
-builds. You need about 8 GB of free memory, so close other apps first.
+**How long it takes:** 15 to 35 minutes of waiting, mostly the two graph
+builds. It took 35 minutes on 2026-11-16 on a 16 GB laptop with other apps
+open; the "~4 min" the script prints for each build is the best case. You need about 8 GB of free memory, so close other apps first.
 
 Why it matters: when an agency's schedule runs out, the app quietly finds no
 trips for that agency. Nothing tells you.

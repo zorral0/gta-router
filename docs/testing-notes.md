@@ -68,7 +68,9 @@ macOS privacy protection (TCC) blocks the coding tool's preview server from
 reading the Downloads folder, so a server started inside the repository shows
 nothing or errors. Workaround: serve a COPY of `web/` from the session's
 scratchpad folder (for example `scratchpad/webroot/`), using a
-`.claude/launch.json` entry that points there. Then:
+`.claude/launch.json` entry that points there (that is a local settings file
+of the Claude Code tool, not part of this repository; other tools have their
+own way to start a preview server). Then:
 
 - Copy again (`cp -R web/. <webroot>/`) after EVERY edit, or you will test old
   code.

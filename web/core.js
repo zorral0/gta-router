@@ -683,6 +683,106 @@ function filterCombo(combo, its){
   return its;
 }
 
+/* ---- asking the engine, and turning its answers into the ranked list ----
+   Everything between "which mixes are on" and "the ranked pool" lives here,
+   with no network and no page in it, so tests/routing.test.mjs can replay
+   answers saved from the real engine through the very same code the page
+   runs. app.js only does the fetch, the spinner and the drawing. */
+
+/* OTP 2.9: the old "plan" query is GONE - this is planConnection.
+   Coordinates are latitude/longitude here (the old API wanted lat/lon!),
+   times are ISO strings, legs carry start/end objects and stopCalls. */
+const PC_QUERY = `query PC($origin:PlanLabeledLocationInput!,
+    $destination:PlanLabeledLocationInput!,$dateTime:PlanDateTimeInput!,
+    $modes:PlanModesInput!,$first:Int,$prefs:PlanPreferencesInput){
+  planConnection(origin:$origin,destination:$destination,dateTime:$dateTime,
+                 modes:$modes,first:$first,preferences:$prefs){
+    edges{node{ duration start end
+      legs{ mode distance duration headsign rentedBike
+            start{scheduledTime estimated{time}}
+            end{scheduledTime estimated{time}}
+            agency{gtfsId name} route{shortName longName color}
+            from{name lat lon stop{gtfsId}} to{name lat lon stop{gtfsId}}
+            stopCalls{stopLocation{... on Stop {name}}}
+            alerts{ id alertHeaderText alertDescriptionText alertUrl
+                    alertSeverityLevel effectiveStartDate effectiveEndDate }
+            legGeometry{points} } } } } }`;
+
+/* The exact `variables` for one engine question: one mode mix, one car
+   reluctance (null for non-drive mixes). from/to are {lat, lng}. Kept apart
+   from the fetch so the fixture-capture script asks the engine precisely
+   what the page asks. */
+function planVariables(combo, from, to, date, time, arriveBy, carReluctance, bikePref){
+  return {
+    origin: { location: { coordinate:
+      { latitude: from.lat, longitude: from.lng } } },
+    destination: { location: { coordinate:
+      { latitude: to.lat, longitude: to.lng } } },
+    // Arrive by pins the ARRIVAL end. Verified live: "first" already
+    // returns the best (latest-departing) trips for latestArrival too;
+    // "last" pads in pointlessly-early departures - don't use it.
+    dateTime: arriveBy
+      ? { latestArrival: torontoISO(date, time) }
+      : { earliestDeparture: torontoISO(date, time) },
+    first: 8,
+    modes: comboModes(combo),
+    prefs: comboPrefs(combo, carReluctance, bikePref) };
+}
+
+/* What one engine answer (its list of itinerary nodes) becomes: reshaped,
+   filtered down to what this mode mix really means, deduplicated and cut. */
+function comboAnswer(combo, nodes){
+  const its = filterCombo(combo, nodes.map(normalizeItin));
+  if (combo.pure) return its;     // already the single best ride, or nothing
+  // drive queries keep more: at reluctance 1.0 the engine returns six real
+  // park-and-ride answers spread from 2 km to 39 km, and a keep of 4 cut
+  // exactly the middle ones this combo was already bad at finding
+  return dedupeAlts(its).slice(0, combo.drive ? 8 : 4);
+}
+
+/* Drive queries run once per reluctance and are merged, so the drive slider
+   always has near, middle and far lots to choose from without re-querying. */
+function mergeDriveTries(tries){
+  return spreadByDrive(dedupeAlts([].concat(...tries)));
+}
+
+/* the mode mixes the current "Using" toggles allow */
+function activeCombos(have){
+  return COMBOS.filter(c => c.need.every(k => have[k]));
+}
+
+/* the car reluctances a mode mix is asked at: every drive mix runs once per
+   DRIVE_RELUCTANCE (plus its own extras), everything else just once with
+   no reluctance */
+function reluctancesFor(combo){
+  return combo.drive
+    ? DRIVE_RELUCTANCE.concat(combo.extraReluctance || [])
+    : [null];
+}
+
+/* itineraries a part actually shows, after the "max drive" cap
+   (applies to both drive categories - "at the end" should stay short) */
+function visibleTrips(part, maxDriveM, avoidTolls){
+  let its = part.its || [];
+  if (part.c.drive)
+    its = its.filter(it => longestCarLegM(it) <= maxDriveM);
+  if (avoidTolls) its = its.filter(it => !isTolled(it));
+  return its;
+}
+
+/* parts -> the ranked result: one pool, drive cap applied, deduped
+   (departure alts collected), then ranked by rankPool(). `raw` is every
+   trip before the cap, which the page needs to say what the cap hid. */
+function rankParts(parts, maxDriveM, avoidTolls, arriveBy){
+  const all = [], raw = [];
+  for (const p of parts){
+    all.push(...visibleTrips(p, maxDriveM, avoidTolls));
+    raw.push(...(p.its || []));
+  }
+  return { ...rankPool(dedupeAlts(all).map(it => ({ it, cost: itineraryCost(it) })),
+                       arriveBy), raw };
+}
+
 /* ---- ranking ----
    Ranking is fastest first in both modes. Ranking "Arrive by" results by
    how late you can leave buries genuinely fast trips that happen to leave

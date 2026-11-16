@@ -1,0 +1,65 @@
+{
+  "main": [
+    {
+      "minutes": 85,
+      "cost": 13.3,
+      "legs": "WALK > BUS 52 > WALK > BUS 47 > WALK",
+      "firstBoard": "YMCA Blvd. @ Kennedy Rd.",
+      "badges": [
+        "Fastest",
+        "Cheapest"
+      ]
+    }
+  ],
+  "rest": [
+    {
+      "minutes": 86,
+      "cost": 13.3,
+      "legs": "WALK > BUS 40 > WALK",
+      "firstBoard": "YMCA Blvd. @ Kennedy Rd.",
+      "badges": []
+    },
+    {
+      "minutes": 87,
+      "cost": 13.3,
+      "legs": "BICYCLE > WALK > BUS 52 > WALK > BUS 47 > WALK",
+      "firstBoard": "YMCA Blvd. @ Kennedy Rd.",
+      "badges": []
+    },
+    {
+      "minutes": 87,
+      "cost": 13.3,
+      "legs": "WALK > BUS 56 > WALK",
+      "firstBoard": "YMCA Blvd. @ Kennedy Rd.",
+      "badges": []
+    },
+    {
+      "minutes": 88,
+      "cost": 13.3,
+      "legs": "BICYCLE > WALK > BUS 40 > WALK",
+      "firstBoard": "YMCA Blvd. @ Kennedy Rd.",
+      "badges": []
+    },
+    {
+      "minutes": 89,
+      "cost": 13.3,
+      "legs": "BICYCLE > WALK > BUS 56 > WALK",
+      "firstBoard": "YMCA Blvd. @ Kennedy Rd.",
+      "badges": []
+    },
+    {
+      "minutes": 101,
+      "cost": 13.3,
+      "legs": "WALK > BUS 40 > WALK",
+      "firstBoard": "YMCA Blvd. @ Kennedy Rd.",
+      "badges": []
+    },
+    {
+      "minutes": 103,
+      "cost": 13.3,
+      "legs": "BICYCLE > WALK > BUS 40 > WALK",
+      "firstBoard": "YMCA Blvd. @ Kennedy Rd.",
+      "badges": []
+    }
+  ]
+}
