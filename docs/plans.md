@@ -4,6 +4,9 @@ Four threads were open when this was written (2026-11-16). For each: the
 goal, what is already decided (do not reopen it without the owner), what is
 still open, and the next three concrete steps.
 
+The sections are grouped by thread, not by priority. The order to work in is
+`HANDOFF.md`, "What to do next".
+
 If you finish a step, edit this file: move it to "Decided / done" and write
 the next one. A plan that is not kept current is worse than none.
 

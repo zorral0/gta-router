@@ -45,7 +45,7 @@ that way. Strings built in JavaScript do not exist in the source as readable
 text until a menu opens.
 
 HOW TO CHECK, two layers:
-1. Source: `bash check-em-dashes.sh` (exit 0 is clean). CI runs the same
+1. Source: `bash check-em-dashes.sh` in the repository root (exit 0 is clean). CI runs the same
    pattern over `web/index.html`, `web/app.js` and `web/core.js` on every push
    (`.github/workflows/tests.yml`, step "No em dashes in the app's text").
 2. Runtime: CI cannot see strings assembled in JS. Load the app, open every

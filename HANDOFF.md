@@ -34,6 +34,19 @@ only for the "Reach map" (shade everywhere reachable in a given time).
 There is no build step, no framework and no installed packages. Python
 scripts use the standard library only. Keep it that way.
 
+Words used throughout:
+
+| Word | Meaning |
+|---|---|
+| OTP | OpenTripPlanner, the routing engine |
+| GTFS, "feed", "schedule" | The timetable file each transit agency publishes. Each has a first and a last day of service |
+| Graph | The file OTP builds from the map and the schedules (`engine/graph.obj`). Rebuilt whenever either changes |
+| Mode mix | One way of combining travel: "transit only", "drive to a station", "Bike Share at the end". Each is one question to the engine |
+| Reluctance | A number telling the engine how much to dislike driving. The app asks at several values because each returns a different station |
+| Park-and-ride tag | The `park_ride=yes` label in OpenStreetMap. The engine only parks at lots that carry it |
+| PRESTO, One Fare | The region's fare card, and the program that makes a second agency's ride free after the first |
+| Live feed | An agency's real-time data: vehicle positions, delays, alerts |
+
 ---
 
 ## 2. Rules before you touch anything
@@ -50,7 +63,7 @@ scripts use the standard library only. Keep it that way.
   `docs/design-rules.md` record what was tried, measured and rejected. If you
   think one is wrong, show new evidence to the owner first.
 - **No em dashes in anything a user reads.** Use a colon, a comma or a full
-  stop. The tests check the page source for this.
+  stop. `bash check-em-dashes.sh` and GitHub check the page source for this.
 - **The repository is public.** No names, personal trips, keys or account
   details in code, comments, docs, tests or commit messages.
 - **Run the tests before every commit** (section 4). After any change that
@@ -138,6 +151,10 @@ python3 tests/check-feeds.py
 python3 tests/record-feeds.py
 ```
 
+```bash
+bash check-em-dashes.sh
+```
+
 What each one protects:
 
 | Test | What breaks if it fails |
@@ -146,8 +163,9 @@ What each one protects:
 | `tests/routing.test.mjs` | The whole "plan a trip" decision, replayed on saved real engine answers. Catches a change that alters which trips are shown, even if nobody remembers why the code is the way it is |
 | `tests/config-guard.py` | Engine settings and the park-and-ride patch that routing silently depends on. Each failure says what breaks and what to restore |
 | `tests/fare-sync.py` | Every loaded agency has a fare |
-| `tests/check-feeds.py` | The schedule expiry checker |
-| `tests/record-feeds.py` | The live-data recorder |
+| `tests/check-feeds.py` | Tests OF the schedule expiry checker. The checker you actually run is `scripts/check-feeds.py` |
+| `tests/record-feeds.py` | Tests OF the live-data recorder (`scripts/record-feeds.py`) |
+| `check-em-dashes.sh` | No em dash in the page's source |
 
 With the app running, the routing benchmark asks the real engine for ten
 known trips and grades the answers. Run it after any change to routing, to
@@ -160,7 +178,16 @@ python3 tests/benchmark.py
 If `tests/routing.test.mjs` says results changed: read its message. If you
 meant to change ranking, fares or filters, regenerate the expected files as
 it describes and read the difference before committing. If you did not mean
-to, your change broke routing.
+to, your change broke routing. To regenerate:
+
+```bash
+UPDATE_ROUTING_SNAPSHOTS=1 node --test tests/routing.test.mjs
+```
+
+That keeps the saved engine answers and only rewrites what the page is
+expected to make of them. To save fresh engine answers instead (after a
+schedule refresh, say, with the app running), run
+`node tests/capture-routing-fixtures.mjs` first.
 
 Traps when testing from an AI coding tool (hidden browser tabs freeze the
 map, and more) are in `docs/testing-notes.md`.
@@ -175,7 +202,8 @@ map, and more) are in `docs/testing-notes.md`.
 | `web/app.js` | The page's code: map, search boxes, results list, menus |
 | `web/core.js` | The rules, with no page or map in them: fares, tolls, the mode mixes, filtering, ranking, Toronto time. Unit-tested |
 | `web/*.json` | Data the page loads: GO fare table, toll grid and rates, transit line shapes, subway boarding positions |
-| `engine/*.json` | OTP settings. Read `docs/routing-notes.md` before editing: wrong keys fail silently |
+| `engine/*.json` | OTP settings for the trip engine. Read `docs/routing-notes.md` before editing: wrong keys fail silently |
+| `engine/reach-engine/*.json` | Settings for the Reach map engine: the same routing settings, with live data switched off on purpose |
 | `engine/` (not in git) | Downloaded schedules, the map, the two OTP jars, the built graphs |
 | `scripts/feeds.sh` | The one list of schedule download links |
 | `scripts/check-feeds.py` | Says which schedules have expired |
@@ -202,8 +230,11 @@ The docs, and when to read each:
 
 On the owner's computer only, never in the repository: the Metrolinx key
 (`metrolinx.env`), everything downloaded or built in `engine/`, the
-recordings (`recordings/`), the research study (`research/`), and older
-working notes (`HANDOFF-archive-*.md`, `ISSUES.md`). The archives are long
+recordings (`recordings/`), the research study (`research/`), an unused
+fare calculator (`scripts/costs.py`), the 2005 guide the subway boarding
+data came from (a PDF), a design note for an unbuilt feature
+(`HANDOFF-go-union-door.md`), and older working notes
+(`HANDOFF-archive-*.md`, `ISSUES.md`). The archives are long
 session-by-session history. Everything still true in them has been moved
 into the docs above, so you should not need them.
 
