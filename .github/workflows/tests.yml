@@ -29,6 +29,13 @@ jobs:
       - name: Feed recorder checks
         run: python3 tests/record-feeds.py
 
+      # settings the routing silently depends on (see docs/routing-notes.md)
+      - name: Engine settings guard
+        run: python3 tests/config-guard.py && python3 tests/config-guard.py --self-test
+
+      - name: Schedule expiry checker
+        run: python3 tests/check-feeds.py
+
       - name: Python scripts compile
         run: python3 -m py_compile scripts/*.py tests/*.py
 
