@@ -1,0 +1,20 @@
+[Unit]
+Description=GTA Router Durham delays filter (rewrites a clean copy of the DRT trip updates feed)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/gta-router
+# One pass first, like run.sh, so drt-rt-filtered.pb exists before the
+# engine starts. The leading "-" means a failed fetch does not stop the
+# unit; the loop below retries. Needs engine/drt-gtfs.zip (push-engine.sh
+# uploads it); restart this unit after that zip changes.
+ExecStartPre=-/usr/bin/python3 -u scripts/drt-rt-filter.py --once
+# No arguments = loop forever, rewriting the file every 50 seconds.
+ExecStart=/usr/bin/python3 -u scripts/drt-rt-filter.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

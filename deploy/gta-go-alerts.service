@@ -1,0 +1,21 @@
+[Unit]
+Description=GTA Router GO alerts filter (rewrites a clean copy of the Metrolinx alerts feed)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/gta-router
+# The script also reads metrolinx.env itself; this mirrors gta-otp.service.
+EnvironmentFile=/home/ubuntu/gta-router/metrolinx.env
+# One pass first, like run.sh, so go-alerts-filtered.pb exists before the
+# engine starts (the engine waits for this unit to be started). The leading
+# "-" means a failed fetch does not stop the unit; the loop below retries.
+ExecStartPre=-/usr/bin/python3 -u scripts/go-alerts-filter.py --once
+# No arguments = loop forever, rewriting the file every 50 seconds.
+ExecStart=/usr/bin/python3 -u scripts/go-alerts-filter.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,13 @@
+# Front door of the cloud engine. Only the two addresses the app uses are
+# open to the internet; the engines' own debug pages stay private.
+# ENGINE_HOST is filled in by server-setup.sh. Caddy fetches the HTTPS
+# certificate for it automatically.
+ENGINE_HOST {
+	handle /otp/gtfs/* {
+		reverse_proxy localhost:8080
+	}
+	handle /otp/traveltime/* {
+		reverse_proxy localhost:8090
+	}
+	respond 404
+}

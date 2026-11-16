@@ -1,0 +1,12 @@
+[Unit]
+Description=GTA Router reach engine (OTP 2.5, isochrones only)
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/gta-router
+ExecStart=/usr/bin/java -Xmx3G -jar otp25.jar --load reach-engine --port 8090 --bindAddress 127.0.0.1
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
