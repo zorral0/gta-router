@@ -51,6 +51,28 @@ python3 ../scripts/patch_ttc_transfers.py   # TTC ships no transfers.txt
 python3 ../scripts/make_go_fares.py         # real GO fare table -> web/go-fares.json
 python3 ../scripts/make_transit_lines.py    # lines drawn on the map -> web/transit-lines.json
 
+# A feed that has run out, has not started yet or is missing would break
+# today's trips (once a refresh loaded a TTC feed that started 8 days later
+# and TTC vanished for a week). Say so before building, and let you keep the
+# old graph instead. The default is No; with no terminal to ask, stop.
+echo ""
+if ! python3 ../scripts/check-feeds.py; then
+  echo ""
+  echo "WARNING: the schedules above are not all usable today."
+  echo "If you build now, trips for those agencies may be missing."
+  echo "Your current graph is untouched; you can stop here and try again later."
+  if [ ! -t 0 ]; then
+    echo "No terminal to ask, so stopping without building."
+    exit 1
+  fi
+  printf "Build anyway? (y/N) "
+  read -r answer
+  case "$answer" in
+    y|Y|yes|YES) echo "Building anyway." ;;
+    *) echo "Stopped. Nothing was built."; exit 1 ;;
+  esac
+fi
+
 echo ""
 echo "=== 3/4 Rebuilding the reach-map graph (2.5 engine, ~4 min) ==="
 # back up the current graphs before any build overwrites graph.obj
