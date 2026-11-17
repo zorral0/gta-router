@@ -1,0 +1,19 @@
+trip,from,to,google_min,planner_min,planner_route,surface_0800_min,surface_read,planner_minus_google,surface_minus_google,flags
+1,Union Station,Yonge & Eglinton,21,27.1,subway 1,32.0,cell,6.1,11.0,CHECK planner; check surface
+2,Kensington Market,Pape & Danforth,40,38.4,tram 510 + subway 2,42.3,cell,-1.6,2.3,
+3,Jane & Finch,Yorkdale Shopping Centre,35,40.0,tram 6 + subway 1,44.6,cell,5.0,9.6,check surface
+4,Jane & Finch,Vaughan Metropolitan Centre,25,34.0,tram 6 + subway 1,39.1,cell,9.0,14.1,CHECK planner; check surface
+5,Scarborough Town Centre,Kennedy Station,17,22.7,bus 904,25.6,cell,5.7,8.6,CHECK planner; check surface
+6,Scarborough Town Centre,Fairview Mall,35,38.8,bus 41,39.9,cell,3.8,4.9,
+7,Square One Shopping Centre,Port Credit GO,38,47.3,bus 2,50.9,cell,9.3,12.9,CHECK planner; check surface
+8,Brampton GO,Bramalea City Centre,20,25.2,bus 501,26.3,cell,5.2,6.3,CHECK planner; check surface
+9,Union Station,Pearson Airport Terminal 1,52,49.4,rail UP,45.9,cell,-2.6,-6.1,
+10,Mount Joy GO,CF Markville,38,42.0,bus 102 + bus purple,42.9,cell,4.0,4.9,
+11,Richmond Hill Centre (Yonge & Hwy 7),CF Markville,32,54.9,bus 001,,unreached,22.9,,CHECK planner; CHECK surface unreached
+12,Vaughan Metropolitan Centre,Yorkdale Shopping Centre,30,35.0,subway 1,38.6,cell,5.0,8.6,check surface
+13,Oshawa Centre,Whitby GO,41,44.1,bus 900 + bus 302,43.6,cell,3.1,2.6,
+14,Oakville GO,Oakville Place,14,20.4,bus 56,21.7,cell,6.4,7.7,CHECK planner; check surface
+15,Burlington GO,Oakville Trafalgar Memorial Hospital,51,50.8,bus 2 + bus 5,,unreached,-0.2,,
+16,Milton GO,Square One Shopping Centre,53,70.5,rail MI + bus 9,,unreached,17.5,,CHECK planner
+17,Pearson Airport Terminal 1,Square One Shopping Centre,77,53.5,bus 7 + bus 107,50.1,cell,-23.5,-26.9,CHECK planner; check surface
+18,Kennedy Station,Union Station,42,40.2,rail ST,45.1,cell,-1.8,3.1,

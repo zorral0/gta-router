@@ -1,0 +1,48 @@
+# research/ tracks code, notes and small hand-made tables only.
+# Data is rebuilt by each folder's build script (see SOURCE.md) and stays local:
+# it is large, and some sources (e.g. TTS) have terms that limit redistribution.
+
+# Ignore everything by default ...
+*
+!*/
+
+# ... then keep code and notes
+!.gitignore
+!*.py
+!*.sh
+!*.md
+!requirements.txt
+
+# Hand-entered or hand-reviewed tables (not reproducible by script)
+!data/traffic/calibration_trips.csv
+!data/transit_check/transit_trips.csv
+!data/grocery/grocery_audit_*.csv
+!data/grocery/grocery_check_all_209.csv
+!phase2/pilot_origins_snapped.csv
+
+# Small pre-run test results cited in the review
+!phase2/pretest_results/*.csv
+!phase2/pretest_results/output.txt
+
+# Two tiny sample maps that pin the map reader's test (phase2/test_surface.py)
+!phase2/test_data/*.tif
+
+# Never descend into these
+.venv/
+**/raw/
+**/cache/
+**/__pycache__/
+**/*surfaces/
+plan/node_modules/
+
+# Kept on the owner's computer for now: the working notebook, review drafts,
+# personal notes and the paper drafts. The methods are published with the
+# report itself.
+/PLAN.md
+/STUDY-DESIGN.md
+/RESEARCH-PLAN-*.md
+/HANDOFF-*.md
+/phase5/NOTES-*.md
+/phase5/backup-*/
+# Travel survey (TTS) numbers wait for the Data Management Group's terms.
+/data/tts/SOURCE.md

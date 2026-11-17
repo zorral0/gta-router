@@ -43,7 +43,7 @@ Not bugs
 - [18. Not built: which door at Union for GO trains](#18-not-built-which-door-at-union-for-go-trains)
 - [20. Pure car trips are deliberately not offered](#20-pure-car-trips-are-deliberately-not-offered)
 
-Notes: a few files named below are on the owner's computer only and are not in the repository: `scripts/costs.py`, `HANDOFF-go-union-door.md`, `ttc-rider-efficiency-guide-2005.pdf`, the old `ISSUES.md`, and everything in `research/` and `recordings/`. If one is missing on your copy, that is why. `deploy/` IS in the repository.
+Notes: a few files named below are on the owner's computer only and are not in the repository: `scripts/costs.py`, `HANDOFF-go-union-door.md`, `ttc-rider-efficiency-guide-2005.pdf`, the old `ISSUES.md`, everything in `recordings/`, and the data, notes and drafts in `research/` (its scripts are in the repository). If one is missing on your copy, that is why. `deploy/` IS in the repository.
 
 ---
 

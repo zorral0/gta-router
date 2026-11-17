@@ -90,9 +90,11 @@ trip on paper". This answers "how often does that trip actually work".
 people worst, using this project's routing engine: a journal-style paper
 (PDF) and a companion web page with maps.
 
-Everything for it lives in `research/`, which is deliberately NOT in this
-repository (it stays on the owner's computer). `research/PLAN.md` is the full
-record of every decision and number, and `research/` has no backup yet.
+Everything for it lives in `research/`. The scripts, the source notes and the
+small hand-checked tables are in this repository (`research/README.md`). The
+data (about 9 GB), the travel survey exports, the working notes and the paper
+drafts stay on the owner's computer, including `research/PLAN.md`, the full
+record of every decision and number. Those local files have no backup yet.
 
 **Decided / done.**
 
