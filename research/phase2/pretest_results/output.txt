@@ -1,0 +1,45 @@
+[cutoff] 60 surfaces, 60 to request
+  wrote research/phase2/pretest_results/cutoff.csv
+
+TEST 1: does the requested cutoff change results? (1.000 = identical)
+  30-min area, 45M request / 30M request       median   0.907  min   0.807  max   0.926
+  45-min area, 60M request / 45M request       median   0.940  min   0.909  max   0.967
+  % of 30-min cells reached in only one        median  66.550  min   7.400  max 100.000
+  median |seconds| difference, shared cells    median 113.750  min   0.000  max 436.000
+[calib] 30 surfaces, 30 to request
+  wrote research/phase2/pretest_results/calibration_grid.csv
+
+CALIBRATION against the car surface (15/15 trips readable; 0 needed the 45M surface)
+  surface time / planner time                  median   1.148  min   1.073  max   1.786
+  OLD factor (Google mid / planner)            median   1.340  min   0.950  max   2.330
+  NEW factor mid / surface (all, n=15)         median   1.160  min   0.552  max   1.942
+  NEW factor mid / surface (city, n=8)         median   1.007  min   0.552  max   1.325
+  NEW factor mid / surface (highway, n=7)      median   1.247  min   1.152  max   1.942
+  NEW factor low / surface (all)               median   0.715  min   0.394  max   1.110
+  NEW factor high / surface (all)              median   1.595  min   0.710  max   2.774
+  -> central factor 1.16; run_reach.py SLOWED_CAR_S would be 1552 s (currently 1333 s)
+[departs] 1400 surfaces, 1380 to request
+  100/1380
+  200/1380
+  300/1380
+  400/1380
+  500/1380
+  600/1380
+  700/1380
+  800/1380
+  900/1380
+  1000/1380
+  1100/1380
+  1200/1380
+  1300/1380
+  wrote research/phase2/pretest_results/departures.csv
+
+TEST 2: 7 departures 10 min apart vs every minute (% error of the median area)
+  30 min: plan's sample, |error %|             median   3.200  min   0.000  max  21.300
+  30 min: worst of 10 start offsets, |error %| median  17.300  min   7.200  max  28.500
+  30 min: every 5 min (13), worst |error %|    median   7.600  min   2.600  max  17.300
+  30 min: origins where some 10-min offset is off by >10%: 17/20
+  45 min: plan's sample, |error %|             median   3.950  min   0.300  max  16.100
+  45 min: worst of 10 start offsets, |error %| median  10.950  min   3.500  max  21.400
+  45 min: every 5 min (13), worst |error %|    median   5.400  min   2.300  max  19.300
+  45 min: origins where some 10-min offset is off by >10%: 11/20

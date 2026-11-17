@@ -1,0 +1,19 @@
+trip,from,to,google_arrive,google_route,notes
+1,Union Station,Yonge & Eglinton,8:21,line 1 direclty up ,
+2,Kensington Market,Pape & Danforth,8:40,"walk to 510, get off at spadina stn then take line 2 to pape, walk to intersection",
+3,Jane & Finch,Yorkdale Shopping Centre,8:35,take line 6 to finch west and take line 1 to yorkdale,
+4,Jane & Finch,Vaughan Metropolitan Centre,8:25,line 6 to finch west then line 1 to vaughan metro,
+5,Scarborough Town Centre,Kennedy Station,8:17,903A,
+6,Scarborough Town Centre,Fairview Mall,8:35,take 41 from scarborough centre bus terminal to sheppard ave e and walk to fairview mall,
+7,Square One Shopping Centre,Port Credit GO,8:38,take the 2 ,
+8,Brampton GO,Bramalea City Centre,8:20,take 501,
+9,Union Station,Pearson Airport Terminal 1,8:52,UP express,
+10,Mount Joy GO,CF Markville,8:38,102 then purple bus,
+11,Richmond Hill Centre (Yonge & Hwy 7),CF Markville,8:32,GO bus 52 to Unionville GO Bus then GO bus 71 to Bullock Dr @ Hwy 7,rechecked from screenshot 2026-09-14 (was 8:38)
+12,Vaughan Metropolitan Centre,Yorkdale Shopping Centre,8:30,line 1  ,
+13,Oshawa Centre,Whitby GO,8:41,52 then 96,
+14,Oakville GO,Oakville Place,8:14,120,
+15,Burlington GO,Oakville Trafalgar Memorial Hospital,8:51,2 then 5,
+16,Milton GO,Square One Shopping Centre,8:53,GO bus 22 to Trafalgar Rd @ Hwy 407 P&R then GO bus 40,confirmed from screenshot 2026-09-14
+17,Pearson Airport Terminal 1,Square One Shopping Centre,9:17,22 then 40,
+18,Kennedy Station,Union Station,8:42,stouville line,

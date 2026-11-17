@@ -143,6 +143,7 @@ tests/               unit tests and the routing benchmark
 data/                OpenStreetMap patch for missing park-and-ride lots
 docs/                runbooks, routing and design notes, known issues, plans
 deploy/              scripts for hosting it (page on Vercel, engines on a small server)
+research/            a study of where GTA transit serves people worst, built on the same engine
 setup.sh, run.sh, stop.sh, refresh.sh
 ```
 

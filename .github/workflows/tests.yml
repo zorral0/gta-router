@@ -41,10 +41,16 @@ jobs:
         run: python3 tests/check-feeds.py
 
       - name: Python scripts compile
-        run: python3 -m py_compile scripts/*.py tests/*.py
+        run: |
+          python3 -m py_compile scripts/*.py tests/*.py
+          find research -name '*.py' -print0 | xargs -0 python3 -m py_compile
+
+      # the research study's travel-time map reader, on two pinned sample maps
+      - name: Research map reader
+        run: python3 research/phase2/test_surface.py
 
       - name: Shell scripts parse
-        run: for f in *.sh scripts/*.sh deploy/*.sh; do bash -n "$f"; done
+        run: for f in *.sh scripts/*.sh deploy/*.sh research/phase2/*.sh; do bash -n "$f"; done
 
       # every spelling: a plain grep for the character misses the HTML entities
       - name: No em dashes in the app's text

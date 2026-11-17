@@ -1,0 +1,14 @@
+certifi==2026.7.22
+charset-normalizer==3.5.1
+geopandas==1.1.4
+idna==3.19
+numpy==2.5.3
+packaging==26.3
+pandas==3.0.5
+pyogrio==0.13.0
+pyproj==3.8.0
+python-dateutil==2.9.0.post0
+requests==2.34.2
+shapely==2.1.2
+six==1.17.0
+urllib3==2.7.0

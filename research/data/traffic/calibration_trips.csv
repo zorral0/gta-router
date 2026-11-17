@@ -1,0 +1,16 @@
+trip,from,to,engine_km,engine_min,engine_kmh,google_min_low,google_min_high,notes,google_mid,ratio_low,ratio_mid,ratio_high,road_type
+1,Union Station,Yonge & Eglinton,8.1,20.2,24.0,18,45,,31.5,0.89,1.56,2.23,city
+2,Kensington Market,Pape & Danforth,6.5,17.6,22.3,16,35,,25.5,0.91,1.45,1.99,city
+3,Jane & Finch,Yorkdale Shopping Centre,11.8,10.5,67.4,14,35,,24.5,1.33,2.33,3.33,highway
+4,Scarborough Town Centre,Kennedy Station,6.7,13.1,30.8,12,26,,19.0,0.92,1.45,1.98,city
+5,Square One Shopping Centre,Port Credit GO,7.2,17.8,24.5,14,35,,24.5,0.79,1.38,1.97,city
+6,Mount Joy GO,CF Markville,5.2,11.2,27.9,9,18,,13.5,0.8,1.21,1.61,city
+7,Oakville GO,Oakville Place,3.0,7.1,25.7,5,9,,7.0,0.7,0.99,1.27,city
+8,Brampton GO,Bramalea City Centre,4.9,11.3,25.9,8,20,,14.0,0.71,1.24,1.77,city
+9,Union Station,Pearson Airport Terminal 1,33.2,28.4,70.2,26,50,,38.0,0.92,1.34,1.76,highway
+10,Oshawa Centre,Whitby GO,7.6,10.5,43.6,6,14,,10.0,0.57,0.95,1.33,city
+11,Vaughan Metropolitan Centre,Yorkdale Shopping Centre,16.0,14.3,67.1,18,40,,29.0,1.26,2.03,2.8,highway
+12,Scarborough Town Centre,Fairview Mall,10.5,13.8,45.7,12,24,,18.0,0.87,1.3,1.74,highway
+13,Milton GO,Square One Shopping Centre,30.1,26.0,69.4,24,45,,34.5,0.92,1.33,1.73,highway
+14,Richmond Hill Centre (Yonge & Hwy 7),CF Markville,15.0,17.3,52.1,14,40,,27.0,0.81,1.56,2.31,highway
+15,Burlington GO,Oakville Trafalgar Memorial Hospital,19.3,23.2,50.1,18,40,,29.0,0.78,1.25,1.72,highway

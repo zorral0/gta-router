@@ -230,7 +230,8 @@ The docs, and when to read each:
 
 On the owner's computer only, never in the repository: the Metrolinx key
 (`metrolinx.env`), everything downloaded or built in `engine/`, the
-recordings (`recordings/`), the research study (`research/`), an unused
+recordings (`recordings/`), the research study's data, notes and drafts (its
+scripts ARE in the repository, see `research/README.md`), an unused
 fare calculator (`scripts/costs.py`), the 2005 guide the subway boarding
 data came from (a PDF), a design note for an unbuilt feature
 (`HANDOFF-go-union-door.md`), and older working notes
